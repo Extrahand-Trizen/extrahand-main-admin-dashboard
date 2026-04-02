@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 2,
+  "dockerfilePath": "./Dockerfile",
+
+  "buildArguments": {
+    "CACHE_BUST": "build-2026-01-06-01",
+    "NEXT_PUBLIC_API_URL": "https://extrahand-main-admin-service.apps.extrahand.in"
+  },
+
+  "expose": {
+    "web": {
+      "containerPort": 3000,
+      "httpPort": 80,
+      "httpsPort": 443
+    }
+  },
+
+  "healthcheck": {
+    "path": "/",
+    "port": 3000,
+    "interval": 30,
+    "timeout": 10,
+    "retries": 3,
+    "startPeriod": 30
+  },
+
+  "envVars": {
+    "NODE_ENV": "production",
+    "PORT": "3000",
+    "NEXT_TELEMETRY_DISABLED": "1",
+    "NEXT_PUBLIC_API_URL": "https://extrahand-main-admin-service.apps.extrahand.in"
+  },
+
+  "instanceCount": 1,
+
+  "hasPersistentData": false,
+
+  "customDomain": "",
+  "forceSsl": true,
+
+  "restart": {
+    "policy": "unless-stopped",
+    "maximumRetryCount": 10
+  },
+
+  "resources": {
+    "memory": "512Mi",
+    "cpu": "0.5"
+  },
+
+  "networking": {
+    "publishAllPorts": false,
+    "enableTcpProxy": false
+  },
+
+  "volumes": [],
+
+  "tags": [
+    "nextjs",
+    "nodejs",
+    "typescript",
+    "react",
+    "admin",
+    "extrahand",
+    "main-admin",
+    "caprover"
+  ],
+
+  "description": "ExtraHand Main Admin Dashboard - Next.js standalone build deployed via CapRover"
+}
