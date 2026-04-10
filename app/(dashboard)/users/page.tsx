@@ -344,7 +344,7 @@ export default function UsersPage() {
                         <TableCell>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                             <div className="flex items-center gap-3">
-                              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 text-amber-700 font-medium">
+                              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-yellow-100 text-yellow-700 font-medium">
                                 {user.name?.charAt(0).toUpperCase() ||
                                   user.email.charAt(0).toUpperCase()}
                               </div>

@@ -73,7 +73,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                     <span className="text-xs text-gray-500">{user.role}</span>
                   </div>
                 </div>
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-amber-100 text-amber-700 font-medium text-sm">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-yellow-100 text-yellow-700 font-medium text-sm">
                   {user.name.charAt(0).toUpperCase()}
                 </div>
                 <ChevronDown className="h-4 w-4 text-gray-500 hidden sm:block" />
@@ -85,7 +85,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                   <p className="text-sm font-medium">{user.name}</p>
                   <p className="text-xs text-gray-500">{user.email}</p>
                   {user.isSuperAdmin && (
-                    <span className="text-xs text-amber-600 font-medium">
+                    <span className="text-xs text-yellow-600 font-medium">
                       Super Admin
                     </span>
                   )}

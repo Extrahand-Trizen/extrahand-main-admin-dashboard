@@ -97,7 +97,7 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <div className="flex h-16 items-center justify-between border-b border-gray-200 px-6 bg-gradient-to-r from-amber-50 to-yellow-50">
+        <div className="flex h-16 items-center justify-between border-b border-gray-200 px-6 bg-gradient-to-r from-yellow-50 to-yellow-100">
           <div className="flex items-center gap-3">
             <Image
               src="/logo.png"
@@ -136,14 +136,14 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
                   isActive
-                    ? 'bg-amber-50 text-amber-700 border-l-4 border-amber-500 shadow-sm'
-                    : 'text-gray-600 hover:bg-amber-50/50 hover:text-amber-600'
+                    ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
+                    : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
                 )}
               >
                 <item.icon
                   className={cn(
                     'h-5 w-5',
-                    isActive ? 'text-amber-600' : 'text-gray-400'
+                    isActive ? 'text-yellow-600' : 'text-gray-400'
                   )}
                 />
                 {item.name}
@@ -159,15 +159,15 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
                 className={cn(
                   'flex items-center justify-between w-full rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
                   isAdminPath
-                    ? 'bg-amber-50 text-amber-700'
-                    : 'text-gray-600 hover:bg-amber-50/50 hover:text-amber-600'
+                    ? 'bg-yellow-50 text-yellow-700'
+                    : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
                 )}
               >
                 <div className="flex items-center gap-3">
                   <Shield
                     className={cn(
                       'h-5 w-5',
-                      isAdminPath ? 'text-amber-600' : 'text-gray-400'
+                      isAdminPath ? 'text-yellow-600' : 'text-gray-400'
                     )}
                   />
                   <span>Super Admin</span>
@@ -193,14 +193,14 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
                         className={cn(
                           'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
                           isActive
-                            ? 'bg-amber-50 text-amber-700 border-l-4 border-amber-500 shadow-sm'
-                            : 'text-gray-600 hover:bg-amber-50/50 hover:text-amber-600'
+                            ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
+                            : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
                         )}
                       >
                         <item.icon
                           className={cn(
                             'h-4 w-4 ml-2',
-                            isActive ? 'text-amber-600' : 'text-gray-400'
+                            isActive ? 'text-yellow-600' : 'text-gray-400'
                           )}
                         />
                         {item.name}

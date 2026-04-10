@@ -33,8 +33,8 @@ export default function AnalyticsPage() {
       value: analytics?.posters.totalRegistered ?? 0,
       subtitle: 'Registered posters',
       icon: Users,
-      color: 'text-amber-600',
-      bg: 'bg-amber-50',
+      color: 'text-yellow-600',
+      bg: 'bg-yellow-50',
     },
     {
       title: 'Total Taskers',
@@ -110,7 +110,7 @@ export default function AnalyticsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <BarChart3 className="h-5 w-5 text-amber-600" />
+            <BarChart3 className="h-5 w-5 text-yellow-600" />
             Metrics snapshot
           </CardTitle>
           <CardDescription>
@@ -119,7 +119,7 @@ export default function AnalyticsPage() {
               : 'No analytics data available yet.'}
           </CardDescription>
           {analytics?.partial?.taskServiceUnavailable && (
-            <CardDescription className="text-amber-600">
+            <CardDescription className="text-yellow-600">
               Task service is currently unavailable. User counts are shown; task counts may be 0 temporarily.
             </CardDescription>
           )}
