@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { listUsers } from '@/lib/api/users';
 import { listTasks } from '@/lib/api/tasks';
-import { listTickets } from '@/lib/api/support';
 import { formatDate } from '@/lib/utils';
 import Link from 'next/link';
 import { usePermissions } from '@/lib/hooks/usePermissions';
@@ -17,8 +16,6 @@ interface DashboardStats {
   activeUsers: number;
   totalTasks: number;
   openTasks: number;
-  totalTickets: number;
-  newTickets: number;
 }
 
 export default function DashboardPage() {
@@ -40,14 +37,6 @@ export default function DashboardPage() {
     retry: false,
   });
 
-  // Fetch tickets data
-  const { data: ticketsData, isLoading: ticketsLoading, error: ticketsError } = useQuery({
-    queryKey: ['tickets', 'stats'],
-    queryFn: () => listTickets({ limit: 1 }),
-    enabled: hasPermission('support.ticket.list'),
-    retry: false,
-  });
-
   // Calculate stats - handle errors gracefully
   const stats: DashboardStats = {
     totalUsers: usersError ? 0 : (usersData?.pagination?.total || 0),
@@ -56,12 +45,9 @@ export default function DashboardPage() {
     totalTasks: tasksError ? 0 : (tasksData?.pagination?.total || 0),
     openTasks:
       tasksError ? 0 : (tasksData?.data?.filter((t: any) => t.status === "open").length || 0),
-    totalTickets: ticketsError ? 0 : (ticketsData?.pagination?.total || 0),
-    newTickets:
-      ticketsError ? 0 : (ticketsData?.data?.filter((t: any) => t.status === "new").length || 0),
   };
 
-  const isLoading = usersLoading || tasksLoading || ticketsLoading;
+  const isLoading = usersLoading || tasksLoading;
 
   const statCards = [
     {
@@ -83,16 +69,6 @@ export default function DashboardPage() {
       bg: 'bg-blue-50',
       href: '/tasks',
       permission: 'task.list',
-    },
-    {
-      title: 'Support Tickets',
-      value: stats.totalTickets,
-      subtitle: `${stats.newTickets} new`,
-      icon: MessageSquare,
-      color: 'text-green-600',
-      bg: 'bg-green-50',
-      href: '/support/tickets',
-      permission: 'support.ticket.list',
     },
     {
       title: 'Disputes',

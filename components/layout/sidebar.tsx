@@ -7,14 +7,12 @@ import {
   LayoutDashboard,
   Users,
   Briefcase,
-  HelpCircle,
-  FileText,
+  BarChart3,
   Settings,
   X,
   ChevronDown,
   ChevronRight,
   Shield,
-  MessageSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -41,16 +39,10 @@ const navigation: Array<{
     permission: 'task.list',
   },
   {
-    name: 'Support Tickets',
-    href: '/support/tickets',
-    icon: MessageSquare,
-    permission: 'support.ticket.list',
-  },
-  {
-    name: 'Support Articles',
-    href: '/support/articles',
-    icon: FileText,
-    permission: 'content.list',
+    name: 'Analytics',
+    href: '/analytics',
+    icon: BarChart3,
+    permission: 'analytics.view',
   },
 ];
 

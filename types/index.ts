@@ -5,8 +5,8 @@ export interface User {
   email: string;
   name: string;
   phone?: string;
-  role: 'tasker' | 'poster' | 'requester' | 'both';
-  roles?: ('tasker' | 'requester' | 'both')[];
+  role: 'tasker' | 'poster' | 'unknown';
+  roles?: ('tasker' | 'poster')[];
   userType?: 'individual' | 'business';
   status: 'active' | 'suspended' | 'banned' | 'inactive';
   isVerified: boolean;
@@ -257,6 +257,25 @@ export interface ApiResponse<T> {
     limit: number;
     total: number;
     pages: number;
+  };
+}
+
+export interface AnalyticsOverview {
+  posters: {
+    totalRegistered: number;
+  };
+  taskers: {
+    totalRegistered: number;
+  };
+  tasks: {
+    total: number;
+    open: number;
+    inProgress: number;
+    completed: number;
+  };
+  generatedAt: string;
+  partial?: {
+    taskServiceUnavailable?: boolean;
   };
 }
 

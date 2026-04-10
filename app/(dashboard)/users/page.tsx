@@ -73,6 +73,14 @@ const statusColors: Record<string, string> = {
   inactive: "secondary",
 };
 
+const getRoleLabel = (role?: string) => {
+  if (!role) return "N/A";
+  const normalizedRole = role.toLowerCase();
+  if (normalizedRole === "tasker") return "tasker";
+  if (normalizedRole === "poster") return "poster";
+  return "N/A";
+};
+
 export default function UsersPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -353,12 +361,12 @@ export default function UsersPage() {
                               <Badge variant={statusColors[user.status] as any}>
                                 {user.status}
                               </Badge>
-                              <Badge variant="outline">{user.role}</Badge>
+                              <Badge variant="outline">{getRoleLabel(user.role)}</Badge>
                             </div>
                           </div>
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
-                          <Badge variant="outline">{user.role}</Badge>
+                          <Badge variant="outline">{getRoleLabel(user.role)}</Badge>
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
                           <Badge variant={statusColors[user.status] as any}>
