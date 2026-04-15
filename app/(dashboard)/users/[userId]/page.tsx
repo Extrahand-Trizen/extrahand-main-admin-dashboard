@@ -170,6 +170,12 @@ export default function UserDetailsPage() {
   };
 
   const user = data?.data;
+  const ratingValue = Number(user?.rating ?? 0);
+  const totalReviewsValue = Number(user?.totalReviews ?? 0);
+  const totalTasksValue = Number(user?.totalTasks ?? 0);
+  const completedTasksValue = Number(user?.completedTasks ?? 0);
+  const postedTasksValue = Number(user?.postedTasks ?? 0);
+  const earnedAmountValue = Number(user?.earnedAmount ?? 0);
 
   const statusColors: Record<string, string> = {
     active: "success",
@@ -393,83 +399,51 @@ export default function UserDetailsPage() {
                 <CardDescription>Key performance metrics</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {user.rating !== undefined && (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Star className="h-4 w-4 text-amber-500" />
-                      <span className="text-sm text-gray-600">Rating</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg font-semibold">
-                        {user.rating.toFixed(1)}
-                      </span>
-                      <span className="text-sm text-gray-500">/ 5.0</span>
-                    </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Star className="h-4 w-4 text-amber-500" />
+                    <span className="text-sm text-gray-600">Rating</span>
                   </div>
-                )}
-                {user.totalReviews !== undefined && (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm text-gray-600">
-                        Total Reviews
-                      </span>
-                    </div>
-                    <span className="text-lg font-semibold">
-                      {user.totalReviews}
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-semibold">{ratingValue.toFixed(1)}</span>
+                    <span className="text-sm text-gray-500">/ 5.0</span>
                   </div>
-                )}
-                {user.totalTasks !== undefined && (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Briefcase className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm text-gray-600">Total Tasks</span>
-                    </div>
-                    <span className="text-lg font-semibold">
-                      {user.totalTasks}
-                    </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-gray-400" />
+                    <span className="text-sm text-gray-600">Total Reviews</span>
                   </div>
-                )}
-                {user.completedTasks !== undefined && (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-green-500" />
-                      <span className="text-sm text-gray-600">
-                        Completed Tasks
-                      </span>
-                    </div>
-                    <span className="text-lg font-semibold">
-                      {user.completedTasks}
-                    </span>
+                  <span className="text-lg font-semibold">{totalReviewsValue}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="h-4 w-4 text-gray-400" />
+                    <span className="text-sm text-gray-600">Total Tasks</span>
                   </div>
-                )}
-                {user.postedTasks !== undefined && (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-blue-500" />
-                      <span className="text-sm text-gray-600">
-                        Posted Tasks
-                      </span>
-                    </div>
-                    <span className="text-lg font-semibold">
-                      {user.postedTasks}
-                    </span>
+                  <span className="text-lg font-semibold">{totalTasksValue}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <span className="text-sm text-gray-600">Completed Tasks</span>
                   </div>
-                )}
-                {user.earnedAmount !== undefined && (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-green-500" />
-                      <span className="text-sm text-gray-600">
-                        Total Earned
-                      </span>
-                    </div>
-                    <span className="text-lg font-semibold">
-                      {formatCurrency(user.earnedAmount)}
-                    </span>
+                  <span className="text-lg font-semibold">{completedTasksValue}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-blue-500" />
+                    <span className="text-sm text-gray-600">Posted Tasks</span>
                   </div>
-                )}
+                  <span className="text-lg font-semibold">{postedTasksValue}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-green-500" />
+                    <span className="text-sm text-gray-600">Total Earned</span>
+                  </div>
+                  <span className="text-lg font-semibold">{formatCurrency(earnedAmountValue)}</span>
+                </div>
               </CardContent>
             </Card>
           </div>

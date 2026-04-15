@@ -278,6 +278,12 @@ export interface AnalyticsOverview {
     taskServiceUnavailable?: boolean;
   };
 }
+export type {
+  AnalyticsRange,
+  PosterAnalytics,
+  PosterVerificationComparison,
+  TaskCategoryBreakdown,
+} from './analytics-contracts';
 
 // Filter Types
 export interface UserFilters {
