@@ -55,7 +55,9 @@ export default function DashboardPage() {
       (tasksError ? 0 : (tasksData?.pagination?.total || 0)),
     openTasks:
       analyticsOverviewData?.data?.tasks?.open ??
-      (tasksError ? 0 : (tasksData?.data?.filter((t: any) => t.status === "open").length || 0)),
+      (tasksError
+        ? 0
+        : (tasksData?.data?.filter((t: any) => t.status === "open")?.length ?? 0)),
   };
 
   const isLoading = usersLoading || tasksLoading;
