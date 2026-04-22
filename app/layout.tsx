@@ -11,8 +11,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "ExtraHand - Main Admin Dashboard",
-  description: "Main Admin Dashboard for ExtraHand Platform Management",
+  title: "ExtraHand - ExtraHand Operations Portal",
+  description: "ExtraHand Operations Portal for ExtraHand Platform Management",
   icons: {
     icon: "/logo.png",
     apple: "/logo.png",

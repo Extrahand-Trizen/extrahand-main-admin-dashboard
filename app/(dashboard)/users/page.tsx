@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
   Search,
-  Filter,
   MoreVertical,
   Ban,
   UserX,
@@ -89,6 +88,9 @@ export default function UsersPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [aadhaarFilter, setAadhaarFilter] = useState<string>("all");
+  const [createdFrom, setCreatedFrom] = useState<string>("");
+  const [createdTo, setCreatedTo] = useState<string>("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -103,12 +105,30 @@ export default function UsersPage() {
   });
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["users", search, statusFilter, roleFilter, page, limit],
+    queryKey: [
+      "users",
+      search,
+      statusFilter,
+      roleFilter,
+      aadhaarFilter,
+      createdFrom,
+      createdTo,
+      page,
+      limit,
+    ],
     queryFn: () =>
       listUsers({
         search: search || undefined,
         status: statusFilter !== "all" ? statusFilter : undefined,
         role: roleFilter !== "all" ? roleFilter : undefined,
+        isAadhaarVerified:
+          aadhaarFilter === "verified"
+            ? true
+            : aadhaarFilter === "not_verified"
+              ? false
+              : undefined,
+        createdFrom: createdFrom || undefined,
+        createdTo: createdTo || undefined,
         page,
         limit,
       }),
@@ -214,6 +234,36 @@ export default function UsersPage() {
     pages: 1,
   };
 
+  const { data: registeredCountData } = useQuery({
+    queryKey: ["users-registered-count", createdFrom, createdTo],
+    queryFn: () =>
+      listUsers({
+        createdFrom: createdFrom || undefined,
+        createdTo: createdTo || undefined,
+        page: 1,
+        limit: 1,
+      }),
+    enabled: hasPermission("user.list"),
+    retry: false,
+  });
+
+  const { data: verifiedCountData } = useQuery({
+    queryKey: ["users-verified-count", createdFrom, createdTo],
+    queryFn: () =>
+      listUsers({
+        isAadhaarVerified: true,
+        createdFrom: createdFrom || undefined,
+        createdTo: createdTo || undefined,
+        page: 1,
+        limit: 1,
+      }),
+    enabled: hasPermission("user.list"),
+    retry: false,
+  });
+
+  const registeredInRange = registeredCountData?.pagination?.total ?? 0;
+  const verifiedInRange = verifiedCountData?.pagination?.total ?? 0;
+
   if (!hasPermission("user.list")) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -240,7 +290,7 @@ export default function UsersPage() {
           <CardTitle className="text-lg">Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
             <div className="space-y-2">
               <Label htmlFor="search">Search</Label>
               <div className="relative">
@@ -297,9 +347,93 @@ export default function UsersPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="aadhaar">Aadhaar</Label>
+              <Select
+                value={aadhaarFilter}
+                onValueChange={(value) => {
+                  setAadhaarFilter(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger id="aadhaar">
+                  <SelectValue placeholder="All users" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All users</SelectItem>
+                  <SelectItem value="verified">Aadhaar verified</SelectItem>
+                  <SelectItem value="not_verified">Aadhaar not verified</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="createdFrom">Created from</Label>
+              <Input
+                id="createdFrom"
+                type="date"
+                value={createdFrom}
+                onChange={(e) => {
+                  setCreatedFrom(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="createdTo">Created to</Label>
+              <Input
+                id="createdTo"
+                type="date"
+                value={createdTo}
+                onChange={(e) => {
+                  setCreatedTo(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>&nbsp;</Label>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setSearch("");
+                  setStatusFilter("all");
+                  setRoleFilter("all");
+                  setAadhaarFilter("all");
+                  setCreatedFrom("");
+                  setCreatedTo("");
+                  setPage(1);
+                }}
+              >
+                Reset
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-gray-600">
+              Registered users{createdFrom || createdTo ? " in selected date range" : ""}
+            </p>
+            <p className="text-2xl font-semibold text-gray-900">
+              {Number(registeredInRange).toLocaleString()}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-gray-600">
+              Aadhaar verified{createdFrom || createdTo ? " in selected date range" : ""}
+            </p>
+            <p className="text-2xl font-semibold text-gray-900">
+              {Number(verifiedInRange).toLocaleString()}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Users Table */}
       <Card>

@@ -43,6 +43,7 @@ import {
   suspendUser,
   unsuspendUser,
 } from "@/lib/api/users";
+import { listTasks, listApplications } from "@/lib/api/tasks";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { formatDate, formatDateTime, formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
@@ -61,6 +62,12 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
+const TASKS_PER_PAGE = 5;
+const OFFERS_PER_PAGE = 5;
+
+const getTaskIdentifier = (task: any): string =>
+  task?.taskId || task?._id || task?.id || "";
+
 export default function UserDetailsPage() {
   const params = useParams();
   const router = useRouter();
@@ -77,6 +84,9 @@ export default function UserDetailsPage() {
     action: null,
     reason: "",
   });
+  const [postedTasksPage, setPostedTasksPage] = useState(1);
+  const [activeTasksPage, setActiveTasksPage] = useState(1);
+  const [offersPage, setOffersPage] = useState(1);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["user", userId],
@@ -170,6 +180,7 @@ export default function UserDetailsPage() {
   };
 
   const user = data?.data;
+  const profileId = String((user as any)?._id || (user as any)?.profileId || "");
   const ratingValue = Number(user?.rating ?? 0);
   const totalReviewsValue = Number(user?.totalReviews ?? 0);
   const totalTasksValue = Number(user?.totalTasks ?? 0);
@@ -182,6 +193,68 @@ export default function UserDetailsPage() {
     suspended: "warning",
     banned: "destructive",
     inactive: "secondary",
+  };
+
+  const { data: postedTasksResponse, isLoading: postedTasksLoading } = useQuery({
+    queryKey: ["user-posted-tasks", profileId, postedTasksPage],
+    queryFn: () =>
+      listTasks({
+        posterId: profileId,
+        page: postedTasksPage,
+        limit: TASKS_PER_PAGE,
+      }),
+    enabled: Boolean(profileId) && hasPermission("task.list"),
+    retry: false,
+  });
+
+  const postedTasks = postedTasksResponse?.data || [];
+  const postedTasksPagination = postedTasksResponse?.pagination || {
+    page: 1,
+    limit: TASKS_PER_PAGE,
+    total: 0,
+    pages: 1,
+  };
+
+  const { data: activeTasksResponse, isLoading: activeTasksLoading } = useQuery({
+    queryKey: ["user-active-assigned-tasks", profileId, activeTasksPage],
+    queryFn: () =>
+      listTasks({
+        assigneeId: profileId,
+        status: "assigned,started,in_progress,review",
+        page: activeTasksPage,
+        limit: TASKS_PER_PAGE,
+      }),
+    enabled: Boolean(profileId) && hasPermission("task.list"),
+    retry: false,
+  });
+
+  const activeAssignedTasks = activeTasksResponse?.data || [];
+  const activeTasksPagination = activeTasksResponse?.pagination || {
+    page: 1,
+    limit: TASKS_PER_PAGE,
+    total: 0,
+    pages: 1,
+  };
+
+  const { data: offersResponse, isLoading: offersLoading } = useQuery({
+    queryKey: ["user-offers", profileId, offersPage],
+    queryFn: () =>
+      listApplications({
+        mine: true,
+        profileId,
+        page: offersPage,
+        limit: OFFERS_PER_PAGE,
+      }),
+    enabled: Boolean(profileId) && hasPermission("task.application.list"),
+    retry: false,
+  });
+
+  const offers = offersResponse?.data || [];
+  const offersPagination = offersResponse?.pagination || {
+    page: 1,
+    limit: OFFERS_PER_PAGE,
+    total: 0,
+    pages: 1,
   };
 
   if (!hasPermission("user.view")) {
@@ -1154,6 +1227,315 @@ export default function UserDetailsPage() {
               </CardContent>
             </Card>
           </div>
+
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-gray-600">Active Task (Working)</p>
+                <p className="text-2xl font-semibold">
+                  {activeAssignedTasks.length > 0 ? "Yes" : "No"}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-gray-600">Current Active Tasks</p>
+                <p className="text-2xl font-semibold">
+                  {activeTasksPagination.total || 0}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-gray-600">Offers Made</p>
+                <p className="text-2xl font-semibold">
+                  {offersPagination.total || 0}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-gray-600">Tasks Posted</p>
+                <p className="text-2xl font-semibold">
+                  {postedTasksPagination.total || 0}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Tasks currently working on */}
+          {hasPermission("task.list") && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Tasks Currently Working On</CardTitle>
+                <CardDescription>
+                  Tasks where this user is assigned and actively working
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {activeTasksLoading ? (
+                  <div className="space-y-3">
+                    {[...Array(2)].map((_, i) => (
+                      <Skeleton key={i} className="h-14 w-full" />
+                    ))}
+                  </div>
+                ) : activeAssignedTasks.length === 0 ? (
+                  <p className="text-sm text-gray-500">No active assigned tasks.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {activeAssignedTasks.map((task: any) => {
+                      const taskIdentifier = getTaskIdentifier(task);
+                      return (
+                        <div
+                          key={taskIdentifier || `${task.title}-${task.createdAt}`}
+                          className="rounded-lg border p-3"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-medium text-sm text-gray-900 truncate">
+                                {task.title || "Untitled task"}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {formatDateTime(task.createdAt)}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="warning">{task.status || "assigned"}</Badge>
+                              {taskIdentifier ? (
+                                <Button size="sm" variant="outline" asChild>
+                                  <Link href={`/tasks/${taskIdentifier}`}>View</Link>
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {activeTasksPagination.pages > 1 && (
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setActiveTasksPage((prev) => Math.max(1, prev - 1))
+                          }
+                          disabled={activeTasksPagination.page <= 1}
+                        >
+                          Prev
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setActiveTasksPage((prev) =>
+                              Math.min(activeTasksPagination.pages, prev + 1),
+                            )
+                          }
+                          disabled={activeTasksPagination.page >= activeTasksPagination.pages}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Tasks user made offers on */}
+          {hasPermission("task.application.list") && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Tasks User Made Offers On</CardTitle>
+                <CardDescription>
+                  Offer history and related task details
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {offersLoading ? (
+                  <div className="space-y-3">
+                    {[...Array(2)].map((_, i) => (
+                      <Skeleton key={i} className="h-14 w-full" />
+                    ))}
+                  </div>
+                ) : offers.length === 0 ? (
+                  <p className="text-sm text-gray-500">No offers found for this user.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {offers.map((offer: any) => {
+                      const task = offer.taskId;
+                      const taskIdentifier = getTaskIdentifier(task);
+                      return (
+                        <div
+                          key={offer.id || offer._id}
+                          className="rounded-lg border p-3"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-medium text-sm text-gray-900 truncate">
+                                {task?.title || "Unknown task"}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Offer status: {offer.status || "pending"}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">{offer.status || "pending"}</Badge>
+                              {taskIdentifier ? (
+                                <Button size="sm" variant="outline" asChild>
+                                  <Link href={`/tasks/${taskIdentifier}`}>View</Link>
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {offersPagination.pages > 1 && (
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setOffersPage((prev) => Math.max(1, prev - 1))}
+                          disabled={offersPagination.page <= 1}
+                        >
+                          Prev
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setOffersPage((prev) =>
+                              Math.min(offersPagination.pages, prev + 1),
+                            )
+                          }
+                          disabled={offersPagination.page >= offersPagination.pages}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Posted Tasks */}
+          {hasPermission("task.list") && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Tasks Posted by User</CardTitle>
+                <CardDescription>
+                  Recent tasks created by this user profile
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {!profileId ? (
+                  <p className="text-sm text-gray-500">
+                    User profile id not available for task lookup.
+                  </p>
+                ) : postedTasksLoading ? (
+                  <div className="space-y-3">
+                    {[...Array(3)].map((_, i) => (
+                      <Skeleton key={i} className="h-14 w-full" />
+                    ))}
+                  </div>
+                ) : postedTasks.length === 0 ? (
+                  <p className="text-sm text-gray-500">No posted tasks found.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {postedTasks.map((task: any) => {
+                      const taskIdentifier = getTaskIdentifier(task);
+                      return (
+                        <div
+                          key={taskIdentifier || `${task.title}-${task.createdAt}`}
+                          className="rounded-lg border p-3"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-medium text-sm text-gray-900 truncate">
+                                {task.title || "Untitled task"}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {formatDateTime(task.createdAt)}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant={
+                                  task.status === "completed"
+                                    ? "default"
+                                    : task.status === "in_progress"
+                                      ? "warning"
+                                      : task.status === "cancelled"
+                                        ? "destructive"
+                                        : "success"
+                                }
+                              >
+                                {task.status || "open"}
+                              </Badge>
+                              {taskIdentifier ? (
+                                <Button size="sm" variant="outline" asChild>
+                                  <Link href={`/tasks/${taskIdentifier}`}>
+                                    View
+                                  </Link>
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="mt-2 flex items-center justify-between text-xs text-gray-600">
+                            <span>{task.category || "Uncategorized"}</span>
+                            <span>{formatCurrency(Number(task.budget || 0))}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {postedTasksPagination.pages > 1 && (
+                      <div className="flex items-center justify-between pt-2">
+                        <p className="text-xs text-gray-600">
+                          Showing {(postedTasksPagination.page - 1) * postedTasksPagination.limit + 1} to{" "}
+                          {Math.min(
+                            postedTasksPagination.page * postedTasksPagination.limit,
+                            postedTasksPagination.total,
+                          )}{" "}
+                          of {postedTasksPagination.total}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setPostedTasksPage((prev) => Math.max(1, prev - 1))
+                            }
+                            disabled={postedTasksPagination.page <= 1}
+                          >
+                            Prev
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setPostedTasksPage((prev) =>
+                                Math.min(postedTasksPagination.pages, prev + 1),
+                              )
+                            }
+                            disabled={
+                              postedTasksPagination.page >= postedTasksPagination.pages
+                            }
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Business Tab */}

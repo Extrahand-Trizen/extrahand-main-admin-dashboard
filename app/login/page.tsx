@@ -92,9 +92,9 @@ export default function LoginPage() {
               className="rounded-lg"
             />
           </div>
-          <CardTitle className="text-2xl font-bold text-gray-900">Admin Dashboard</CardTitle>
+          <CardTitle className="text-2xl font-bold text-gray-900">ExtraHand Operations Portal</CardTitle>
           <CardDescription className="text-sm text-gray-500 mt-2">
-            Sign in to access the ExtraHand Admin Dashboard
+            Sign in to access the ExtraHand Operations Portal
           </CardDescription>
         </CardHeader>
         <CardContent>

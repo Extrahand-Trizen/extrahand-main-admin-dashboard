@@ -12,9 +12,30 @@ export async function listTasks(filters?: TaskFilters): Promise<ApiResponse<Task
   if (filters?.status) params.append('status', filters.status);
   if (filters?.category) params.append('category', filters.category);
   if (filters?.posterId) params.append('posterId', filters.posterId);
+  if (filters?.assigneeId) params.append('assigneeId', filters.assigneeId);
 
   const query = params.toString();
   return apiRequest<ApiResponse<Task[]>>(`/api/v1/tasks${query ? `?${query}` : ''}`);
+}
+
+export async function listApplications(filters?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  taskId?: string;
+  mine?: boolean;
+  profileId?: string;
+}): Promise<ApiResponse<any[]>> {
+  const params = new URLSearchParams();
+  if (filters?.page) params.append('page', filters.page.toString());
+  if (filters?.limit) params.append('limit', filters.limit.toString());
+  if (filters?.status) params.append('status', filters.status);
+  if (filters?.taskId) params.append('taskId', filters.taskId);
+  if (filters?.mine) params.append('mine', 'true');
+  if (filters?.profileId) params.append('profileId', filters.profileId);
+
+  const query = params.toString();
+  return apiRequest<ApiResponse<any[]>>(`/api/v1/applications${query ? `?${query}` : ''}`);
 }
 
 /**

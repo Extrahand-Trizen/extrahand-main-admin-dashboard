@@ -1,11 +1,12 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { Users, Briefcase, MessageSquare, AlertTriangle, TrendingUp, ArrowRight } from 'lucide-react';
+import { Users, Briefcase, AlertTriangle, TrendingUp, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { listUsers } from '@/lib/api/users';
 import { listTasks } from '@/lib/api/tasks';
+import { getAnalyticsOverview } from '@/lib/api/analytics';
 import { formatDate } from '@/lib/utils';
 import Link from 'next/link';
 import { usePermissions } from '@/lib/hooks/usePermissions';
@@ -37,14 +38,24 @@ export default function DashboardPage() {
     retry: false,
   });
 
+  const { data: analyticsOverviewData } = useQuery({
+    queryKey: ['analytics', 'overview', 'dashboard-card'],
+    queryFn: getAnalyticsOverview,
+    enabled: hasPermission('analytics.view'),
+    retry: false,
+  });
+
   // Calculate stats - handle errors gracefully
   const stats: DashboardStats = {
     totalUsers: usersError ? 0 : (usersData?.pagination?.total || 0),
     activeUsers:
       usersError ? 0 : (usersData?.data?.filter((u: any) => u.status === "active").length || 0),
-    totalTasks: tasksError ? 0 : (tasksData?.pagination?.total || 0),
+    totalTasks:
+      analyticsOverviewData?.data?.tasks?.total ??
+      (tasksError ? 0 : (tasksData?.pagination?.total || 0)),
     openTasks:
-      tasksError ? 0 : (tasksData?.data?.filter((t: any) => t.status === "open").length || 0),
+      analyticsOverviewData?.data?.tasks?.open ??
+      (tasksError ? 0 : (tasksData?.data?.filter((t: any) => t.status === "open").length || 0)),
   };
 
   const isLoading = usersLoading || tasksLoading;
@@ -80,6 +91,16 @@ export default function DashboardPage() {
       href: '#',
       permission: null,
     },
+    {
+      title: 'Taskers Aadhaar Verified',
+      value: analyticsOverviewData?.data?.taskers?.aadhaarVerified ?? 0,
+      subtitle: 'Tasker profiles only',
+      icon: Users,
+      color: 'text-emerald-700',
+      bg: 'bg-emerald-50',
+      href: '/analytics',
+      permission: 'analytics.view',
+    },
   ];
 
   const quickActions = [
@@ -96,20 +117,6 @@ export default function DashboardPage() {
       href: '/tasks',
       icon: Briefcase,
       permission: 'task.list',
-    },
-    {
-      title: 'Support Tickets',
-      description: 'Handle customer support requests',
-      href: '/support/tickets',
-      icon: MessageSquare,
-      permission: 'support.ticket.list',
-    },
-    {
-      title: 'Support Articles',
-      description: 'Manage knowledge base articles',
-      href: '/support/articles',
-      icon: MessageSquare,
-      permission: 'content.list',
     },
   ];
 

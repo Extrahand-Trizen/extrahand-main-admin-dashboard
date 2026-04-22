@@ -54,3 +54,88 @@ export interface TaskCategoryBreakdown {
   generatedAt: string;
 }
 
+export interface TaskCategoryPerformance {
+  range: string;
+  totals: {
+    posted: number;
+    open: number;
+    active: number;
+    completed: number;
+    cancelled: number;
+    completionRate: number;
+    cancellationRate: number;
+  };
+  categories: Array<{
+    category: string;
+    posted: number;
+    open: number;
+    active: number;
+    completed: number;
+    cancelled: number;
+    completionRate: number;
+    cancellationRate: number;
+    fulfillmentRate: number;
+  }>;
+  generatedAt: string;
+}
+
+export interface TaskCancellationAnalytics {
+  range: string;
+  totals: {
+    totalTasks: number;
+    cancelledTasks: number;
+    cancellationRate: number;
+    cancelledBeforeAssignment: number;
+    cancelledAfterAssignment: number;
+  };
+  trend: Array<{
+    date: string;
+    totalTasks: number;
+    cancelledTasks: number;
+    cancellationRate: number;
+  }>;
+  categories: Array<{
+    category: string;
+    totalTasks: number;
+    cancelledTasks: number;
+    cancellationRate: number;
+  }>;
+  generatedAt: string;
+}
+
+export interface UserAnalytics {
+  userId: string;
+  range: string;
+  profile: {
+    profileId: string;
+    uid: string;
+    name: string;
+    email?: string;
+    role: 'tasker' | 'poster' | 'unknown';
+    roles: Array<'tasker' | 'poster'>;
+    isVerified: boolean;
+    isAadhaarVerified: boolean;
+    isPANVerified: boolean;
+    isBankVerified: boolean;
+  };
+  poster: {
+    postedTasks: number;
+    totalBidsReceived: number;
+    tasksWithAtLeastOneBid: number;
+    openTasks: number;
+    activeTasks: number;
+    completedTasks: number;
+    questionsAskedOnMyTasks: number;
+  };
+  tasker: {
+    applicationsPlaced: number;
+    acceptedApplications: number;
+    pendingApplications: number;
+    activeAssignedTasks: number;
+    completedAssignedTasks: number;
+    questionsAsked: number;
+    answersGiven: number;
+  };
+  generatedAt: string;
+}
+

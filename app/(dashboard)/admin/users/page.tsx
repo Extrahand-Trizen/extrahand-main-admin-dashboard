@@ -143,7 +143,7 @@ export default function AdminUsersPage() {
                       <TableCell>
                         {user.isSuperAdmin ? (
                           <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100 border-purple-200">
-                            Super Admin
+                            Operational Admin
                           </Badge>
                         ) : (
                           <Badge variant="outline">Admin</Badge>

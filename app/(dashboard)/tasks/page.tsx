@@ -59,6 +59,9 @@ import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableSkeleton } from "@/components/LoadingSkeleton";
 
+const getTaskIdentifier = (task: Partial<Task> & { _id?: string; id?: string }) =>
+  task.taskId || task._id || task.id || "";
+
 const statusColors: Record<string, string> = {
   open: "success",
   in_progress: "warning",
@@ -123,8 +126,15 @@ export default function TasksPage() {
       toast.error("Reason is required");
       return;
     }
+    const taskIdentifier = getTaskIdentifier(
+      selectedTask as Partial<Task> & { _id?: string; id?: string },
+    );
+    if (!taskIdentifier) {
+      toast.error("Task identifier missing. Please refresh and try again.");
+      return;
+    }
     deleteMutation.mutate({
-      taskId: selectedTask.taskId,
+      taskId: taskIdentifier,
       reason: deleteDialog.reason,
     });
   };
@@ -273,8 +283,12 @@ export default function TasksPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {tasks.map((task) => (
-                      <TableRow key={task.taskId}>
+                    {tasks.map((task) => {
+                      const taskIdentifier = getTaskIdentifier(
+                        task as Partial<Task> & { _id?: string; id?: string },
+                      );
+                      return (
+                      <TableRow key={taskIdentifier || `${task.title}-${task.createdAt}`}>
                         <TableCell>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                             <div className="flex items-center gap-3">
@@ -325,7 +339,9 @@ export default function TasksPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem asChild>
-                                <Link href={`/tasks/${task.taskId}`}>
+                                <Link
+                                  href={taskIdentifier ? `/tasks/${taskIdentifier}` : "/tasks"}
+                                >
                                   <Eye className="mr-2 h-4 w-4" />
                                   View Details
                                 </Link>
@@ -333,7 +349,11 @@ export default function TasksPage() {
                               {hasPermission("task.update") && (
                                 <DropdownMenuItem asChild>
                                   <Link
-                                    href={`/tasks/${task.taskId}?edit=true`}
+                                    href={
+                                      taskIdentifier
+                                        ? `/tasks/${taskIdentifier}?edit=true`
+                                        : "/tasks"
+                                    }
                                   >
                                     <Edit className="mr-2 h-4 w-4" />
                                     Edit Task
@@ -353,7 +373,8 @@ export default function TasksPage() {
                           </DropdownMenu>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>

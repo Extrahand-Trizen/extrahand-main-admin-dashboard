@@ -1,4 +1,5 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+let refreshInFlight: Promise<string | null> | null = null;
 
 if (!API_BASE_URL) {
   throw new Error('NEXT_PUBLIC_API_URL environment variable is required');
@@ -7,6 +8,54 @@ if (!API_BASE_URL) {
 /**
  * Get fresh admin token (JWT-based, refreshes if expired)
  */
+async function refreshAccessToken(): Promise<string | null> {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  if (refreshInFlight) {
+    return refreshInFlight;
+  }
+
+  refreshInFlight = (async () => {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json();
+      if (!data.success || !data.data?.accessToken) {
+        return null;
+      }
+
+      localStorage.setItem('accessToken', data.data.accessToken);
+      if (data.data.refreshToken) {
+        localStorage.setItem('refreshToken', data.data.refreshToken);
+      }
+
+      return data.data.accessToken as string;
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      return null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+}
+
 async function getAdminToken(): Promise<string | null> {
   if (typeof window === 'undefined') {
     return null;
@@ -21,29 +70,9 @@ async function getAdminToken(): Promise<string | null> {
       
       // If token expires in less than 5 minutes, try to refresh
       if (payload.exp && payload.exp - now < 300) {
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (refreshToken) {
-          try {
-            const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ refreshToken }),
-            });
-
-            if (response.ok) {
-              const data = await response.json();
-              if (data.success && data.data?.accessToken) {
-                localStorage.setItem('accessToken', data.data.accessToken);
-                if (data.data.refreshToken) {
-                  localStorage.setItem('refreshToken', data.data.refreshToken);
-                }
-                return data.data.accessToken;
-              }
-            }
-          } catch (error) {
-            // Refresh failed, continue with existing token
-            console.error('Token refresh failed:', error);
-          }
+        const refreshedToken = await refreshAccessToken();
+        if (refreshedToken) {
+          return refreshedToken;
         }
       }
       
@@ -83,54 +112,55 @@ export async function apiRequest<T>(
 
   if (response.status === 401) {
     // Token expired, try to refresh once
-    const refreshToken = localStorage.getItem('refreshToken');
-    if (refreshToken) {
-      try {
-        const refreshResponse = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken }),
-        });
+    const refreshedAccessToken = await refreshAccessToken();
 
-        if (refreshResponse.ok) {
-          const refreshData = await refreshResponse.json();
-          if (refreshData.success && refreshData.data?.accessToken) {
-            localStorage.setItem('accessToken', refreshData.data.accessToken);
-            if (refreshData.data.refreshToken) {
-              localStorage.setItem('refreshToken', refreshData.data.refreshToken);
-            }
-            
-            // Retry original request with new token
-            const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
-              ...options,
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${refreshData.data.accessToken}`,
-                ...options.headers,
-              },
-            });
-            
-            if (!retryResponse.ok) {
-              throw new Error(`API request failed: ${retryResponse.statusText}`);
-            }
-            
-            return await retryResponse.json();
-          }
-        }
-      } catch (error) {
-        // Refresh failed, clear tokens and redirect to login
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        window.location.href = '/login';
-        throw new Error('Session expired. Please login again.');
-      }
+    // If refresh did not produce a new access token, treat session as expired.
+    if (!refreshedAccessToken) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      window.location.href = '/login';
+      throw new Error('Session expired. Please login again.');
     }
-    
-    // No refresh token, redirect to login
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    window.location.href = '/login';
-    throw new Error('Session expired. Please login again.');
+
+    // Retry original request with refreshed token.
+    const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${refreshedAccessToken}`,
+        ...options.headers,
+      },
+    });
+
+    // Retry can fail for many reasons (permissions/service errors) and should not force logout.
+    if (retryResponse.status === 401) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      window.location.href = '/login';
+      throw new Error('Session expired. Please login again.');
+    }
+
+    if (!retryResponse.ok) {
+      if (retryResponse.status === 404) {
+        console.warn(`API endpoint not found: ${endpoint}`);
+        return null as T;
+      }
+
+      const retryErrorData = await retryResponse
+        .json()
+        .catch(() => ({ error: retryResponse.statusText }));
+      const retryErrorMessage =
+        retryErrorData.error || `API request failed: ${retryResponse.statusText}`;
+      console.error(`API Error (${retryResponse.status}):`, retryErrorMessage);
+
+      if (retryResponse.status >= 500) {
+        throw new Error(retryErrorMessage);
+      }
+
+      return null as T;
+    }
+
+    return await retryResponse.json();
   }
 
   if (!response.ok) {

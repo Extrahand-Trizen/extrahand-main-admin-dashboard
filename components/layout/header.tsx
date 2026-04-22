@@ -23,6 +23,12 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
 
+  const displayRole = (role?: string) => {
+    if (!role) return '';
+    if (role === 'super_admin') return 'operational_admin';
+    return role;
+  };
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -70,7 +76,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                 <div className="hidden sm:flex items-center gap-2 text-sm">
                   <div className="flex flex-col items-end">
                     <span className="font-medium text-gray-900">{user.name}</span>
-                    <span className="text-xs text-gray-500">{user.role}</span>
+                    <span className="text-xs text-gray-500">{displayRole(user.role)}</span>
                   </div>
                 </div>
                 <div className="flex items-center justify-center w-8 h-8 rounded-full bg-yellow-100 text-yellow-700 font-medium text-sm">
@@ -86,7 +92,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                   <p className="text-xs text-gray-500">{user.email}</p>
                   {user.isSuperAdmin && (
                     <span className="text-xs text-yellow-600 font-medium">
-                      Super Admin
+                      Operational Admin
                     </span>
                   )}
                 </div>

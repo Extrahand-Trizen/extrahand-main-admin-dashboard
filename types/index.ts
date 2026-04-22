@@ -266,6 +266,7 @@ export interface AnalyticsOverview {
   };
   taskers: {
     totalRegistered: number;
+    aadhaarVerified?: number;
   };
   tasks: {
     total: number;
@@ -283,6 +284,9 @@ export type {
   PosterAnalytics,
   PosterVerificationComparison,
   TaskCategoryBreakdown,
+  TaskCategoryPerformance,
+  TaskCancellationAnalytics,
+  UserAnalytics,
 } from './analytics-contracts';
 
 // Filter Types
@@ -290,6 +294,9 @@ export interface UserFilters {
   search?: string;
   status?: string;
   role?: string;
+  isAadhaarVerified?: boolean;
+  createdFrom?: string;
+  createdTo?: string;
   page?: number;
   limit?: number;
 }
@@ -299,6 +306,7 @@ export interface TaskFilters {
   status?: string;
   category?: string;
   posterId?: string;
+  assigneeId?: string;
   page?: number;
   limit?: number;
 }

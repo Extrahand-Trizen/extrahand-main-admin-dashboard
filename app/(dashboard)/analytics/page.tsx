@@ -12,7 +12,9 @@ import {
   getAnalyticsOverview,
   getPosterAnalytics,
   getPosterVerificationComparison,
+  getTaskCancellationAnalytics,
   getTaskCategoryBreakdown,
+  getTaskCategoryPerformance,
 } from '@/lib/api/analytics';
 
 export default function AnalyticsPage() {
@@ -48,6 +50,20 @@ export default function AnalyticsPage() {
     retry: false,
   });
 
+  const { data: categoryPerformanceData } = useQuery({
+    queryKey: ['analytics', 'task-category-performance'],
+    queryFn: () => getTaskCategoryPerformance('30d'),
+    enabled: hasPermission('analytics.view'),
+    retry: false,
+  });
+
+  const { data: cancellationData } = useQuery({
+    queryKey: ['analytics', 'task-cancellations'],
+    queryFn: () => getTaskCancellationAnalytics('30d'),
+    enabled: hasPermission('analytics.view'),
+    retry: false,
+  });
+
   if (!hasPermission('analytics.view')) {
     return (
       <div className="space-y-4">
@@ -61,6 +77,8 @@ export default function AnalyticsPage() {
   const comparison = comparisonData?.data;
   const posterAnalytics = posterAnalyticsData?.data;
   const categoryBreakdown = categoryBreakdownData?.data;
+  const categoryPerformance = categoryPerformanceData?.data;
+  const cancellations = cancellationData?.data;
   const cards = [
     {
       title: 'Total Posters',
@@ -213,6 +231,115 @@ export default function AnalyticsPage() {
                 )}
               </div>
             ))
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Task Category Performance (Last 30 days)</CardTitle>
+          <CardDescription>
+            Monitor completion, fulfillment, and cancellation rates by category.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-lg border p-3">
+              <p className="text-xs text-gray-500">Overall completion rate</p>
+              <p className="text-lg font-semibold text-gray-900">
+                {categoryPerformance?.totals.completionRate ?? 0}%
+              </p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-xs text-gray-500">Overall cancellation rate</p>
+              <p className="text-lg font-semibold text-gray-900">
+                {categoryPerformance?.totals.cancellationRate ?? 0}%
+              </p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-xs text-gray-500">Cancelled tasks</p>
+              <p className="text-lg font-semibold text-gray-900">
+                {categoryPerformance?.totals.cancelled ?? 0}
+              </p>
+            </div>
+          </div>
+
+          {(categoryPerformance?.categories || []).length === 0 ? (
+            <p className="text-sm text-gray-500">No category performance data available yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {(categoryPerformance?.categories || []).slice(0, 10).map((row) => (
+                <div key={`perf-${row.category}`} className="rounded-lg border p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-gray-800">{row.category}</p>
+                    <p className="text-xs text-gray-500">Posted: {row.posted}</p>
+                  </div>
+                  <div className="mt-2 grid gap-1 md:grid-cols-3">
+                    <p className="text-xs text-gray-600">Completed: {row.completed}</p>
+                    <p className="text-xs text-gray-600">Active: {row.active}</p>
+                    <p className="text-xs text-gray-600">Cancelled: {row.cancelled}</p>
+                    <p className="text-xs text-gray-600">Completion: {row.completionRate}%</p>
+                    <p className="text-xs text-gray-600">Fulfillment: {row.fulfillmentRate}%</p>
+                    <p className="text-xs text-gray-600">Cancellation: {row.cancellationRate}%</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Task Cancellation Analytics (Last 30 days)</CardTitle>
+          <CardDescription>
+            Track cancellation levels and whether they occur before or after assignment.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-4">
+            <div className="rounded-lg border p-3">
+              <p className="text-xs text-gray-500">Cancellation rate</p>
+              <p className="text-lg font-semibold text-gray-900">
+                {cancellations?.totals.cancellationRate ?? 0}%
+              </p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-xs text-gray-500">Cancelled tasks</p>
+              <p className="text-lg font-semibold text-gray-900">
+                {cancellations?.totals.cancelledTasks ?? 0}
+              </p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-xs text-gray-500">Before assignment</p>
+              <p className="text-lg font-semibold text-gray-900">
+                {cancellations?.totals.cancelledBeforeAssignment ?? 0}
+              </p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-xs text-gray-500">After assignment</p>
+              <p className="text-lg font-semibold text-gray-900">
+                {cancellations?.totals.cancelledAfterAssignment ?? 0}
+              </p>
+            </div>
+          </div>
+
+          {(cancellations?.categories || []).length === 0 ? (
+            <p className="text-sm text-gray-500">No cancellation-by-category data available yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {(cancellations?.categories || []).slice(0, 10).map((row) => (
+                <div
+                  key={`cancel-${row.category}`}
+                  className="flex items-center justify-between rounded-lg border p-3"
+                >
+                  <p className="text-sm font-medium text-gray-800">{row.category}</p>
+                  <p className="text-xs text-gray-600">
+                    {row.cancelledTasks}/{row.totalTasks} ({row.cancellationRate}%)
+                  </p>
+                </div>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>

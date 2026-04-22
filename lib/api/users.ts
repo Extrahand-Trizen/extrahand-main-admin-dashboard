@@ -11,6 +11,11 @@ export async function listUsers(filters?: UserFilters): Promise<ApiResponse<User
   if (filters?.search) params.append('search', filters.search);
   if (filters?.status) params.append('status', filters.status);
   if (filters?.role) params.append('role', filters.role);
+  if (typeof filters?.isAadhaarVerified === 'boolean') {
+    params.append('isAadhaarVerified', String(filters.isAadhaarVerified));
+  }
+  if (filters?.createdFrom) params.append('createdFrom', filters.createdFrom);
+  if (filters?.createdTo) params.append('createdTo', filters.createdTo);
 
   const query = params.toString();
   return apiRequest<ApiResponse<User[]>>(`/api/v1/users${query ? `?${query}` : ''}`);

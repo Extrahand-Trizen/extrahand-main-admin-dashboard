@@ -63,6 +63,25 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+const formatLocationDisplay = (location: unknown): string => {
+  if (!location) return "Not specified";
+  if (typeof location === "string") return location;
+  if (typeof location === "object") {
+    const loc = location as {
+      address?: string;
+      city?: string;
+      state?: string;
+      country?: string;
+    };
+    return (
+      loc.address ||
+      [loc.city, loc.state, loc.country].filter(Boolean).join(", ") ||
+      "Location available"
+    );
+  }
+  return "Location available";
+};
+
 export default function TaskDetailsPage() {
   const params = useParams();
   const router = useRouter();
@@ -70,6 +89,7 @@ export default function TaskDetailsPage() {
   const queryClient = useQueryClient();
   const { hasPermission } = usePermissions();
   const taskId = params.taskId as string;
+  const isValidTaskId = Boolean(taskId && taskId !== "undefined" && taskId !== "null");
   const isEditMode = searchParams.get("edit") === "true";
 
   const [deleteDialog, setDeleteDialog] = useState<{
@@ -88,14 +108,17 @@ export default function TaskDetailsPage() {
   } = useQuery({
     queryKey: ["task", taskId],
     queryFn: () => getTask(taskId),
-    enabled: !!taskId && hasPermission("task.view"),
+    enabled: isValidTaskId && hasPermission("task.view"),
   });
 
   const { data: applicationsData, isLoading: applicationsLoading } = useQuery({
     queryKey: ["task-applications", taskId, applicationsPage],
     queryFn: () =>
       getTaskApplications(taskId, { page: applicationsPage, limit: 10 }),
-    enabled: !!taskId && hasPermission("task.application.list"),
+    enabled:
+      isValidTaskId &&
+      hasPermission("task.view") &&
+      hasPermission("task.application.list"),
   });
 
   const deleteMutation = useMutation({
@@ -135,6 +158,10 @@ export default function TaskDetailsPage() {
   };
 
   const confirmDelete = () => {
+    if (!isValidTaskId) {
+      toast.error("Invalid task id");
+      return;
+    }
     if (!deleteDialog.reason.trim()) {
       toast.error("Reason is required");
       return;
@@ -177,6 +204,26 @@ export default function TaskDetailsPage() {
         <p className="text-gray-500">
           You don't have permission to view task details.
         </p>
+      </div>
+    );
+  }
+
+  if (!isValidTaskId) {
+    return (
+      <div className="space-y-6">
+        <Link href="/tasks">
+          <Button variant="ghost" size="sm">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Tasks
+          </Button>
+        </Link>
+        <Card>
+          <CardContent className="py-8">
+            <div className="text-center text-red-600">
+              Invalid task id. Please open task details from the list again.
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -237,7 +284,9 @@ export default function TaskDetailsPage() {
           </Link>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">{task.title}</h1>
-            <p className="mt-1 text-sm text-gray-600">Task ID: {task.taskId}</p>
+            <p className="mt-1 text-sm text-gray-600">
+              Task ID: {task.taskId || (task as any)._id || taskId}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -316,7 +365,7 @@ export default function TaskDetailsPage() {
                     </Label>
                     <div className="mt-1 flex items-center gap-2 text-sm text-gray-900">
                       <MapPin className="h-4 w-4 text-gray-400" />
-                      {task.location}
+                      {formatLocationDisplay(task.location)}
                     </div>
                   </div>
                 )}
