@@ -10,6 +10,7 @@ export interface User {
   userType?: 'individual' | 'business';
   status: 'active' | 'suspended' | 'banned' | 'inactive';
   isVerified: boolean;
+  isEmailVerified?: boolean;
   isActive?: boolean;
   photoURL?: string;
   createdAt: string;

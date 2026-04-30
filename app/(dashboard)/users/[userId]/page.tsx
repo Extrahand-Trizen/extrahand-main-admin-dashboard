@@ -14,7 +14,7 @@ import {
   MapPin,
   Star,
   Briefcase,
-  DollarSign,
+  IndianRupee,
   Award,
   Building2,
   CheckCircle2,
@@ -187,6 +187,11 @@ export default function UserDetailsPage() {
   const completedTasksValue = Number(user?.completedTasks ?? 0);
   const postedTasksValue = Number(user?.postedTasks ?? 0);
   const earnedAmountValue = Number(user?.earnedAmount ?? 0);
+  const isEmailVerified = Boolean(user?.isEmailVerified ?? user?.isVerified);
+  const isPhoneVerified =
+    typeof user?.phoneVerified === "boolean"
+      ? user.phoneVerified
+      : Boolean(user?.phone);
 
   const statusColors: Record<string, string> = {
     active: "success",
@@ -512,7 +517,7 @@ export default function UserDetailsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 text-green-500" />
+                    <IndianRupee className="h-4 w-4 text-green-500" />
                     <span className="text-sm text-gray-600">Total Earned</span>
                   </div>
                   <span className="text-lg font-semibold">{formatCurrency(earnedAmountValue)}</span>
@@ -534,7 +539,7 @@ export default function UserDetailsPage() {
                     <p className="text-sm font-medium text-gray-700">Email</p>
                     <p className="text-xs text-gray-500">Verification</p>
                   </div>
-                  {user.isVerified ? (
+                  {isEmailVerified ? (
                     <CheckCircle2 className="h-5 w-5 text-green-500" />
                   ) : (
                     <XCircle className="h-5 w-5 text-gray-400" />
@@ -545,7 +550,7 @@ export default function UserDetailsPage() {
                     <p className="text-sm font-medium text-gray-700">Phone</p>
                     <p className="text-xs text-gray-500">Verification</p>
                   </div>
-                  {user.phoneVerified ? (
+                  {isPhoneVerified ? (
                     <CheckCircle2 className="h-5 w-5 text-green-500" />
                   ) : (
                     <XCircle className="h-5 w-5 text-gray-400" />

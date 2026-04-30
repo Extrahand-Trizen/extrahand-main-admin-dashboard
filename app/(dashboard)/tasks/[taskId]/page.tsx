@@ -6,7 +6,7 @@ import {
   ArrowLeft,
   Calendar,
   MapPin,
-  DollarSign,
+  IndianRupee,
   User,
   FileText,
   Trash2,
@@ -389,7 +389,15 @@ export default function TaskDetailsPage() {
           {hasPermission("task.application.list") && (
             <Card>
               <CardHeader>
-                <CardTitle>Applications</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Applications</CardTitle>
+                  <Badge variant="secondary">
+                    {applicationsPagination.total || 0}{" "}
+                    {(applicationsPagination.total || 0) === 1
+                      ? "application"
+                      : "applications"}
+                  </Badge>
+                </div>
                 <CardDescription>
                   Task applications and their status
                 </CardDescription>
@@ -565,7 +573,7 @@ export default function TaskDetailsPage() {
                   Budget
                 </Label>
                 <div className="mt-1 flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-gray-400" />
+                  <IndianRupee className="h-4 w-4 text-gray-400" />
                   <span className="text-sm font-semibold text-gray-900">
                     {formatCurrency(task.budget)}
                   </span>

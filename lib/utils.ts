@@ -44,10 +44,25 @@ export function formatDateTime(date: string | Date): string {
   });
 }
 
-export function formatCurrency(amount: number): string {
+export function formatCurrency(amount: number | string | null | undefined): string {
+  const numericAmount =
+    typeof amount === 'number'
+      ? amount
+      : typeof amount === 'string'
+        ? Number(amount)
+        : NaN;
+
+  if (!Number.isFinite(numericAmount)) {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0,
+    }).format(0);
+  }
+
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(numericAmount);
 }
