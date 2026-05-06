@@ -109,7 +109,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                placeholder="admin@extrahand.in"
+                placeholder="operationsmanager@extrahand.in"
                 className="border-gray-300 focus:border-amber-500 focus:ring-amber-500"
                 autoComplete="email"
               />
