@@ -194,6 +194,75 @@ export interface TaskApplication {
   createdAt: string;
 }
 
+export interface PaymentOverview {
+  metrics: {
+    totalPayins: string | null;
+    totalRefunds: string | null;
+    totalPayouts: string | null;
+    capturedCount: number;
+    failedCount: number;
+    successRate: number;
+  };
+  alerts: Array<{
+    type: string;
+    count: number;
+    windowHours?: number;
+  }>;
+}
+
+export interface PaymentTransaction {
+  escrowId: string;
+  razorpayOrderId: string;
+  razorpayPaymentId: string | null;
+  taskId: string;
+  posterUid: string;
+  performerUid: string;
+  status: string;
+  paymentStatus: string | null;
+  amountInRupees: string | null;
+  createdAt: string;
+  links?: {
+    posterUserId?: string;
+    performerUserId?: string;
+    taskId?: string;
+    posterName?: string;
+    taskTitle?: string;
+    taskerName?: string;
+  };
+}
+
+export interface PaymentPayout {
+  payoutId: string;
+  performerUid: string;
+  taskId?: string;
+  posterUid?: string;
+  amount: string;
+  netAmount: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface PaymentRefund {
+  refundId: string;
+  paymentId: string;
+  taskId?: string;
+  posterUid?: string;
+  performerUid?: string;
+  refundAmount: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface PaymentLedgerEntry {
+  transactionId: string;
+  type: string;
+  amount: string;
+  taskId?: string;
+  posterUid?: string;
+  performerUid?: string;
+  createdAt: string;
+}
+
 // Support Types
 export interface SupportTicket {
   _id: string;

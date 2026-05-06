@@ -8,6 +8,7 @@ import {
   Users,
   Briefcase,
   BarChart3,
+  CreditCard,
   Settings,
   X,
   ChevronDown,
@@ -38,12 +39,14 @@ const navigation: Array<{
     icon: Briefcase,
     permission: 'task.list',
   },
-  {
-    name: 'Analytics',
-    href: '/analytics',
-    icon: BarChart3,
-    permission: 'analytics.view',
-  },
+];
+
+const paymentItems = [
+  { name: 'Overview', href: '/payments/overview' },
+  { name: 'Transactions', href: '/payments/transactions' },
+  { name: 'Payouts', href: '/payments/payouts' },
+  { name: 'Refunds', href: '/payments/refunds' },
+  { name: 'Ledger', href: '/payments/ledger' },
 ];
 
 // Super Admin section items
@@ -64,6 +67,9 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
   const { hasPermission } = usePermissions();
   const [superAdminSectionOpen, setSuperAdminSectionOpen] = useState(
     pathname?.startsWith('/admin')
+  );
+  const [paymentsSectionOpen, setPaymentsSectionOpen] = useState(
+    pathname?.startsWith('/payments')
   );
 
   const handleLinkClick = () => {
@@ -150,6 +156,83 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
               </Link>
             );
           })}
+
+          {hasPermission('payment.list') && (
+            <div className="space-y-1">
+              <button
+                onClick={() => setPaymentsSectionOpen(!paymentsSectionOpen)}
+                className={cn(
+                  'flex items-center justify-between w-full rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                  pathname?.startsWith('/payments')
+                    ? 'bg-yellow-50 text-yellow-700'
+                    : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <CreditCard
+                    className={cn(
+                      'h-5 w-5',
+                      pathname?.startsWith('/payments')
+                        ? 'text-yellow-600'
+                        : 'text-gray-400'
+                    )}
+                  />
+                  <span>Payments</span>
+                </div>
+                {paymentsSectionOpen ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </button>
+              {paymentsSectionOpen && (
+                <div className="ml-6 space-y-1">
+                  {paymentItems.map((item) => {
+                    const isActive =
+                      pathname === item.href || pathname?.startsWith(item.href + '/');
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={handleLinkClick}
+                        className={cn(
+                          'block rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
+                          isActive
+                            ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
+                            : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
+                        )}
+                      >
+                        {item.name}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {hasPermission('analytics.view') && (
+            <Link
+              href="/analytics"
+              onClick={handleLinkClick}
+              className={cn(
+                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                pathname === '/analytics' || pathname?.startsWith('/analytics/')
+                  ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
+                  : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
+              )}
+            >
+              <BarChart3
+                className={cn(
+                  'h-5 w-5',
+                  pathname === '/analytics' || pathname?.startsWith('/analytics/')
+                    ? 'text-yellow-600'
+                    : 'text-gray-400'
+                )}
+              />
+              Analytics
+            </Link>
+          )}
 
           {/* Super Admin Section (Collapsible) */}
           {isSuperAdmin && (
