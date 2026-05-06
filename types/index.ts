@@ -5,8 +5,8 @@ export interface User {
   email: string;
   name: string;
   phone?: string;
-  role: 'tasker' | 'poster' | 'unknown';
-  roles?: ('tasker' | 'poster')[];
+  role: 'Helper' | 'Customer' | 'unknown';
+  roles?: ('Helper' | 'Customer')[];
   userType?: 'individual' | 'business';
   status: 'active' | 'suspended' | 'banned' | 'inactive';
   isVerified: boolean;
@@ -103,7 +103,7 @@ export interface User {
   
   // Role Verifications
   roleVerifications?: {
-    tasker?: {
+    Helper?: {
       canAcceptTasks?: boolean;
       verifiedAt?: string;
       requirements?: {
@@ -114,7 +114,7 @@ export interface User {
         emergency?: boolean;
       };
     };
-    poster?: {
+    Customer?: {
       canPostTasks?: boolean;
       verifiedAt?: string;
       requirements?: {
@@ -177,7 +177,7 @@ export interface Task {
   description: string;
   category: string;
   status: 'open' | 'in_progress' | 'completed' | 'cancelled';
-  posterId: string;
+  customerId: string;
   budget: number;
   location?: string;
   createdAt: string;
@@ -187,7 +187,7 @@ export interface Task {
 export interface TaskApplication {
   applicationId: string;
   taskId: string;
-  taskerId: string;
+  helperId: string;
   status: 'pending' | 'accepted' | 'rejected';
   proposedAmount?: number;
   message?: string;
@@ -222,12 +222,12 @@ export interface PaymentTransaction {
   amountInRupees: string | null;
   createdAt: string;
   links?: {
-    posterUserId?: string;
-    performerUserId?: string;
+    customerUserId?: string;
+    helperUserId?: string;
     taskId?: string;
-    posterName?: string;
+    customerName?: string;
     taskTitle?: string;
-    taskerName?: string;
+    helperName?: string;
   };
 }
 
@@ -235,7 +235,7 @@ export interface PaymentPayout {
   payoutId: string;
   performerUid: string;
   taskId?: string;
-  posterUid?: string;
+  CustomerUid?: string;
   amount: string;
   netAmount: string;
   status: string;
@@ -246,7 +246,7 @@ export interface PaymentRefund {
   refundId: string;
   paymentId: string;
   taskId?: string;
-  posterUid?: string;
+  CustomerUid?: string;
   performerUid?: string;
   refundAmount: string;
   status: string;
@@ -258,7 +258,7 @@ export interface PaymentLedgerEntry {
   type: string;
   amount: string;
   taskId?: string;
-  posterUid?: string;
+  CustomerUid?: string;
   performerUid?: string;
   createdAt: string;
 }
@@ -331,10 +331,10 @@ export interface ApiResponse<T> {
 }
 
 export interface AnalyticsOverview {
-  posters: {
+  Customers: {
     totalRegistered: number;
   };
-  taskers: {
+  Helpers: {
     totalRegistered: number;
     aadhaarVerified?: number;
   };
@@ -351,8 +351,8 @@ export interface AnalyticsOverview {
 }
 export type {
   AnalyticsRange,
-  PosterAnalytics,
-  PosterVerificationComparison,
+  CustomerAnalytics,
+  CustomerVerificationComparison,
   TaskCategoryBreakdown,
   TaskCategoryPerformance,
   TaskCancellationAnalytics,
@@ -375,7 +375,7 @@ export interface TaskFilters {
   search?: string;
   status?: string;
   category?: string;
-  posterId?: string;
+  CustomerId?: string;
   assigneeId?: string;
   page?: number;
   limit?: number;

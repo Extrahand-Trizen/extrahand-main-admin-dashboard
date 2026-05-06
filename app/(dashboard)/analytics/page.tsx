@@ -10,8 +10,8 @@ import { StatsCardSkeleton } from '@/components/LoadingSkeleton';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import {
   getAnalyticsOverview,
-  getPosterAnalytics,
-  getPosterVerificationComparison,
+  getCustomerAnalytics,
+  getCustomerVerificationComparison,
   getTaskCancellationAnalytics,
   getTaskCategoryBreakdown,
   getTaskCategoryPerformance,
@@ -19,8 +19,8 @@ import {
 
 export default function AnalyticsPage() {
   const { hasPermission } = usePermissions();
-  const [posterIdInput, setPosterIdInput] = useState('');
-  const [selectedPosterId, setSelectedPosterId] = useState('');
+  const [CustomerIdInput, setCustomerIdInput] = useState('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
 
   const { data, isLoading } = useQuery({
     queryKey: ['analytics', 'overview'],
@@ -31,15 +31,15 @@ export default function AnalyticsPage() {
 
   const { data: comparisonData } = useQuery({
     queryKey: ['analytics', 'verification-comparison'],
-    queryFn: () => getPosterVerificationComparison('30d'),
+    queryFn: () => getCustomerVerificationComparison('30d'),
     enabled: hasPermission('analytics.view'),
     retry: false,
   });
 
-  const { data: posterAnalyticsData, isFetching: isPosterLoading } = useQuery({
-    queryKey: ['analytics', 'poster', selectedPosterId],
-    queryFn: () => getPosterAnalytics(selectedPosterId, '30d'),
-    enabled: hasPermission('analytics.view') && Boolean(selectedPosterId),
+  const { data: CustomerAnalyticsData, isFetching: isCustomerLoading } = useQuery({
+    queryKey: ['analytics', 'Customer', selectedCustomerId],
+    queryFn: () => getCustomerAnalytics(selectedCustomerId, '30d'),
+    enabled: hasPermission('analytics.view') && Boolean(selectedCustomerId),
     retry: false,
   });
 
@@ -75,23 +75,23 @@ export default function AnalyticsPage() {
 
   const analytics = data?.data;
   const comparison = comparisonData?.data;
-  const posterAnalytics = posterAnalyticsData?.data;
+  const CustomerAnalytics = CustomerAnalyticsData?.data;
   const categoryBreakdown = categoryBreakdownData?.data;
   const categoryPerformance = categoryPerformanceData?.data;
   const cancellations = cancellationData?.data;
   const cards = [
     {
-      title: 'Total Posters',
-      value: analytics?.posters.totalRegistered ?? 0,
-      subtitle: 'Registered posters',
+      title: 'Total Customers',
+      value: analytics?.Customers.totalRegistered ?? 0,
+      subtitle: 'Registered Customers',
       icon: Users,
       color: 'text-yellow-600',
       bg: 'bg-yellow-50',
     },
     {
-      title: 'Total Taskers',
-      value: analytics?.taskers.totalRegistered ?? 0,
-      subtitle: 'Registered taskers',
+      title: 'Total Helpers',
+      value: analytics?.Helpers.totalRegistered ?? 0,
+      subtitle: 'Registered Helpers',
       icon: UserCheck,
       color: 'text-indigo-600',
       bg: 'bg-indigo-50',
@@ -127,7 +127,7 @@ export default function AnalyticsPage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>
         <p className="mt-2 text-sm text-gray-600">
-          Platform growth overview for posters, taskers, and tasks.
+          Platform growth overview for Customers, Helpers, and tasks.
         </p>
       </div>
 
@@ -180,24 +180,24 @@ export default function AnalyticsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Verified vs Unverified Posters (Last 30 days)</CardTitle>
+          <CardTitle className="text-base">Verified vs Unverified Customers (Last 30 days)</CardTitle>
           <CardDescription>Compares task posting and bidding behavior by verification status.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <div className="rounded-lg border p-4">
             <p className="text-sm font-medium text-gray-700">Verified</p>
-            <p className="mt-2 text-sm text-gray-600">Posters: {comparison?.verified.posterCount ?? 0}</p>
+            <p className="mt-2 text-sm text-gray-600">Customers: {comparison?.verified.CustomerCount ?? 0}</p>
             <p className="text-sm text-gray-600">Tasks: {comparison?.verified.taskCount ?? 0}</p>
             <p className="text-sm text-gray-600">Bids: {comparison?.verified.bidCount ?? 0}</p>
-            <p className="text-sm text-gray-600">Avg tasks/poster: {comparison?.verified.avgTasksPerPoster ?? 0}</p>
+            <p className="text-sm text-gray-600">Avg tasks/Customer: {comparison?.verified.avgTasksPerCustomer ?? 0}</p>
             <p className="text-sm text-gray-600">Avg bids/task: {comparison?.verified.avgBidsPerTask ?? 0}</p>
           </div>
           <div className="rounded-lg border p-4">
             <p className="text-sm font-medium text-gray-700">Unverified</p>
-            <p className="mt-2 text-sm text-gray-600">Posters: {comparison?.unverified.posterCount ?? 0}</p>
+            <p className="mt-2 text-sm text-gray-600">Customers: {comparison?.unverified.CustomerCount ?? 0}</p>
             <p className="text-sm text-gray-600">Tasks: {comparison?.unverified.taskCount ?? 0}</p>
             <p className="text-sm text-gray-600">Bids: {comparison?.unverified.bidCount ?? 0}</p>
-            <p className="text-sm text-gray-600">Avg tasks/poster: {comparison?.unverified.avgTasksPerPoster ?? 0}</p>
+            <p className="text-sm text-gray-600">Avg tasks/Customer: {comparison?.unverified.avgTasksPerCustomer ?? 0}</p>
             <p className="text-sm text-gray-600">Avg bids/task: {comparison?.unverified.avgBidsPerTask ?? 0}</p>
           </div>
         </CardContent>
@@ -207,7 +207,7 @@ export default function AnalyticsPage() {
         <CardHeader>
           <CardTitle className="text-base">Task Demand by Category (Last 30 days)</CardTitle>
           <CardDescription>
-            Track which categories and subcategories posters are targeting most.
+            Track which categories and subcategories Customers are targeting most.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -346,41 +346,41 @@ export default function AnalyticsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Per-poster Analytics</CardTitle>
-          <CardDescription>Enter poster profile ObjectId (`requesterId`) to inspect task and bid signals.</CardDescription>
+          <CardTitle className="text-base">Per-Customer Analytics</CardTitle>
+          <CardDescription>Enter Customer profile ObjectId (`requesterId`) to inspect task and bid signals.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2">
             <Input
               placeholder="Paste requesterId"
-              value={posterIdInput}
-              onChange={(e) => setPosterIdInput(e.target.value)}
+              value={CustomerIdInput}
+              onChange={(e) => setCustomerIdInput(e.target.value)}
             />
             <Button
               type="button"
-              onClick={() => setSelectedPosterId(posterIdInput.trim())}
-              disabled={!posterIdInput.trim()}
+              onClick={() => setSelectedCustomerId(CustomerIdInput.trim())}
+              disabled={!CustomerIdInput.trim()}
             >
               Load
             </Button>
           </div>
 
-          {selectedPosterId && (
+          {selectedCustomerId && (
             <div className="rounded-lg border p-4">
-              {isPosterLoading ? (
-                <p className="text-sm text-gray-500">Loading poster analytics...</p>
+              {isCustomerLoading ? (
+                <p className="text-sm text-gray-500">Loading Customer analytics...</p>
               ) : (
                 <>
-                  <p className="text-sm font-medium text-gray-700">{posterAnalytics?.profile.name || 'Unknown Poster'}</p>
+                  <p className="text-sm font-medium text-gray-700">{CustomerAnalytics?.profile.name || 'Unknown Customer'}</p>
                   <p className="mt-2 text-sm text-gray-600">
-                    Verification: {posterAnalytics?.profile.isVerified ? 'Verified' : 'Unverified'}
+                    Verification: {CustomerAnalytics?.profile.isVerified ? 'Verified' : 'Unverified'}
                   </p>
-                  <p className="text-sm text-gray-600">Posted tasks: {posterAnalytics?.metrics.postedTasks ?? 0}</p>
-                  <p className="text-sm text-gray-600">Total bids: {posterAnalytics?.metrics.totalBids ?? 0}</p>
-                  <p className="text-sm text-gray-600">Genuine tasks: {posterAnalytics?.metrics.genuineTaskCount ?? 0}</p>
+                  <p className="text-sm text-gray-600">Posted tasks: {CustomerAnalytics?.metrics.postedTasks ?? 0}</p>
+                  <p className="text-sm text-gray-600">Total bids: {CustomerAnalytics?.metrics.totalBids ?? 0}</p>
+                  <p className="text-sm text-gray-600">Genuine tasks: {CustomerAnalytics?.metrics.genuineTaskCount ?? 0}</p>
                   <p className="mt-2 text-sm font-medium text-gray-700">Top categories</p>
                   <div className="mt-1 space-y-1">
-                    {(posterAnalytics?.metrics.categories || []).slice(0, 5).map((item) => (
+                    {(CustomerAnalytics?.metrics.categories || []).slice(0, 5).map((item) => (
                       <p className="text-sm text-gray-600" key={item.category}>
                         {item.category}: {item.count}
                       </p>

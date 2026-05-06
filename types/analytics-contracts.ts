@@ -1,6 +1,6 @@
 export type AnalyticsRange = '7d' | '30d' | '90d';
 
-export interface PosterAnalytics {
+export interface CustomerAnalytics {
   requesterId: string;
   range: string;
   profile: {
@@ -22,20 +22,20 @@ export interface PosterAnalytics {
   generatedAt: string;
 }
 
-export interface PosterVerificationComparison {
+export interface CustomerVerificationComparison {
   range: string;
   verified: {
-    posterCount: number;
+    CustomerCount: number;
     taskCount: number;
     bidCount: number;
-    avgTasksPerPoster: number;
+    avgTasksPerCustomer: number;
     avgBidsPerTask: number;
   };
   unverified: {
-    posterCount: number;
+    CustomerCount: number;
     taskCount: number;
     bidCount: number;
-    avgTasksPerPoster: number;
+    avgTasksPerCustomer: number;
     avgBidsPerTask: number;
   };
   generatedAt: string;
@@ -111,14 +111,14 @@ export interface UserAnalytics {
     uid: string;
     name: string;
     email?: string;
-    role: 'tasker' | 'poster' | 'unknown';
-    roles: Array<'tasker' | 'poster'>;
+    role: 'Helper' | 'Customer' | 'unknown';
+    roles: Array<'Helper' | 'Customer'>;
     isVerified: boolean;
     isAadhaarVerified: boolean;
     isPANVerified: boolean;
     isBankVerified: boolean;
   };
-  poster: {
+  Customer: {
     postedTasks: number;
     totalBidsReceived: number;
     tasksWithAtLeastOneBid: number;
@@ -127,7 +127,7 @@ export interface UserAnalytics {
     completedTasks: number;
     questionsAskedOnMyTasks: number;
   };
-  tasker: {
+  Helper: {
     applicationsPlaced: number;
     acceptedApplications: number;
     pendingApplications: number;

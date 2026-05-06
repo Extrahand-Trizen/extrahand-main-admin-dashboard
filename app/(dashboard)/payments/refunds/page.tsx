@@ -31,7 +31,7 @@ export default function PaymentRefundsPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-3 py-2 text-left">Refund ID</th>
-                  <th className="px-3 py-2 text-left">Poster</th>
+                  <th className="px-3 py-2 text-left">Customer</th>
                   <th className="px-3 py-2 text-left">Task</th>
                   <th className="px-3 py-2 text-left">Performer</th>
                   <th className="px-3 py-2 text-left">Amount</th>
@@ -44,7 +44,7 @@ export default function PaymentRefundsPage() {
                 ) : rows.map((row) => (
                   <tr key={row.refundId} className="border-t">
                     <td className="px-3 py-2 font-mono text-xs">{row.refundId}</td>
-                    <td className="px-3 py-2">{row.posterUid ? <Link className="text-blue-600 hover:underline" href={`/users/${encodeURIComponent(row.posterUid)}`}>{row.posterUid}</Link> : "—"}</td>
+                    <td className="px-3 py-2">{row.CustomerUid ? <Link className="text-blue-600 hover:underline" href={`/users/${encodeURIComponent(row.CustomerUid)}`}>{row.CustomerUid}</Link> : "—"}</td>
                     <td className="px-3 py-2">{row.taskId ? <Link className="text-blue-600 hover:underline" href={`/tasks/${encodeURIComponent(row.taskId)}`}>{row.taskId}</Link> : "—"}</td>
                     <td className="px-3 py-2">{row.performerUid ? <Link className="text-blue-600 hover:underline" href={`/users/${encodeURIComponent(row.performerUid)}`}>{row.performerUid}</Link> : "—"}</td>
                     <td className="px-3 py-2">₹{row.refundAmount}</td>

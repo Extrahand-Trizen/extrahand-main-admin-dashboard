@@ -75,8 +75,8 @@ const statusColors: Record<string, string> = {
 const getRoleLabel = (role?: string) => {
   if (!role) return "N/A";
   const normalizedRole = role.toLowerCase();
-  if (normalizedRole === "tasker") return "tasker";
-  if (normalizedRole === "poster") return "poster";
+  if (normalizedRole === "Helper") return "Helper";
+  if (normalizedRole === "Customer") return "Customer";
   return "N/A";
 };
 
@@ -342,8 +342,8 @@ export default function UsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value="tasker">Tasker</SelectItem>
-                  <SelectItem value="poster">Poster</SelectItem>
+                  <SelectItem value="Helper">Helper</SelectItem>
+                  <SelectItem value="Customer">Customer</SelectItem>
                 </SelectContent>
               </Select>
             </div>

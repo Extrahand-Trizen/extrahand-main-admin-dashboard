@@ -2,8 +2,8 @@ import { apiRequest } from './client';
 import {
   AnalyticsOverview,
   ApiResponse,
-  PosterAnalytics,
-  PosterVerificationComparison,
+  CustomerAnalytics,
+  CustomerVerificationComparison,
   TaskCategoryBreakdown,
   TaskCategoryPerformance,
   TaskCancellationAnalytics,
@@ -14,18 +14,18 @@ export async function getAnalyticsOverview(): Promise<ApiResponse<AnalyticsOverv
   return apiRequest<ApiResponse<AnalyticsOverview>>('/api/v1/analytics/overview');
 }
 
-export async function getPosterAnalytics(
+export async function getCustomerAnalytics(
   requesterId: string,
   range: '7d' | '30d' | '90d' = '30d'
-): Promise<ApiResponse<PosterAnalytics>> {
-  return apiRequest<ApiResponse<PosterAnalytics>>(`/api/v1/analytics/posters/${requesterId}?range=${range}`);
+): Promise<ApiResponse<CustomerAnalytics>> {
+  return apiRequest<ApiResponse<CustomerAnalytics>>(`/api/v1/analytics/Customers/${requesterId}?range=${range}`);
 }
 
-export async function getPosterVerificationComparison(
+export async function getCustomerVerificationComparison(
   range: '7d' | '30d' | '90d' = '30d'
-): Promise<ApiResponse<PosterVerificationComparison>> {
-  return apiRequest<ApiResponse<PosterVerificationComparison>>(
-    `/api/v1/analytics/posters/verification-comparison?range=${range}`
+): Promise<ApiResponse<CustomerVerificationComparison>> {
+  return apiRequest<ApiResponse<CustomerVerificationComparison>>(
+    `/api/v1/analytics/Customers/verification-comparison?range=${range}`
   );
 }
 

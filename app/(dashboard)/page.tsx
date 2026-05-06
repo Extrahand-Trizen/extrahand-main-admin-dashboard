@@ -92,9 +92,9 @@ export default function DashboardPage() {
       permission: null,
     },
     {
-      title: 'Taskers Aadhaar Verified',
-      value: analyticsOverviewData?.data?.taskers?.aadhaarVerified ?? 0,
-      subtitle: 'Tasker profiles only',
+      title: 'Helpers Aadhaar Verified',
+      value: analyticsOverviewData?.data?.Helpers?.aadhaarVerified ?? 0,
+      subtitle: 'Helper profiles only',
       icon: Users,
       color: 'text-emerald-700',
       bg: 'bg-emerald-50',

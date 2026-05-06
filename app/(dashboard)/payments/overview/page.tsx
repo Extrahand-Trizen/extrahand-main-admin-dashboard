@@ -46,7 +46,7 @@ export default function PaymentsOverviewPage() {
     {
       title: "Total Refunds",
       value: `₹${metrics?.totalRefunds ?? "0.00"}`,
-      subtitle: "Refunded to posters",
+      subtitle: "Refunded to Customers",
       icon: RefreshCcw,
       color: "text-orange-600",
       bg: "bg-orange-50",

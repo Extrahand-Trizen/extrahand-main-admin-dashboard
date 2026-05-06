@@ -34,7 +34,7 @@ export default function PaymentTransactionsPage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Payment Transactions</h1>
         <p className="mt-2 text-sm text-gray-600">
-          Payment rows with poster, task, and tasker details.
+          Payment rows with Customer, task, and Helper details.
         </p>
       </div>
 
@@ -65,9 +65,9 @@ export default function PaymentTransactionsPage() {
                   <th className="px-3 py-2 text-left">Amount</th>
                   <th className="px-3 py-2 text-left">Payment Status</th>
                   <th className="px-3 py-2 text-left">Hold Status</th>
-                  <th className="px-3 py-2 text-left">Poster</th>
+                  <th className="px-3 py-2 text-left">Customer</th>
                   <th className="px-3 py-2 text-left">Task</th>
-                  <th className="px-3 py-2 text-left">Tasker</th>
+                  <th className="px-3 py-2 text-left">Helper</th>
                 </tr>
               </thead>
               <tbody>
@@ -83,8 +83,8 @@ export default function PaymentTransactionsPage() {
                       <td className="px-3 py-2">{row.paymentStatus || "unknown"}</td>
                       <td className="px-3 py-2">{row.status}</td>
                       <td className="px-3 py-2">
-                        <Link href={`/users/${encodeURIComponent(row.links?.posterUserId || row.posterUid)}`} className="text-blue-600 hover:underline">
-                          {row.links?.posterName || row.posterUid}
+                        <Link href={`/users/${encodeURIComponent(row.links?.customerUserId || row.posterUid)}`} className="text-blue-600 hover:underline">
+                          {row.links?.customerName || row.posterUid}
                         </Link>
                       </td>
                       <td className="px-3 py-2">
@@ -93,8 +93,8 @@ export default function PaymentTransactionsPage() {
                         </Link>
                       </td>
                       <td className="px-3 py-2">
-                        <Link href={`/users/${encodeURIComponent(row.links?.performerUserId || row.performerUid)}`} className="text-blue-600 hover:underline">
-                          {row.links?.taskerName || row.performerUid}
+                        <Link href={`/users/${encodeURIComponent(row.links?.helperUserId || row.performerUid)}`} className="text-blue-600 hover:underline">
+                          {row.links?.helperName || row.performerUid}
                         </Link>
                       </td>
                     </tr>
