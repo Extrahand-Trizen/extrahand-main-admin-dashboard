@@ -375,7 +375,7 @@ export interface TaskFilters {
   search?: string;
   status?: string;
   category?: string;
-  CustomerId?: string;
+  customerId?: string;
   assigneeId?: string;
   page?: number;
   limit?: number;

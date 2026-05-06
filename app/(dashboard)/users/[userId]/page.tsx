@@ -204,7 +204,7 @@ export default function UserDetailsPage() {
     queryKey: ["user-posted-tasks", profileId, postedTasksPage],
     queryFn: () =>
       listTasks({
-        posterId: profileId,
+        customerId: profileId,
         page: postedTasksPage,
         limit: TASKS_PER_PAGE,
       }),
@@ -1051,21 +1051,21 @@ export default function UserDetailsPage() {
                       Role-Specific Verifications
                     </Label>
                     <div className="space-y-3">
-                      {user.roleVerifications.tasker && (
+                      {user.roleVerifications.Helper && (
                         <div>
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium">Tasker</span>
-                            {user.roleVerifications.tasker.canAcceptTasks ? (
+                            <span className="text-sm font-medium">Helper</span>
+                            {user.roleVerifications.Helper.canAcceptTasks ? (
                               <Badge variant="success">Can Accept Tasks</Badge>
                             ) : (
                               <Badge variant="secondary">Cannot Accept</Badge>
                             )}
                           </div>
-                          {user.roleVerifications.tasker.requirements && (
+                          {user.roleVerifications.Helper.requirements && (
                             <div className="mt-2 space-y-1 text-xs text-gray-600">
                               <p>
                                 Aadhaar:{" "}
-                                {user.roleVerifications.tasker.requirements
+                                {user.roleVerifications.Helper.requirements
                                   .aadhaar ? (
                                   <CheckCircle2 className="inline h-3 w-3 text-green-500" />
                                 ) : (
@@ -1074,7 +1074,7 @@ export default function UserDetailsPage() {
                               </p>
                               <p>
                                 PAN:{" "}
-                                {user.roleVerifications.tasker.requirements
+                                {user.roleVerifications.Helper.requirements
                                   .pan ? (
                                   <CheckCircle2 className="inline h-3 w-3 text-green-500" />
                                 ) : (
@@ -1083,7 +1083,7 @@ export default function UserDetailsPage() {
                               </p>
                               <p>
                                 Bank:{" "}
-                                {user.roleVerifications.tasker.requirements
+                                {user.roleVerifications.Helper.requirements
                                   .bank ? (
                                   <CheckCircle2 className="inline h-3 w-3 text-green-500" />
                                 ) : (
@@ -1094,21 +1094,21 @@ export default function UserDetailsPage() {
                           )}
                         </div>
                       )}
-                      {user.roleVerifications.poster && (
+                      {user.roleVerifications.Customer && (
                         <div>
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium">Poster</span>
-                            {user.roleVerifications.poster.canPostTasks ? (
+                            <span className="text-sm font-medium">Customer</span>
+                            {user.roleVerifications.Customer.canPostTasks ? (
                               <Badge variant="success">Can Post Tasks</Badge>
                             ) : (
                               <Badge variant="secondary">Cannot Post</Badge>
                             )}
                           </div>
-                          {user.roleVerifications.poster.requirements && (
+                          {user.roleVerifications.Customer.requirements && (
                             <div className="mt-2 space-y-1 text-xs text-gray-600">
                               <p>
                                 Aadhaar:{" "}
-                                {user.roleVerifications.poster.requirements
+                                {user.roleVerifications.Customer.requirements
                                   .aadhaar ? (
                                   <CheckCircle2 className="inline h-3 w-3 text-green-500" />
                                 ) : (

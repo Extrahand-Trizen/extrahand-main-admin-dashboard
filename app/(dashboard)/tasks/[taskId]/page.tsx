@@ -419,7 +419,7 @@ export default function TaskDetailsPage() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Tasker</TableHead>
+                            <TableHead>Helper</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="hidden md:table-cell">
                               Proposed Amount
@@ -438,11 +438,11 @@ export default function TaskDetailsPage() {
                               <TableCell>
                                 <div className="flex items-center gap-2">
                                   <div className="flex items-center justify-center w-8 h-8 rounded-full bg-amber-100 text-amber-700 font-medium text-sm">
-                                    {app.taskerId?.charAt(0).toUpperCase() ||
-                                      "T"}
+                                    {app.helperId?.charAt(0).toUpperCase() ||
+                                      "H"}
                                   </div>
                                   <span className="text-sm font-medium text-gray-900">
-                                    {app.taskerId || "Unknown"}
+                                    {app.helperId || "Unknown"}
                                   </span>
                                 </div>
                               </TableCell>
@@ -559,12 +559,12 @@ export default function TaskDetailsPage() {
             <CardContent className="space-y-4">
               <div>
                 <Label className="text-xs font-medium text-gray-500">
-                  Poster ID
+                  Customer ID
                 </Label>
                 <div className="mt-1 flex items-center gap-2">
                   <User className="h-4 w-4 text-gray-400" />
                   <span className="text-sm font-medium text-gray-900">
-                    {task.posterId}
+                    {task.customerId}
                   </span>
                 </div>
               </div>
