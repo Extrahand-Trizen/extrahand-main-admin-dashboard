@@ -72,12 +72,26 @@ const statusColors: Record<string, string> = {
   inactive: "secondary",
 };
 
-const getRoleLabel = (role?: string) => {
-  if (!role) return "N/A";
-  const normalizedRole = role.toLowerCase();
-  if (normalizedRole === "Helper") return "Helper";
-  if (normalizedRole === "Customer") return "Customer";
-  return "N/A";
+const getNormalizedRoleLabel = (role?: string) => {
+  if (!role) return null;
+
+  const normalizedRole = role.trim().toLowerCase();
+  if (normalizedRole === "helper") return "Helper";
+  if (normalizedRole === "customer") return "Customer";
+
+  return null;
+};
+
+const getRoleLabel = (user: Pick<User, "role" | "roles">) => {
+  const roleLabels = (user.roles || [])
+    .map((role) => getNormalizedRoleLabel(role))
+    .filter((role): role is string => Boolean(role));
+
+  if (roleLabels.length > 0) {
+    return Array.from(new Set(roleLabels)).join(", ");
+  }
+
+  return getNormalizedRoleLabel(user.role) || "N/A";
 };
 
 export default function UsersPage() {
@@ -495,12 +509,12 @@ export default function UsersPage() {
                               <Badge variant={statusColors[user.status] as any}>
                                 {user.status}
                               </Badge>
-                              <Badge variant="outline">{getRoleLabel(user.role)}</Badge>
+                              <Badge variant="outline">{getRoleLabel(user)}</Badge>
                             </div>
                           </div>
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
-                          <Badge variant="outline">{getRoleLabel(user.role)}</Badge>
+                          <Badge variant="outline">{getRoleLabel(user)}</Badge>
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
                           <Badge variant={statusColors[user.status] as any}>
