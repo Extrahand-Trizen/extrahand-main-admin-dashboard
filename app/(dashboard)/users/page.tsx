@@ -85,7 +85,10 @@ const getNormalizedRoleLabel = (role?: string) => {
 const getRoleLabel = (user: Pick<User, "role" | "roles">) => {
   const roleLabels = (user.roles || [])
     .map((role) => getNormalizedRoleLabel(role))
-    .filter((role): role is string => Boolean(role));
+    .filter(
+      (role): role is NonNullable<ReturnType<typeof getNormalizedRoleLabel>> =>
+        role !== null,
+    );
 
   if (roleLabels.length > 0) {
     return Array.from(new Set(roleLabels)).join(", ");
