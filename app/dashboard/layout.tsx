@@ -46,11 +46,11 @@ export default function DashboardLayout({
   useEffect(() => {
     if (!loading && isAuthenticated && hasPermission('payment.list')) {
       // Prefetch overview and small slices for faster navigation
-      queryClient.prefetchQuery(['payments', 'overview'], getPaymentsOverview);
-      queryClient.prefetchQuery(['payments', 'transactions', { limit: 10, offset: 0 }], () => listPaymentTransactions({ limit: 10, offset: 0 }));
-      queryClient.prefetchQuery(['payments', 'payouts', { limit: 10, offset: 0 }], () => listPaymentPayouts({ limit: 10, offset: 0 }));
-      queryClient.prefetchQuery(['payments', 'refunds', { limit: 10, offset: 0 }], () => listPaymentRefunds({ limit: 10, offset: 0 }));
-      queryClient.prefetchQuery(['payments', 'ledger', { limit: 10, offset: 0 }], () => listPaymentLedger({ limit: 10, offset: 0 }));
+      queryClient.prefetchQuery({ queryKey: ['payments', 'overview'], queryFn: getPaymentsOverview });
+      queryClient.prefetchQuery({ queryKey: ['payments', 'transactions', { limit: 10, offset: 0 }], queryFn: () => listPaymentTransactions({ limit: 10, offset: 0 }) });
+      queryClient.prefetchQuery({ queryKey: ['payments', 'payouts', { limit: 10, offset: 0 }], queryFn: () => listPaymentPayouts({ limit: 10, offset: 0 }) });
+      queryClient.prefetchQuery({ queryKey: ['payments', 'refunds', { limit: 10, offset: 0 }], queryFn: () => listPaymentRefunds({ limit: 10, offset: 0 }) });
+      queryClient.prefetchQuery({ queryKey: ['payments', 'ledger', { limit: 10, offset: 0 }], queryFn: () => listPaymentLedger({ limit: 10, offset: 0 }) });
     }
   }, [loading, isAuthenticated, hasPermission, queryClient]);
 

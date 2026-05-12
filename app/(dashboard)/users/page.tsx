@@ -76,15 +76,8 @@ const getNormalizedRoleLabel = (role?: string) => {
   if (!role) return null;
 
   const normalizedRole = role.trim().toLowerCase();
-  if (normalizedRole === "helper" || normalizedRole === "tasker") return "Helper";
-  if (
-    normalizedRole === "customer" ||
-    normalizedRole === "poster" ||
-    normalizedRole === "requester"
-  ) {
-    return "Customer";
-  }
-  if (normalizedRole === "both") return "Customer & Helper";
+  if (normalizedRole === "helper") return "Helper";
+  if (normalizedRole === "customer") return "Customer";
 
   return null;
 };
@@ -101,10 +94,7 @@ const getRoleLabel = (user: Pick<User, "role" | "roles">) => {
     return Array.from(new Set(roleLabels)).join(", ");
   }
 
-  const single = getNormalizedRoleLabel(user.role);
-  if (single) return single;
-  if (user.role && String(user.role).toLowerCase() === "unknown") return "—";
-  return "N/A";
+  return getNormalizedRoleLabel(user.role) || "N/A";
 };
 
 export default function UsersPage() {
@@ -369,8 +359,8 @@ export default function UsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value="tasker">Helper</SelectItem>
-                  <SelectItem value="poster">Customer</SelectItem>
+                  <SelectItem value="Helper">Helper</SelectItem>
+                  <SelectItem value="Customer">Customer</SelectItem>
                 </SelectContent>
               </Select>
             </div>
