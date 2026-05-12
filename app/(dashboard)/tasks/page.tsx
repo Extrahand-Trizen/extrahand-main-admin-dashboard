@@ -75,7 +75,7 @@ export default function TasksPage() {
   const { hasPermission } = usePermissions();
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("open");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
