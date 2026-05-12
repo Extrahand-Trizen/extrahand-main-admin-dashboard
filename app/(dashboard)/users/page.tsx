@@ -547,7 +547,9 @@ export default function UsersPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem asChild>
-                                <Link href={`/users/${user.userId}`}>
+                                <Link
+                                  href={`/users/${encodeURIComponent(user.userId)}`}
+                                >
                                   <Eye className="mr-2 h-4 w-4" />
                                   View Details
                                 </Link>

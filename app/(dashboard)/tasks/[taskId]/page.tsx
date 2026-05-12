@@ -507,7 +507,7 @@ export default function TaskDetailsPage() {
                                   {hasPermission("user.view") &&
                                   extractHelperProfileId(app) ? (
                                     <Link
-                                      href={`/users/${extractHelperProfileId(app)}`}
+                                      href={`/users/${encodeURIComponent(extractHelperProfileId(app))}`}
                                       className="text-sm font-medium text-blue-700 hover:underline"
                                     >
                                       {helperDetailsByProfileId.get(
@@ -646,7 +646,7 @@ export default function TaskDetailsPage() {
                   <User className="h-4 w-4 text-gray-400" />
                   {hasPermission("user.view") && customerProfileId ? (
                     <Link
-                      href={`/users/${customerProfileId}`}
+                      href={`/users/${encodeURIComponent(customerProfileId)}`}
                       className="text-sm font-medium text-blue-700 hover:underline"
                     >
                       {customerDetails?.data?.name || "View customer details"}

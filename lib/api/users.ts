@@ -25,7 +25,15 @@ export async function listUsers(filters?: UserFilters): Promise<ApiResponse<User
  * Get user by ID
  */
 export async function getUser(userId: string): Promise<ApiResponse<User>> {
-  return apiRequest<ApiResponse<User>>(`/api/v1/users/${userId}`);
+  const segment = encodeURIComponent(userId);
+  const res = await apiRequest<ApiResponse<User> | null>(`/api/v1/users/${segment}`);
+  if (res == null || res.success === false) {
+    throw new Error(
+      (res as ApiResponse<User> | null)?.error ||
+        'User not found or could not be loaded',
+    );
+  }
+  return res;
 }
 
 /**

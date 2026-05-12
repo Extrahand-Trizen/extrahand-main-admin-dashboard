@@ -73,7 +73,9 @@ export default function UserDetailsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { hasPermission } = usePermissions();
-  const userId = params.userId as string;
+  const rawUserId = params.userId as string;
+  const userId =
+    typeof rawUserId === 'string' ? decodeURIComponent(rawUserId) : '';
 
   const [actionDialog, setActionDialog] = useState<{
     open: boolean;
@@ -296,6 +298,10 @@ export default function UserDetailsPage() {
   }
 
   if (error || !user) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'Failed to load user details. Please try again.';
     return (
       <div className="space-y-6">
         <Link href="/users">
@@ -306,9 +312,7 @@ export default function UserDetailsPage() {
         </Link>
         <Card>
           <CardContent className="py-8">
-            <div className="text-center text-red-600">
-              Failed to load user details. Please try again.
-            </div>
+            <div className="text-center text-red-600">{message}</div>
           </CardContent>
         </Card>
       </div>
