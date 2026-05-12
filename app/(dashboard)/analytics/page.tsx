@@ -83,7 +83,7 @@ export default function AnalyticsPage() {
     {
       title: 'Total Customers',
       value: analytics?.Customers.totalRegistered ?? 0,
-      subtitle: 'Poster / requester role (can overlap with Helpers)',
+      subtitle: 'Registered customers',
       icon: Users,
       color: 'text-yellow-600',
       bg: 'bg-yellow-50',
@@ -91,7 +91,7 @@ export default function AnalyticsPage() {
     {
       title: 'Total Helpers',
       value: analytics?.Helpers.totalRegistered ?? 0,
-      subtitle: 'Tasker role (can overlap with Customers)',
+      subtitle: 'Registered helpers',
       icon: UserCheck,
       color: 'text-indigo-600',
       bg: 'bg-indigo-50',
@@ -176,6 +176,29 @@ export default function AnalyticsPage() {
             </CardDescription>
           )}
         </CardHeader>
+        {(analytics?.Helpers?.categoryCounts || []).length > 0 && (
+          <CardContent>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-gray-700">
+                Helpers by category (from skills)
+              </p>
+              <p className="text-xs text-gray-500">
+                Total helpers: {analytics?.Helpers?.categorySummary?.totalHelpers ?? 0} | Categorized: {analytics?.Helpers?.categorySummary?.categorizedHelpers ?? 0} | Uncategorized: {analytics?.Helpers?.categorySummary?.uncategorizedHelpers ?? 0}
+              </p>
+              <div className="space-y-2">
+                {(analytics?.Helpers?.categoryCounts || []).map((row) => (
+                  <div
+                    key={`helper-category-${row.category}`}
+                    className="flex items-center justify-between rounded-md border p-2"
+                  >
+                    <p className="text-sm text-gray-800 capitalize">{row.category}</p>
+                    <p className="text-sm font-semibold text-gray-900">{row.helperCount}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        )}
       </Card>
 
       <Card>
@@ -207,7 +230,7 @@ export default function AnalyticsPage() {
         <CardHeader>
           <CardTitle className="text-base">Task Demand by Category (Last 30 days)</CardTitle>
           <CardDescription>
-            Track which categories and subcategories Customers are targeting most.
+            Track which categories Customers are targeting most.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -220,15 +243,6 @@ export default function AnalyticsPage() {
                   <p className="text-sm font-medium text-gray-800">{category.category}</p>
                   <p className="text-sm font-semibold text-gray-900">{category.count}</p>
                 </div>
-                {(category.subcategories || []).length > 0 && (
-                  <div className="mt-2 grid gap-1 md:grid-cols-2">
-                    {category.subcategories.slice(0, 6).map((sub) => (
-                      <p key={`${category.category}-${sub.subcategory}`} className="text-xs text-gray-600">
-                        {sub.subcategory}: {sub.count}
-                      </p>
-                    ))}
-                  </div>
-                )}
               </div>
             ))
           )}

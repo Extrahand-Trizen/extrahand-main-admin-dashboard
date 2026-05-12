@@ -84,3 +84,37 @@ export async function unsuspendUser(userId: string): Promise<ApiResponse<User>> 
     method: 'POST',
   });
 }
+
+/**
+ * Preview users with no role saved (dry run — safe, no deletion)
+ */
+export async function previewUsersWithoutRoles(): Promise<{
+  success: boolean;
+  data: {
+    dryRun: boolean;
+    count: number;
+    users: Array<{ uid: string; name: string; email: string; createdAt: string }>;
+  };
+  message: string;
+}> {
+  return apiRequest(`/api/v1/users/cleanup/no-role?dry_run=true`);
+}
+
+/**
+ * Delete all users with no role saved (cascades to Firebase + Task Service)
+ */
+export async function deleteUsersWithoutRoles(): Promise<{
+  success: boolean;
+  data: {
+    dryRun: boolean;
+    count: number;
+    deletedCount: number;
+    users: Array<{ uid: string; name: string; email: string; createdAt: string }>;
+  };
+  message: string;
+}> {
+  return apiRequest(`/api/v1/users/cleanup/no-role`, {
+    method: 'POST',
+    body: JSON.stringify({ dry_run: false }),
+  });
+}

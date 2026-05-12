@@ -331,16 +331,21 @@ export interface ApiResponse<T> {
 }
 
 export interface AnalyticsOverview {
-  /** All non-deleted profiles (matches Users / Dashboard totals). Customer + Helper cards can overlap (dual-role). */
-  platform?: {
-    totalRegisteredUsers: number;
-  };
   Customers: {
     totalRegistered: number;
   };
   Helpers: {
     totalRegistered: number;
     aadhaarVerified?: number;
+    categoryCounts?: Array<{
+      category: string;
+      helperCount: number;
+    }>;
+    categorySummary?: {
+      totalHelpers: number;
+      categorizedHelpers: number;
+      uncategorizedHelpers: number;
+    };
   };
   tasks: {
     total: number;

@@ -131,6 +131,7 @@ export default function UsersPage() {
     reason: "",
   });
 
+
   const { data, isLoading, error } = useQuery({
     queryKey: [
       "users",
@@ -369,8 +370,8 @@ export default function UsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value="Helper">Helper</SelectItem>
-                  <SelectItem value="Customer">Customer</SelectItem>
+                  <SelectItem value="helper">Helper</SelectItem>
+                  <SelectItem value="customer">Customer</SelectItem>
                 </SelectContent>
               </Select>
             </div>

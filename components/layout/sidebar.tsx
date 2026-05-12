@@ -63,8 +63,9 @@ interface SidebarProps {
 
 export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, user } = useAuth();
   const { hasPermission } = usePermissions();
+  const isPaymentsOnlyRole = user?.role === 'payments_admin' && !isSuperAdmin;
   const [superAdminSectionOpen, setSuperAdminSectionOpen] = useState(
     pathname?.startsWith('/admin')
   );
@@ -82,6 +83,7 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
 
   // Filter navigation items based on permissions
   const filteredNavigation = navigation.filter((item) => {
+    if (isPaymentsOnlyRole && item.href === '/dashboard') return false;
     if (!item.permission) return true;
     return hasPermission(item.permission);
   });
@@ -211,7 +213,7 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
             </div>
           )}
 
-          {hasPermission('analytics.view') && (
+          {!isPaymentsOnlyRole && hasPermission('analytics.view') && (
             <Link
               href="/analytics"
               onClick={handleLinkClick}

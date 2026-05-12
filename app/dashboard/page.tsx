@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Users, Briefcase, AlertTriangle, TrendingUp, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +11,8 @@ import { getAnalyticsOverview } from '@/lib/api/analytics';
 import { formatDate } from '@/lib/utils';
 import Link from 'next/link';
 import { usePermissions } from '@/lib/hooks/usePermissions';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { useRouter } from 'next/navigation';
 import { StatsCardSkeleton } from '@/components/LoadingSkeleton';
 
 interface DashboardStats {
@@ -20,7 +23,20 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const { user, isSuperAdmin } = useAuth();
   const { hasPermission } = usePermissions();
+  const isPaymentsOnlyRole = user?.role === 'payments_admin' && !isSuperAdmin;
+
+  useEffect(() => {
+    if (isPaymentsOnlyRole) {
+      router.replace('/payments/overview');
+    }
+  }, [isPaymentsOnlyRole, router]);
+
+  if (isPaymentsOnlyRole) {
+    return null;
+  }
 
   // Fetch users data
   const { data: usersData, isLoading: usersLoading, error: usersError } = useQuery({
