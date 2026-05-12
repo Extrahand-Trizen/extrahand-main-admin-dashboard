@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { BarChart3, Users, UserCheck, Briefcase, CircleDot, CheckCircle2 } from 'lucide-react';
+import { BarChart3, Users, UserCheck, Briefcase, CircleDot, CheckCircle2, Users2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -81,9 +81,17 @@ export default function AnalyticsPage() {
   const cancellations = cancellationData?.data;
   const cards = [
     {
+      title: 'Total registered users',
+      value: analytics?.platform?.totalRegisteredUsers ?? 0,
+      subtitle: 'All profiles (matches Dashboard / Users)',
+      icon: Users2,
+      color: 'text-amber-700',
+      bg: 'bg-amber-50',
+    },
+    {
       title: 'Total Customers',
       value: analytics?.Customers.totalRegistered ?? 0,
-      subtitle: 'Registered Customers',
+      subtitle: 'Poster / requester role (can overlap with Helpers)',
       icon: Users,
       color: 'text-yellow-600',
       bg: 'bg-yellow-50',
@@ -91,7 +99,7 @@ export default function AnalyticsPage() {
     {
       title: 'Total Helpers',
       value: analytics?.Helpers.totalRegistered ?? 0,
-      subtitle: 'Registered Helpers',
+      subtitle: 'Tasker role (can overlap with Customers)',
       icon: UserCheck,
       color: 'text-indigo-600',
       bg: 'bg-indigo-50',

@@ -65,10 +65,16 @@ export async function deleteTask(
   taskId: string,
   reason: string
 ): Promise<ApiResponse<void>> {
-  return apiRequest<ApiResponse<void>>(`/api/v1/tasks/${taskId}`, {
+  const result = await apiRequest<ApiResponse<void>>(`/api/v1/tasks/${taskId}`, {
     method: 'DELETE',
     body: JSON.stringify({ reason }),
   });
+  if (!result || result.success === false) {
+    const msg =
+      (result as ApiResponse<void> | null)?.error || 'Failed to delete task';
+    throw new Error(msg);
+  }
+  return result;
 }
 
 /**

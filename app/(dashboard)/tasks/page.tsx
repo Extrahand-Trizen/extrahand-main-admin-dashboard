@@ -456,7 +456,14 @@ export default function TasksPage() {
       {/* Delete Confirmation Dialog */}
       <Dialog
         open={deleteDialog.open}
-        onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteDialog({ open: false, reason: "" });
+            setSelectedTask(null);
+          } else {
+            setDeleteDialog((d) => ({ ...d, open: true }));
+          }
+        }}
       >
         <DialogContent>
           <DialogHeader>
@@ -465,10 +472,8 @@ export default function TasksPage() {
               {selectedTask && (
                 <>
                   Are you sure you want to delete "{selectedTask.title}"? This
-                  action cannot be undone.
-                  <span className="block mt-2 text-red-600">
-                    This action requires a reason.
-                  </span>
+                  action cannot be undone. Please enter a reason below (required
+                  for audit).
                 </>
               )}
             </DialogDescription>

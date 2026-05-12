@@ -331,6 +331,10 @@ export interface ApiResponse<T> {
 }
 
 export interface AnalyticsOverview {
+  /** All non-deleted profiles (matches Users / Dashboard totals). Customer + Helper cards can overlap (dual-role). */
+  platform?: {
+    totalRegisteredUsers: number;
+  };
   Customers: {
     totalRegistered: number;
   };
