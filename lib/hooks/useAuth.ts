@@ -35,39 +35,18 @@ export function useAuth() {
     try {
       // Verify token
       const response = await verifyToken();
-      if (response && response.success && response.data) {
-        // Token is valid, but we need to get user info
-        // For now, decode token to get user info
-        try {
-          const payload = JSON.parse(atob(accessToken.split('.')[1]));
-          setUser({
-            userId: payload.userId,
-            email: payload.email,
-            name: payload.name || payload.email,
-            dashboardType: payload.dashboardType,
-            role: payload.role,
-            isSuperAdmin: payload.isSuperAdmin || false,
-            permissions: payload.permissions || [],
-          });
-        } catch (error) {
-          console.error('Failed to decode token:', error);
-          // Try to decode token anyway if verify endpoint fails
-          try {
-            const payload = JSON.parse(atob(accessToken.split('.')[1]));
-            setUser({
-              userId: payload.userId,
-              email: payload.email,
-              name: payload.name || payload.email,
-              dashboardType: payload.dashboardType,
-              role: payload.role,
-              isSuperAdmin: payload.isSuperAdmin || false,
-              permissions: payload.permissions || [],
-            });
-          } catch (decodeError) {
-            console.error('Failed to decode token:', decodeError);
-            setUser(null);
-          }
-        }
+      if (response && response.success && response.data?.user) {
+        // Always prefer server-verified user payload, because JWT may not embed permissions.
+        const verifiedUser = response.data.user;
+        setUser({
+          userId: verifiedUser.userId,
+          email: verifiedUser.email,
+          name: verifiedUser.name || verifiedUser.email,
+          dashboardType: verifiedUser.dashboardType,
+          role: verifiedUser.role,
+          isSuperAdmin: verifiedUser.isSuperAdmin || false,
+          permissions: verifiedUser.permissions || [],
+        });
       } else {
         // Token invalid or endpoint not found, try to refresh or decode token
         try {

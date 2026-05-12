@@ -76,8 +76,15 @@ const getNormalizedRoleLabel = (role?: string) => {
   if (!role) return null;
 
   const normalizedRole = role.trim().toLowerCase();
-  if (normalizedRole === "helper") return "Helper";
-  if (normalizedRole === "customer") return "Customer";
+  if (normalizedRole === "helper" || normalizedRole === "tasker") return "Helper";
+  if (
+    normalizedRole === "customer" ||
+    normalizedRole === "poster" ||
+    normalizedRole === "requester"
+  ) {
+    return "Customer";
+  }
+  if (normalizedRole === "both") return "Customer & Helper";
 
   return null;
 };
@@ -94,7 +101,10 @@ const getRoleLabel = (user: Pick<User, "role" | "roles">) => {
     return Array.from(new Set(roleLabels)).join(", ");
   }
 
-  return getNormalizedRoleLabel(user.role) || "N/A";
+  const single = getNormalizedRoleLabel(user.role);
+  if (single) return single;
+  if (user.role && String(user.role).toLowerCase() === "unknown") return "—";
+  return "N/A";
 };
 
 export default function UsersPage() {
