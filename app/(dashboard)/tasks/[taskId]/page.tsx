@@ -1,6 +1,11 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  useQueries,
+} from "@tanstack/react-query";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -32,6 +37,7 @@ import {
   getTaskApplications,
   updateApplicationStatus,
 } from "@/lib/api/tasks";
+import { getUser } from "@/lib/api/users";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { formatDate, formatCurrency, formatDateTime } from "@/lib/utils";
 import { toast } from "sonner";
@@ -80,6 +86,21 @@ const formatLocationDisplay = (location: unknown): string => {
     );
   }
   return "Location available";
+};
+
+const extractCustomerProfileId = (task: any): string => {
+  const raw =
+    task?.CustomerId ||
+    task?.customerId ||
+    task?.requesterId ||
+    task?.requesterProfileId ||
+    "";
+  return String(raw).trim();
+};
+
+const extractHelperProfileId = (application: any): string => {
+  const raw = application?.HelperId || application?.helperId || application?.applicantId || "";
+  return String(raw).trim();
 };
 
 export default function TaskDetailsPage() {
@@ -178,6 +199,39 @@ export default function TaskDetailsPage() {
 
   const task = taskData?.data;
   const applications = applicationsData?.data || [];
+  const customerProfileId = extractCustomerProfileId(task);
+  const uniqueHelperProfileIds = Array.from(
+    new Set(
+      applications
+        .map((app: any) => extractHelperProfileId(app))
+        .filter((id: string) => Boolean(id)),
+    ),
+  );
+
+  const { data: customerDetails } = useQuery({
+    queryKey: ["user-from-task-customer", customerProfileId],
+    queryFn: () => getUser(customerProfileId),
+    enabled:
+      Boolean(customerProfileId) &&
+      hasPermission("user.view") &&
+      hasPermission("task.view"),
+    retry: false,
+  });
+
+  const helperDetailQueries = useQueries({
+    queries: uniqueHelperProfileIds.map((profileId) => ({
+      queryKey: ["user-from-task-helper", profileId],
+      queryFn: () => getUser(profileId),
+      enabled: hasPermission("user.view") && hasPermission("task.view"),
+      retry: false,
+    })),
+  });
+
+  const helperDetailsByProfileId = new Map<string, any>();
+  uniqueHelperProfileIds.forEach((profileId, index) => {
+    const payload = helperDetailQueries[index]?.data?.data;
+    if (payload) helperDetailsByProfileId.set(profileId, payload);
+  });
   const applicationsPagination = applicationsData?.pagination || {
     page: 1,
     limit: 10,
@@ -438,12 +492,39 @@ export default function TaskDetailsPage() {
                               <TableCell>
                                 <div className="flex items-center gap-2">
                                   <div className="flex items-center justify-center w-8 h-8 rounded-full bg-amber-100 text-amber-700 font-medium text-sm">
-                                    {app.helperId?.charAt(0).toUpperCase() ||
-                                      "H"}
+                                    {(
+                                      helperDetailsByProfileId.get(
+                                        extractHelperProfileId(app),
+                                      )?.name ||
+                                      app.helperName ||
+                                      app.HelperName ||
+                                      extractHelperProfileId(app) ||
+                                      "H"
+                                    )
+                                      ?.charAt(0)
+                                      .toUpperCase()}
                                   </div>
-                                  <span className="text-sm font-medium text-gray-900">
-                                    {app.helperId || "Unknown"}
-                                  </span>
+                                  {hasPermission("user.view") &&
+                                  extractHelperProfileId(app) ? (
+                                    <Link
+                                      href={`/users/${extractHelperProfileId(app)}`}
+                                      className="text-sm font-medium text-blue-700 hover:underline"
+                                    >
+                                      {helperDetailsByProfileId.get(
+                                        extractHelperProfileId(app),
+                                      )?.name || "View helper details"}
+                                    </Link>
+                                  ) : (
+                                    <span className="text-sm font-medium text-gray-900">
+                                      {helperDetailsByProfileId.get(
+                                        extractHelperProfileId(app),
+                                      )?.name ||
+                                        app.helperName ||
+                                        app.HelperName ||
+                                        extractHelperProfileId(app) ||
+                                        "Unknown"}
+                                    </span>
+                                  )}
                                 </div>
                               </TableCell>
                               <TableCell>
@@ -563,9 +644,18 @@ export default function TaskDetailsPage() {
                 </Label>
                 <div className="mt-1 flex items-center gap-2">
                   <User className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm font-medium text-gray-900">
-                    {task.customerId}
-                  </span>
+                  {hasPermission("user.view") && customerProfileId ? (
+                    <Link
+                      href={`/users/${customerProfileId}`}
+                      className="text-sm font-medium text-blue-700 hover:underline"
+                    >
+                      {customerDetails?.data?.name || "View customer details"}
+                    </Link>
+                  ) : (
+                    <span className="text-sm font-medium text-gray-900">
+                      {customerDetails?.data?.name || customerProfileId || "N/A"}
+                    </span>
+                  )}
                 </div>
               </div>
               <div>
