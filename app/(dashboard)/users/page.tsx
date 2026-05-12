@@ -369,8 +369,8 @@ export default function UsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value="Helper">Helper</SelectItem>
-                  <SelectItem value="Customer">Customer</SelectItem>
+                  <SelectItem value="tasker">Helper</SelectItem>
+                  <SelectItem value="poster">Customer</SelectItem>
                 </SelectContent>
               </Select>
             </div>

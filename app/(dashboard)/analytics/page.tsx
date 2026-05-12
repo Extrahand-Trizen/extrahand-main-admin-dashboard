@@ -83,7 +83,7 @@ export default function AnalyticsPage() {
     {
       title: 'Total registered users',
       value: analytics?.platform?.totalRegisteredUsers ?? 0,
-      subtitle: 'All profiles (matches Dashboard / Users)',
+      subtitle: 'Registered users',
       icon: Users2,
       color: 'text-amber-700',
       bg: 'bg-amber-50',
@@ -91,7 +91,7 @@ export default function AnalyticsPage() {
     {
       title: 'Total Customers',
       value: analytics?.Customers.totalRegistered ?? 0,
-      subtitle: 'Poster / requester role (can overlap with Helpers)',
+      subtitle: 'Registered customers',
       icon: Users,
       color: 'text-yellow-600',
       bg: 'bg-yellow-50',
@@ -99,7 +99,7 @@ export default function AnalyticsPage() {
     {
       title: 'Total Helpers',
       value: analytics?.Helpers.totalRegistered ?? 0,
-      subtitle: 'Tasker role (can overlap with Customers)',
+      subtitle: 'Registered helpers',
       icon: UserCheck,
       color: 'text-indigo-600',
       bg: 'bg-indigo-50',

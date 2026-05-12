@@ -93,29 +93,14 @@ export default function AdminInvitesPage() {
     const formData = new FormData(e.currentTarget);
     createMutation.mutate({
       email: formData.get("email") as string,
-      dashboardType: formData.get("dashboardType") as DashboardType,
+      // invitations are for the main admin portal only
+      dashboardType: 'main_admin',
       role: formData.get("role") as string,
       customMessage: formData.get("customMessage") as string,
     });
   };
 
-  const getRoleOptions = (dashboardType: string) => {
-    switch (dashboardType) {
-      case "main_admin":
-        return ["platform_admin", "operations", "support", "trust"]; // Based on permissions.ts
-      case "payment_admin":
-        return ["payment_manager", "payment_viewer"]; // Placeholder roles
-      case "content_admin":
-        return ["content_manager", "editor", "moderator"]; // Placeholder roles
-      case "leads_onboarding":
-        return ["onboarding_manager", "verifier"]; // Placeholder roles
-      default:
-        return ["admin", "viewer"];
-    }
-  };
-
-  const [selectedDashboard, setSelectedDashboard] =
-    useState<string>("main_admin");
+  // Roles are fixed for invites: super_admin, operations_admin, payments_admin, support_admin
 
   return (
     <div className="p-6 space-y-6">
@@ -150,46 +135,19 @@ export default function AdminInvitesPage() {
                   placeholder="admin@extrahand.com"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="dashboardType">Dashboard</Label>
-                  <Select
-                    name="dashboardType"
-                    defaultValue="main_admin"
-                    onValueChange={setSelectedDashboard}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select Dashboard" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="main_admin">Main Admin</SelectItem>
-                      <SelectItem value="payment_admin">
-                        Payment Admin
-                      </SelectItem>
-                      <SelectItem value="content_admin">
-                        Content Admin
-                      </SelectItem>
-                      <SelectItem value="leads_onboarding">
-                        Leads Onboarding
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="role">Role</Label>
-                  <Select name="role" required>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select Role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getRoleOptions(selectedDashboard).map((role) => (
-                        <SelectItem key={role} value={role}>
-                          {role.replace("_", " ").toUpperCase()}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="role">Role</Label>
+                <Select name="role" required>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="super_admin">Super Admin</SelectItem>
+                    <SelectItem value="operations_admin">Operations Admin</SelectItem>
+                    <SelectItem value="payments_admin">Payments Admin</SelectItem>
+                    <SelectItem value="support_admin">Support Admin</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="customMessage">Message (Optional)</Label>

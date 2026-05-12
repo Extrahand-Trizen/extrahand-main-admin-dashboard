@@ -14,6 +14,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { usePermissions } from '@/lib/hooks/usePermissions';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  getPaymentsOverview,
+  listPaymentTransactions,
+  listPaymentPayouts,
+  listPaymentRefunds,
+  listPaymentLedger,
+} from '@/lib/api/payments';
 
 export default function DashboardLayout({
   children,
@@ -21,6 +30,8 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { isAuthenticated, loading, logout } = useAuth();
+  const { hasPermission } = usePermissions();
+  const queryClient = useQueryClient();
   const router = useRouter();
   const [showWarn, setShowWarn] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -30,6 +41,18 @@ export default function DashboardLayout({
       router.push('/login');
     }
   }, [isAuthenticated, loading, router]);
+
+  // Prefetch payments data at app load if user has payments view permission
+  useEffect(() => {
+    if (!loading && isAuthenticated && hasPermission('payment.list')) {
+      // Prefetch overview and small slices for faster navigation
+      queryClient.prefetchQuery(['payments', 'overview'], getPaymentsOverview);
+      queryClient.prefetchQuery(['payments', 'transactions', { limit: 10, offset: 0 }], () => listPaymentTransactions({ limit: 10, offset: 0 }));
+      queryClient.prefetchQuery(['payments', 'payouts', { limit: 10, offset: 0 }], () => listPaymentPayouts({ limit: 10, offset: 0 }));
+      queryClient.prefetchQuery(['payments', 'refunds', { limit: 10, offset: 0 }], () => listPaymentRefunds({ limit: 10, offset: 0 }));
+      queryClient.prefetchQuery(['payments', 'ledger', { limit: 10, offset: 0 }], () => listPaymentLedger({ limit: 10, offset: 0 }));
+    }
+  }, [loading, isAuthenticated, hasPermission, queryClient]);
 
   // Session timeout handling (1 hour inactivity, 24 hour hard cap)
   useEffect(() => {
