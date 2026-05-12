@@ -1,4 +1,4 @@
-import { apiRequest } from "./client";
+import { apiRequest, publicApiRequest } from "./client";
 
 // Types
 export type DashboardType =
@@ -43,6 +43,12 @@ export interface CreateInviteData {
   dashboardType: DashboardType;
   role: string;
   customMessage?: string;
+}
+
+export interface AcceptInviteData {
+  token: string;
+  password: string;
+  name: string;
 }
 
 // API Endpoints
@@ -101,6 +107,22 @@ export const cancelInvite = async (inviteId: string) => {
     message: string;
   }>(`/api/v1/admin/invites/${inviteId}`, {
     method: "DELETE",
+  });
+
+  return res;
+};
+
+export const acceptInvite = async (inviteId: string, payload: AcceptInviteData) => {
+  const res = await publicApiRequest<{
+    success: boolean;
+    message: string;
+    data?: {
+      userId: string;
+      email: string;
+    };
+  }>(`/api/v1/invites/${inviteId}/accept`, {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 
   return res;
