@@ -280,6 +280,7 @@ export default function UsersPage() {
     queryFn: () =>
       listUsers({
         isAadhaarVerified: true,
+        role: "helper",
         createdFrom: createdFrom || undefined,
         createdTo: createdTo || undefined,
         page: 1,
@@ -454,7 +455,7 @@ export default function UsersPage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-gray-600">
-              Aadhaar verified{createdFrom || createdTo ? " in selected date range" : ""}
+              Aadhaar verified Helpers{createdFrom || createdTo ? " in selected date range" : ""}
             </p>
             <p className="text-2xl font-semibold text-gray-900">
               {Number(verifiedInRange).toLocaleString()}
@@ -502,7 +503,13 @@ export default function UsersPage() {
                   </TableHeader>
                   <TableBody>
                     {users.map((user) => (
-                      <TableRow key={user.userId}>
+                       <TableRow
+                        key={user.userId}
+                        className="cursor-pointer hover:bg-gray-50 transition-colors"
+                        onClick={() =>
+                          router.push(`/users/${encodeURIComponent(user.userId)}`)
+                        }
+                      >
                         <TableCell>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                             <div className="flex items-center gap-3">
@@ -538,7 +545,7 @@ export default function UsersPage() {
                         <TableCell className="hidden lg:table-cell text-sm text-gray-500">
                           {formatDate(user.createdAt)}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="sm">
