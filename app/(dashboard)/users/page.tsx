@@ -148,7 +148,7 @@ export default function UsersPage() {
       listUsers({
         search: search || undefined,
         status: statusFilter !== "all" ? statusFilter : undefined,
-        role: roleFilter !== "all" ? roleFilter : undefined,
+        role: aadhaarFilter !== "all" ? "helper" : (roleFilter !== "all" ? roleFilter : undefined),
         isAadhaarVerified:
           aadhaarFilter === "verified"
             ? true
