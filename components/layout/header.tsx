@@ -25,8 +25,7 @@ export function Header({ onMenuClick }: HeaderProps) {
 
   const displayRole = (role?: string) => {
     if (!role) return '';
-    if (role === 'super_admin') return 'operational_admin';
-    return role;
+    return role.replace(/_/g, ' ');
   };
 
   const handleLogout = async () => {
@@ -92,7 +91,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                   <p className="text-xs text-gray-500">{user.email}</p>
                   {user.isSuperAdmin && (
                     <span className="text-xs text-yellow-600 font-medium">
-                      Operational Admin
+                      Super Admin
                     </span>
                   )}
                 </div>

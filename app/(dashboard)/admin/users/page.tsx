@@ -23,6 +23,22 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Loader2,
   MoreHorizontal,
   Search,
@@ -34,11 +50,18 @@ import { toast } from "sonner";
 import { listUsers, updateUser, AdminUser } from "@/lib/api/admin";
 import { formatDate } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 export default function AdminUsersPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
+  const { isSuperAdmin } = usePermissions();
+  const [shiftRoleDialog, setShiftRoleDialog] = useState<{
+    open: boolean;
+    user: AdminUser | null;
+    role: string;
+  }>({ open: false, user: null, role: "" });
 
   // Fetch Users
   const { data, isLoading } = useQuery({
@@ -68,6 +91,25 @@ export default function AdminUsersPage() {
   const handleStatusChange = (userId: string, currentStatus: string) => {
     const newStatus = currentStatus === "active" ? "suspended" : "active";
     updateStatusMutation.mutate({ userId, status: newStatus });
+  };
+
+  const updateRoleMutation = useMutation({
+    mutationFn: ({ userId, role }: { userId: string; role: string }) =>
+      updateUser(userId, { role } as any),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      toast.success("Role updated successfully");
+      setShiftRoleDialog({ open: false, user: null, role: "" });
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || "Failed to update role");
+    },
+  });
+
+  const primaryRoleLabel = (user: AdminUser) => {
+    if (user.isSuperAdmin) return "Super Admin";
+    const role = user.dashboardAccess?.[0]?.role;
+    return role ? role.replace(/_/g, " ") : "Admin";
   };
 
   return (
@@ -106,7 +148,6 @@ export default function AdminUsersPage() {
                 <TableRow>
                   <TableHead>User</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Dashboard Access</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Joined</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -116,7 +157,7 @@ export default function AdminUsersPage() {
                 {data?.users.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={5}
                       className="text-center py-8 text-muted-foreground"
                     >
                       No admin users found.
@@ -141,36 +182,12 @@ export default function AdminUsersPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {user.isSuperAdmin ? (
-                          <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100 border-purple-200">
-                            Operational Admin
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline">Admin</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {user.dashboardAccess.map((access, idx) => (
-                            <Badge
-                              key={idx}
-                              variant="secondary"
-                              className="text-xs"
-                            >
-                              {access.dashboardType === "main_admin"
-                                ? "Main"
-                                : access.dashboardType === "payment_admin"
-                                  ? "Pay"
-                                  : access.dashboardType === "content_admin"
-                                    ? "Content"
-                                    : access.dashboardType ===
-                                        "leads_onboarding"
-                                      ? "Leads"
-                                      : "Other"}
-                              : {access.role.replace("_", " ")}
-                            </Badge>
-                          ))}
-                        </div>
+                        <Badge
+                          variant={user.isSuperAdmin ? "default" : "outline"}
+                          className={user.isSuperAdmin ? "bg-purple-100 text-purple-700 hover:bg-purple-100 border-purple-200" : ""}
+                        >
+                          {primaryRoleLabel(user)}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -194,6 +211,22 @@ export default function AdminUsersPage() {
                             <DropdownMenuItem>
                               <UserCog className="mr-2 h-4 w-4" /> Edit Details
                             </DropdownMenuItem>
+                            {isSuperAdmin && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    setShiftRoleDialog({
+                                      open: true,
+                                      user,
+                                      role: user.dashboardAccess?.[0]?.role || "",
+                                    })
+                                  }
+                                >
+                                  Shift Role
+                                </DropdownMenuItem>
+                              </>
+                            )}
                             <DropdownMenuSeparator />
                             {user.status === "active" ? (
                               <DropdownMenuItem
@@ -228,6 +261,64 @@ export default function AdminUsersPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={shiftRoleDialog.open}
+        onOpenChange={(open) =>
+          setShiftRoleDialog((d) => ({ ...d, open, user: open ? d.user : null }))
+        }
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Shift Role</DialogTitle>
+            <DialogDescription>
+              Update the role for this admin user. (Super Admin only)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="role">Role</Label>
+            <Select
+              value={shiftRoleDialog.role}
+              onValueChange={(value) =>
+                setShiftRoleDialog((d) => ({ ...d, role: value }))
+              }
+            >
+              <SelectTrigger id="role">
+                <SelectValue placeholder="Select role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="super_admin">super admin</SelectItem>
+                <SelectItem value="operations_admin">operations admin</SelectItem>
+                <SelectItem value="support_admin">support admin</SelectItem>
+                <SelectItem value="payments_admin">payments admin</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShiftRoleDialog({ open: false, user: null, role: "" })}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!shiftRoleDialog.user?.userId || !shiftRoleDialog.role) {
+                  toast.error("Role is required");
+                  return;
+                }
+                updateRoleMutation.mutate({
+                  userId: shiftRoleDialog.user.userId,
+                  role: shiftRoleDialog.role,
+                });
+              }}
+              disabled={!shiftRoleDialog.role || updateRoleMutation.isPending}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

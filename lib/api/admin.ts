@@ -5,7 +5,6 @@ export type DashboardType =
   | "main_admin"
   | "super_admin"
   | "leads_onboarding"
-  | "content_admin"
   | "payment_admin";
 
 export interface AdminInvite {

@@ -78,6 +78,102 @@ export async function deleteTask(
 }
 
 /**
+ * Request task deletion (Operations -> Super Admin approval)
+ */
+export async function requestTaskDelete(
+  taskId: string,
+  reason: string
+): Promise<ApiResponse<{ requestId: string }>> {
+  const result = await apiRequest<ApiResponse<{ requestId: string }>>(
+    `/api/v1/tasks/${taskId}/delete-requests`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    },
+  );
+
+  if (!result || result.success === false) {
+    const msg =
+      (result as ApiResponse<{ requestId: string }> | null)?.error ||
+      "Failed to request task deletion";
+    throw new Error(msg);
+  }
+
+  return result;
+}
+
+export async function listDeletedTasks(filters?: TaskFilters): Promise<ApiResponse<Task[]>> {
+  const params = new URLSearchParams();
+  if (filters?.page) params.append('page', filters.page.toString());
+  if (filters?.limit) params.append('limit', filters.limit.toString());
+  if (filters?.search) params.append('search', filters.search);
+
+  const query = params.toString();
+  return apiRequest<ApiResponse<Task[]>>(`/api/v1/tasks/recycle-bin${query ? `?${query}` : ''}`);
+}
+
+export async function restoreTask(taskId: string): Promise<ApiResponse<Task>> {
+  const result = await apiRequest<ApiResponse<Task>>(`/api/v1/tasks/${taskId}/restore`, {
+    method: 'POST',
+  });
+  if (!result || result.success === false) {
+    const msg =
+      (result as ApiResponse<Task> | null)?.error || 'Failed to restore task';
+    throw new Error(msg);
+  }
+  return result;
+}
+
+export async function listTaskDeleteRequests(params?: {
+  page?: number;
+  limit?: number;
+  status?: "pending" | "approved" | "rejected" | "all";
+  search?: string;
+}): Promise<ApiResponse<any>> {
+  const query = new URLSearchParams();
+  if (params?.page) query.append("page", params.page.toString());
+  if (params?.limit) query.append("limit", params.limit.toString());
+  if (params?.status) query.append("status", params.status);
+  if (params?.search) query.append("search", params.search);
+  const qs = query.toString();
+  return apiRequest<ApiResponse<any>>(`/api/v1/tasks/delete-requests${qs ? `?${qs}` : ""}`);
+}
+
+export async function approveTaskDeleteRequest(
+  requestId: string,
+  decisionNote?: string,
+): Promise<ApiResponse<any>> {
+  const result = await apiRequest<ApiResponse<any>>(
+    `/api/v1/tasks/delete-requests/${requestId}/approve`,
+    {
+      method: "POST",
+      body: JSON.stringify({ decisionNote }),
+    },
+  );
+  if (!result || result.success === false) {
+    throw new Error((result as any)?.error || "Failed to approve delete request");
+  }
+  return result;
+}
+
+export async function rejectTaskDeleteRequest(
+  requestId: string,
+  decisionNote?: string,
+): Promise<ApiResponse<any>> {
+  const result = await apiRequest<ApiResponse<any>>(
+    `/api/v1/tasks/delete-requests/${requestId}/reject`,
+    {
+      method: "POST",
+      body: JSON.stringify({ decisionNote }),
+    },
+  );
+  if (!result || result.success === false) {
+    throw new Error((result as any)?.error || "Failed to reject delete request");
+  }
+  return result;
+}
+
+/**
  * Get task applications
  */
 export async function getTaskApplications(

@@ -6,7 +6,7 @@ import {
   useQueryClient,
   useQueries,
 } from "@tanstack/react-query";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Calendar,
@@ -15,11 +15,11 @@ import {
   User,
   FileText,
   Trash2,
-  Edit,
   CheckCircle,
   XCircle,
   ChevronLeft,
   ChevronRight,
+  Send,
 } from "lucide-react";
 import {
   Card,
@@ -34,6 +34,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   getTask,
   deleteTask,
+  requestTaskDelete,
   getTaskApplications,
   updateApplicationStatus,
 } from "@/lib/api/tasks";
@@ -106,14 +107,19 @@ const extractHelperProfileId = (application: any): string => {
 export default function TaskDetailsPage() {
   const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { hasPermission } = usePermissions();
+  const { hasPermission, isSuperAdmin } = usePermissions();
   const taskId = params.taskId as string;
   const isValidTaskId = Boolean(taskId && taskId !== "undefined" && taskId !== "null");
-  const isEditMode = searchParams.get("edit") === "true";
 
   const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    reason: string;
+  }>({
+    open: false,
+    reason: "",
+  });
+  const [deleteRequestDialog, setDeleteRequestDialog] = useState<{
     open: boolean;
     reason: string;
   }>({
@@ -155,6 +161,18 @@ export default function TaskDetailsPage() {
     },
   });
 
+  const deleteRequestMutation = useMutation({
+    mutationFn: ({ taskId, reason }: { taskId: string; reason: string }) =>
+      requestTaskDelete(taskId, reason),
+    onSuccess: () => {
+      toast.success("Delete request sent to Super Admin");
+      setDeleteRequestDialog({ open: false, reason: "" });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to send delete request");
+    },
+  });
+
   const updateApplicationStatusMutation = useMutation({
     mutationFn: ({
       applicationId,
@@ -178,6 +196,10 @@ export default function TaskDetailsPage() {
     setDeleteDialog({ open: true, reason: "" });
   };
 
+  const handleRequestDelete = () => {
+    setDeleteRequestDialog({ open: true, reason: "" });
+  };
+
   const confirmDelete = () => {
     if (!isValidTaskId) {
       toast.error("Invalid task id");
@@ -188,6 +210,18 @@ export default function TaskDetailsPage() {
       return;
     }
     deleteMutation.mutate({ taskId, reason: deleteDialog.reason });
+  };
+
+  const confirmDeleteRequest = () => {
+    if (!isValidTaskId) {
+      toast.error("Invalid task id");
+      return;
+    }
+    if (!deleteRequestDialog.reason.trim()) {
+      toast.error("Reason is required");
+      return;
+    }
+    deleteRequestMutation.mutate({ taskId, reason: deleteRequestDialog.reason });
   };
 
   const handleApplicationStatusChange = (
@@ -344,18 +378,17 @@ export default function TaskDetailsPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {hasPermission("task.update") && (
-            <Button variant="outline" asChild>
-              <Link href={`/tasks/${taskId}?edit=true`}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit
-              </Link>
-            </Button>
-          )}
-          {hasPermission("task.delete") && (
+          {/* Task editing disabled for all roles */}
+          {isSuperAdmin && hasPermission("task.delete") && (
             <Button variant="destructive" onClick={handleDelete}>
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
+            </Button>
+          )}
+          {!isSuperAdmin && hasPermission("task.delete") && (
+            <Button variant="outline" onClick={handleRequestDelete}>
+              <Send className="mr-2 h-4 w-4" />
+              Request Delete
             </Button>
           )}
         </div>
@@ -718,6 +751,57 @@ export default function TaskDetailsPage() {
               disabled={!deleteDialog.reason.trim()}
             >
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Request Dialog */}
+      <Dialog
+        open={deleteRequestDialog.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteRequestDialog({ open: false, reason: "" });
+          } else {
+            setDeleteRequestDialog((d) => ({ ...d, open: true }));
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request Task Deletion</DialogTitle>
+            <DialogDescription>
+              This will send a delete request to Super Admin for "{task.title}".
+              Please enter a reason below (required).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="delete-request-reason">Reason *</Label>
+            <Textarea
+              id="delete-request-reason"
+              placeholder="Enter the reason for requesting deletion..."
+              value={deleteRequestDialog.reason}
+              onChange={(e) =>
+                setDeleteRequestDialog({
+                  ...deleteRequestDialog,
+                  reason: e.target.value,
+                })
+              }
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteRequestDialog({ open: false, reason: "" })}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmDeleteRequest}
+              disabled={!deleteRequestDialog.reason.trim()}
+            >
+              Send Request
             </Button>
           </DialogFooter>
         </DialogContent>

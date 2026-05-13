@@ -255,7 +255,7 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
                       isAdminPath ? 'text-yellow-600' : 'text-gray-400'
                     )}
                   />
-                  <span>Operational Admin</span>
+                  <span>Super Admin</span>
                 </div>
                 {superAdminSectionOpen ? (
                   <ChevronDown className="h-4 w-4" />

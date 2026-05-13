@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { BarChart3, Users, UserCheck, Briefcase, CircleDot, CheckCircle2 } from 'lucide-react';
+import { BarChart3, Users, UserCheck, Briefcase } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -97,28 +97,12 @@ export default function AnalyticsPage() {
       bg: 'bg-indigo-50',
     },
     {
-      title: 'Total Tasks',
-      value: analytics?.tasks.total ?? 0,
-      subtitle: `${analytics?.tasks.open ?? 0} open`,
+      title: 'Open Tasks',
+      value: analytics?.tasks.open ?? 0,
+      subtitle: 'Currently open',
       icon: Briefcase,
       color: 'text-blue-600',
       bg: 'bg-blue-50',
-    },
-    {
-      title: 'In Progress Tasks',
-      value: analytics?.tasks.inProgress ?? 0,
-      subtitle: 'Currently active',
-      icon: CircleDot,
-      color: 'text-purple-600',
-      bg: 'bg-purple-50',
-    },
-    {
-      title: 'Completed Tasks',
-      value: analytics?.tasks.completed ?? 0,
-      subtitle: 'Successfully finished',
-      icon: CheckCircle2,
-      color: 'text-green-600',
-      bg: 'bg-green-50',
     },
   ];
 

@@ -1,19 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
   Search,
   MoreVertical,
   Eye,
-  Edit,
   Trash2,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
   Briefcase,
+  Send,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,7 +50,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { listTasks, deleteTask } from "@/lib/api/tasks";
+import { listTasks, deleteTask, requestTaskDelete } from "@/lib/api/tasks";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
@@ -72,7 +72,7 @@ const statusColors: Record<string, string> = {
 export default function TasksPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { hasPermission } = usePermissions();
+  const { hasPermission, isSuperAdmin } = usePermissions();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("open");
@@ -81,6 +81,13 @@ export default function TasksPage() {
   const [limit, setLimit] = useState(20);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    reason: string;
+  }>({
+    open: false,
+    reason: "",
+  });
+  const [deleteRequestDialog, setDeleteRequestDialog] = useState<{
     open: boolean;
     reason: string;
   }>({
@@ -116,9 +123,27 @@ export default function TasksPage() {
     },
   });
 
+  const deleteRequestMutation = useMutation({
+    mutationFn: ({ taskId, reason }: { taskId: string; reason: string }) =>
+      requestTaskDelete(taskId, reason),
+    onSuccess: () => {
+      toast.success("Delete request sent to Super Admin");
+      setDeleteRequestDialog({ open: false, reason: "" });
+      setSelectedTask(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to send delete request");
+    },
+  });
+
   const handleDelete = (task: Task) => {
     setSelectedTask(task);
     setDeleteDialog({ open: true, reason: "" });
+  };
+
+  const handleRequestDelete = (task: Task) => {
+    setSelectedTask(task);
+    setDeleteRequestDialog({ open: true, reason: "" });
   };
 
   const confirmDelete = () => {
@@ -139,6 +164,24 @@ export default function TasksPage() {
     });
   };
 
+  const confirmDeleteRequest = () => {
+    if (!selectedTask || !deleteRequestDialog.reason.trim()) {
+      toast.error("Reason is required");
+      return;
+    }
+    const taskIdentifier = getTaskIdentifier(
+      selectedTask as Partial<Task> & { _id?: string; id?: string },
+    );
+    if (!taskIdentifier) {
+      toast.error("Task identifier missing. Please refresh and try again.");
+      return;
+    }
+    deleteRequestMutation.mutate({
+      taskId: taskIdentifier,
+      reason: deleteRequestDialog.reason,
+    });
+  };
+
   const tasks = data?.data || [];
   const pagination = data?.pagination || {
     page: 1,
@@ -146,6 +189,12 @@ export default function TasksPage() {
     total: 0,
     pages: 1,
   };
+
+  const canRequestDelete = useMemo(() => {
+    if (!hasPermission("task.list")) return false;
+    if (isSuperAdmin) return false;
+    return hasPermission("task.delete");
+  }, [hasPermission, isSuperAdmin]);
 
   // Extract unique categories from tasks
   const categories = Array.from(
@@ -165,11 +214,23 @@ export default function TasksPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Tasks</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Manage and monitor platform tasks
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Tasks</h1>
+          <p className="mt-2 text-sm text-gray-600">
+            Manage and monitor platform tasks
+          </p>
+        </div>
+        {isSuperAdmin && (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/tasks/delete-requests">Delete Requests</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/tasks/recycle-bin">Recycle Bin</Link>
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -288,7 +349,15 @@ export default function TasksPage() {
                         task as Partial<Task> & { _id?: string; id?: string },
                       );
                       return (
-                      <TableRow key={taskIdentifier || `${task.title}-${task.createdAt}`}>
+                      <TableRow 
+                        key={taskIdentifier || `${task.title}-${task.createdAt}`}
+                        className="cursor-pointer hover:bg-gray-50 transition-colors"
+                        onClick={() => {
+                          if (taskIdentifier) {
+                            router.push(`/tasks/${taskIdentifier}`);
+                          }
+                        }}
+                      >
                         <TableCell>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                             <div className="flex items-center gap-3">
@@ -330,7 +399,7 @@ export default function TasksPage() {
                         <TableCell className="hidden lg:table-cell text-sm text-gray-500">
                           {formatDate(task.createdAt)}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="sm">
@@ -346,27 +415,19 @@ export default function TasksPage() {
                                   View Details
                                 </Link>
                               </DropdownMenuItem>
-                              {hasPermission("task.update") && (
-                                <DropdownMenuItem asChild>
-                                  <Link
-                                    href={
-                                      taskIdentifier
-                                        ? `/tasks/${taskIdentifier}?edit=true`
-                                        : "/tasks"
-                                    }
-                                  >
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Edit Task
-                                  </Link>
-                                </DropdownMenuItem>
-                              )}
-                              {hasPermission("task.delete") && (
+                              {isSuperAdmin && hasPermission("task.delete") && (
                                 <DropdownMenuItem
                                   onClick={() => handleDelete(task)}
                                   className="text-red-600"
                                 >
                                   <Trash2 className="mr-2 h-4 w-4" />
                                   Delete Task
+                                </DropdownMenuItem>
+                              )}
+                              {canRequestDelete && (
+                                <DropdownMenuItem onClick={() => handleRequestDelete(task)}>
+                                  <Send className="mr-2 h-4 w-4" />
+                                  Request Delete
                                 </DropdownMenuItem>
                               )}
                             </DropdownMenuContent>
@@ -503,6 +564,59 @@ export default function TasksPage() {
               disabled={!deleteDialog.reason.trim()}
             >
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Request Dialog */}
+      <Dialog
+        open={deleteRequestDialog.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteRequestDialog({ open: false, reason: "" });
+            setSelectedTask(null);
+          } else {
+            setDeleteRequestDialog((d) => ({ ...d, open: true }));
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request Task Deletion</DialogTitle>
+            <DialogDescription>
+              {selectedTask && (
+                <>
+                  This will send a delete request to Super Admin for "{selectedTask.title}".
+                  Please enter a reason below (required).
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="delete-request-reason">Reason *</Label>
+            <Textarea
+              id="delete-request-reason"
+              placeholder="Enter the reason for requesting deletion..."
+              value={deleteRequestDialog.reason}
+              onChange={(e) =>
+                setDeleteRequestDialog({ ...deleteRequestDialog, reason: e.target.value })
+              }
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteRequestDialog({ open: false, reason: "" })}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmDeleteRequest}
+              disabled={!deleteRequestDialog.reason.trim()}
+            >
+              Send Request
             </Button>
           </DialogFooter>
         </DialogContent>
