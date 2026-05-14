@@ -97,7 +97,7 @@ export default function AnalyticsPage() {
       bg: 'bg-indigo-50',
     },
     {
-      title: 'Open Tasks',
+      title: 'Open Works',
       value: analytics?.tasks.open ?? 0,
       subtitle: 'Currently open',
       icon: Briefcase,
@@ -105,7 +105,7 @@ export default function AnalyticsPage() {
       bg: 'bg-blue-50',
     },
     {
-      title: 'Total Tasks',
+      title: 'Total Works',
       value: analytics?.tasks.total ?? 0,
       subtitle: `${analytics?.tasks.open ?? 0} open`,
       icon: Briefcase,
@@ -113,7 +113,7 @@ export default function AnalyticsPage() {
       bg: 'bg-gray-50',
     },
     {
-      title: 'In Progress Tasks',
+      title: 'In Progress Works',
       value: analytics?.tasks.inProgress ?? 0,
       subtitle: 'Currently active',
       icon: CircleDot,
@@ -121,7 +121,7 @@ export default function AnalyticsPage() {
       bg: 'bg-purple-50',
     },
     {
-      title: 'Completed Tasks',
+      title: 'Completed Works',
       value: analytics?.tasks.completed ?? 0,
       subtitle: 'Successfully finished',
       icon: CheckCircle2,
@@ -135,7 +135,7 @@ export default function AnalyticsPage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>
         <p className="mt-2 text-sm text-gray-600">
-          Platform growth overview for Customers, Helpers, and tasks.
+          Platform growth overview for Customers, Helpers, and works.
         </p>
       </div>
 
@@ -180,7 +180,7 @@ export default function AnalyticsPage() {
           </CardDescription>
           {analytics?.partial?.taskServiceUnavailable && (
             <CardDescription className="text-yellow-600">
-              Task service is currently unavailable. User counts are shown; task counts may be 0 temporarily.
+              Work service is currently unavailable. User counts are shown; work counts may be 0 temporarily.
             </CardDescription>
           )}
         </CardHeader>
@@ -212,31 +212,31 @@ export default function AnalyticsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Verified vs Unverified Customers (Last 30 days)</CardTitle>
-          <CardDescription>Compares task posting and bidding behavior by verification status.</CardDescription>
+          <CardDescription>Compares work posting and bidding behavior by verification status.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <div className="rounded-lg border p-4">
             <p className="text-sm font-medium text-gray-700">Verified</p>
             <p className="mt-2 text-sm text-gray-600">Customers: {comparison?.verified.CustomerCount ?? 0}</p>
-            <p className="text-sm text-gray-600">Tasks: {comparison?.verified.taskCount ?? 0}</p>
+            <p className="text-sm text-gray-600">Works: {comparison?.verified.taskCount ?? 0}</p>
             <p className="text-sm text-gray-600">Bids: {comparison?.verified.bidCount ?? 0}</p>
-            <p className="text-sm text-gray-600">Avg tasks/Customer: {comparison?.verified.avgTasksPerCustomer ?? 0}</p>
-            <p className="text-sm text-gray-600">Avg bids/task: {comparison?.verified.avgBidsPerTask ?? 0}</p>
+            <p className="text-sm text-gray-600">Avg works/Customer: {comparison?.verified.avgTasksPerCustomer ?? 0}</p>
+            <p className="text-sm text-gray-600">Avg bids/work: {comparison?.verified.avgBidsPerTask ?? 0}</p>
           </div>
           <div className="rounded-lg border p-4">
             <p className="text-sm font-medium text-gray-700">Unverified</p>
             <p className="mt-2 text-sm text-gray-600">Customers: {comparison?.unverified.CustomerCount ?? 0}</p>
-            <p className="text-sm text-gray-600">Tasks: {comparison?.unverified.taskCount ?? 0}</p>
+            <p className="text-sm text-gray-600">Works: {comparison?.unverified.taskCount ?? 0}</p>
             <p className="text-sm text-gray-600">Bids: {comparison?.unverified.bidCount ?? 0}</p>
-            <p className="text-sm text-gray-600">Avg tasks/Customer: {comparison?.unverified.avgTasksPerCustomer ?? 0}</p>
-            <p className="text-sm text-gray-600">Avg bids/task: {comparison?.unverified.avgBidsPerTask ?? 0}</p>
+            <p className="text-sm text-gray-600">Avg works/Customer: {comparison?.unverified.avgTasksPerCustomer ?? 0}</p>
+            <p className="text-sm text-gray-600">Avg bids/work: {comparison?.unverified.avgBidsPerTask ?? 0}</p>
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Task Demand by Category (Last 30 days)</CardTitle>
+          <CardTitle className="text-base">Work Demand by Category (Last 30 days)</CardTitle>
           <CardDescription>
             Track which categories Customers are targeting most.
           </CardDescription>
@@ -259,7 +259,7 @@ export default function AnalyticsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Task Category Performance (Last 30 days)</CardTitle>
+          <CardTitle className="text-base">Work Category Performance (Last 30 days)</CardTitle>
           <CardDescription>
             Monitor completion, fulfillment, and cancellation rates by category.
           </CardDescription>
@@ -279,7 +279,7 @@ export default function AnalyticsPage() {
               </p>
             </div>
             <div className="rounded-lg border p-3">
-              <p className="text-xs text-gray-500">Cancelled tasks</p>
+              <p className="text-xs text-gray-500">Cancelled works</p>
               <p className="text-lg font-semibold text-gray-900">
                 {categoryPerformance?.totals.cancelled ?? 0}
               </p>
@@ -313,7 +313,7 @@ export default function AnalyticsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Task Cancellation Analytics (Last 30 days)</CardTitle>
+          <CardTitle className="text-base">Work Cancellation Analytics (Last 30 days)</CardTitle>
           <CardDescription>
             Track cancellation levels and whether they occur before or after assignment.
           </CardDescription>
@@ -327,7 +327,7 @@ export default function AnalyticsPage() {
               </p>
             </div>
             <div className="rounded-lg border p-3">
-              <p className="text-xs text-gray-500">Cancelled tasks</p>
+              <p className="text-xs text-gray-500">Cancelled works</p>
               <p className="text-lg font-semibold text-gray-900">
                 {cancellations?.totals.cancelledTasks ?? 0}
               </p>
@@ -369,7 +369,7 @@ export default function AnalyticsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Per-Customer Analytics</CardTitle>
-          <CardDescription>Enter Customer profile ObjectId (`requesterId`) to inspect task and bid signals.</CardDescription>
+          <CardDescription>Enter Customer profile ObjectId (`requesterId`) to inspect work and bid signals.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2">
@@ -397,9 +397,9 @@ export default function AnalyticsPage() {
                   <p className="mt-2 text-sm text-gray-600">
                     Verification: {CustomerAnalytics?.profile.isVerified ? 'Verified' : 'Unverified'}
                   </p>
-                  <p className="text-sm text-gray-600">Posted tasks: {CustomerAnalytics?.metrics.postedTasks ?? 0}</p>
+                  <p className="text-sm text-gray-600">Posted works: {CustomerAnalytics?.metrics.postedTasks ?? 0}</p>
                   <p className="text-sm text-gray-600">Total bids: {CustomerAnalytics?.metrics.totalBids ?? 0}</p>
-                  <p className="text-sm text-gray-600">Genuine tasks: {CustomerAnalytics?.metrics.genuineTaskCount ?? 0}</p>
+                  <p className="text-sm text-gray-600">Genuine works: {CustomerAnalytics?.metrics.genuineTaskCount ?? 0}</p>
                   <p className="mt-2 text-sm font-medium text-gray-700">Top categories</p>
                   <div className="mt-1 space-y-1">
                     {(CustomerAnalytics?.metrics.categories || []).slice(0, 5).map((item) => (

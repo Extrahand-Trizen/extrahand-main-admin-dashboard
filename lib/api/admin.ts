@@ -171,3 +171,14 @@ export const updateUser = async (
 
   return res?.data;
 };
+
+export const deleteUser = async (userId: string) => {
+  const res = await apiRequest<{
+    success: boolean;
+    message: string;
+  }>(`/api/v1/admin/users/${userId}`, {
+    method: "DELETE",
+  });
+
+  return res;
+};

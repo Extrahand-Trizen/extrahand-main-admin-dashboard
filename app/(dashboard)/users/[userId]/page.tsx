@@ -501,21 +501,21 @@ export default function UserDetailsPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Briefcase className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm text-gray-600">Total Tasks</span>
+                    <span className="text-sm text-gray-600">Total Works</span>
                   </div>
                   <span className="text-lg font-semibold">{totalTasksValue}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    <span className="text-sm text-gray-600">Completed Tasks</span>
+                    <span className="text-sm text-gray-600">Completed Works</span>
                   </div>
                   <span className="text-lg font-semibold">{completedTasksValue}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-blue-500" />
-                    <span className="text-sm text-gray-600">Posted Tasks</span>
+                    <span className="text-sm text-gray-600">Posted Works</span>
                   </div>
                   <span className="text-lg font-semibold">{postedTasksValue}</span>
                 </div>
@@ -1060,7 +1060,7 @@ export default function UserDetailsPage() {
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium">Helper</span>
                             {user.roleVerifications.Helper.canAcceptTasks ? (
-                              <Badge variant="success">Can Accept Tasks</Badge>
+                              <Badge variant="success">Can Accept Works</Badge>
                             ) : (
                               <Badge variant="secondary">Cannot Accept</Badge>
                             )}
@@ -1103,7 +1103,7 @@ export default function UserDetailsPage() {
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium">Customer</span>
                             {user.roleVerifications.Customer.canPostTasks ? (
-                              <Badge variant="success">Can Post Tasks</Badge>
+                              <Badge variant="success">Can Post Works</Badge>
                             ) : (
                               <Badge variant="secondary">Cannot Post</Badge>
                             )}
@@ -1164,13 +1164,13 @@ export default function UserDetailsPage() {
             {/* Task Statistics */}
             <Card>
               <CardHeader>
-                <CardTitle>Task Statistics</CardTitle>
+                <CardTitle>Work Statistics</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3">
                   {user.totalTasks !== undefined && (
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Total Tasks</span>
+                      <span className="text-sm text-gray-600">Total Works</span>
                       <span className="text-lg font-semibold">
                         {user.totalTasks}
                       </span>
@@ -1240,7 +1240,7 @@ export default function UserDetailsPage() {
           <div className="grid gap-4 md:grid-cols-4">
             <Card>
               <CardContent className="pt-6">
-                <p className="text-sm text-gray-600">Active Task (Working)</p>
+                <p className="text-sm text-gray-600">Active Work (Working)</p>
                 <p className="text-2xl font-semibold">
                   {activeAssignedTasks.length > 0 ? "Yes" : "No"}
                 </p>
@@ -1248,7 +1248,7 @@ export default function UserDetailsPage() {
             </Card>
             <Card>
               <CardContent className="pt-6">
-                <p className="text-sm text-gray-600">Current Active Tasks</p>
+                <p className="text-sm text-gray-600">Current Active Works</p>
                 <p className="text-2xl font-semibold">
                   {activeTasksPagination.total || 0}
                 </p>
@@ -1264,7 +1264,7 @@ export default function UserDetailsPage() {
             </Card>
             <Card>
               <CardContent className="pt-6">
-                <p className="text-sm text-gray-600">Tasks Posted</p>
+                <p className="text-sm text-gray-600">Works Posted</p>
                 <p className="text-2xl font-semibold">
                   {postedTasksPagination.total || 0}
                 </p>
@@ -1276,9 +1276,9 @@ export default function UserDetailsPage() {
           {hasPermission("task.list") && (
             <Card>
               <CardHeader>
-                <CardTitle>Tasks Currently Working On</CardTitle>
+                <CardTitle>Works Currently Working On</CardTitle>
                 <CardDescription>
-                  Tasks where this user is assigned and actively working
+                  Works where this user is assigned and actively working
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1356,7 +1356,7 @@ export default function UserDetailsPage() {
           {hasPermission("task.application.list") && (
             <Card>
               <CardHeader>
-                <CardTitle>Tasks User Made Offers On</CardTitle>
+                <CardTitle>Works User Made Offers On</CardTitle>
                 <CardDescription>
                   Offer history and related task details
                 </CardDescription>
@@ -1435,9 +1435,9 @@ export default function UserDetailsPage() {
           {hasPermission("task.list") && (
             <Card>
               <CardHeader>
-                <CardTitle>Tasks Posted by User</CardTitle>
+                <CardTitle>Works Posted by User</CardTitle>
                 <CardDescription>
-                  Recent tasks created by this user profile
+                  Recent works created by this user profile
                 </CardDescription>
               </CardHeader>
               <CardContent>

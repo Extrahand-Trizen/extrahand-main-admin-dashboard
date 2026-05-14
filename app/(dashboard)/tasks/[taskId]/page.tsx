@@ -302,13 +302,13 @@ export default function TaskDetailsPage() {
         <Link href="/tasks">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Tasks
+            Back to Works
           </Button>
         </Link>
         <Card>
           <CardContent className="py-8">
             <div className="text-center text-red-600">
-              Invalid task id. Please open task details from the list again.
+              Invalid work id. Please open work details from the list again.
             </div>
           </CardContent>
         </Card>
@@ -345,13 +345,13 @@ export default function TaskDetailsPage() {
         <Link href="/tasks">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Tasks
+            Back to Works
           </Button>
         </Link>
         <Card>
           <CardContent className="py-8">
             <div className="text-center text-red-600">
-              Failed to load task details. Please try again.
+              Failed to load work details. Please try again.
             </div>
           </CardContent>
         </Card>
@@ -373,7 +373,7 @@ export default function TaskDetailsPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">{task.title}</h1>
             <p className="mt-1 text-sm text-gray-600">
-              Task ID: {task.taskId || (task as any)._id || taskId}
+              Work ID: {task.taskId || (task as any)._id || taskId}
             </p>
           </div>
         </div>
@@ -400,8 +400,8 @@ export default function TaskDetailsPage() {
           {/* Task Details */}
           <Card>
             <CardHeader>
-              <CardTitle>Task Details</CardTitle>
-              <CardDescription>Complete task information</CardDescription>
+              <CardTitle>Work Details</CardTitle>
+              <CardDescription>Complete work information</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
@@ -486,7 +486,7 @@ export default function TaskDetailsPage() {
                   </Badge>
                 </div>
                 <CardDescription>
-                  Task applications and their status
+                  Work applications and their status
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -720,7 +720,7 @@ export default function TaskDetailsPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Task</DialogTitle>
+            <DialogTitle>Delete Work</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete "{task.title}"? This action cannot
               be undone. Please enter a reason below (required for audit).
@@ -730,7 +730,7 @@ export default function TaskDetailsPage() {
             <Label htmlFor="delete-reason">Reason *</Label>
             <Textarea
               id="delete-reason"
-              placeholder="Enter the reason for deleting this task..."
+              placeholder="Enter the reason for deleting this work..."
               value={deleteDialog.reason}
               onChange={(e) =>
                 setDeleteDialog({ ...deleteDialog, reason: e.target.value })
@@ -769,7 +769,7 @@ export default function TaskDetailsPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Request Task Deletion</DialogTitle>
+            <DialogTitle>Request Work Deletion</DialogTitle>
             <DialogDescription>
               This will send a delete request to Super Admin for "{task.title}".
               Please enter a reason below (required).

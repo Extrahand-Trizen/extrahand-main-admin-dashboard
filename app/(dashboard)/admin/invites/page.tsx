@@ -37,7 +37,6 @@ import {
   createInvite,
   resendInvite,
   cancelInvite,
-  DashboardType,
 } from "@/lib/api/admin";
 import { formatDate } from "@/lib/utils"; // Assuming this utility exists
 
@@ -191,7 +190,6 @@ export default function AdminInvitesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Email</TableHead>
-                  <TableHead>Dashboard</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Sent By</TableHead>
@@ -203,7 +201,7 @@ export default function AdminInvitesPage() {
                 {data?.invites.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={6}
                       className="text-center py-8 text-muted-foreground"
                     >
                       No invitations found.
@@ -214,9 +212,6 @@ export default function AdminInvitesPage() {
                     <TableRow key={invite.inviteId}>
                       <TableCell className="font-medium">
                         {invite.email}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{invite.dashboardType}</Badge>
                       </TableCell>
                       <TableCell className="capitalize">
                         {invite.role.replace("_", " ")}

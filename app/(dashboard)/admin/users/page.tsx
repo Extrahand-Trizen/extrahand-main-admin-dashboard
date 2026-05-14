@@ -45,9 +45,10 @@ import {
   ShieldAlert,
   ShieldCheck,
   UserCog,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { listUsers, updateUser, AdminUser } from "@/lib/api/admin";
+import { listUsers, updateUser, deleteUser, AdminUser } from "@/lib/api/admin";
 import { formatDate } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { usePermissions } from "@/lib/hooks/usePermissions";
@@ -62,6 +63,10 @@ export default function AdminUsersPage() {
     user: AdminUser | null;
     role: string;
   }>({ open: false, user: null, role: "" });
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    user: AdminUser | null;
+  }>({ open: false, user: null });
 
   // Fetch Users
   const { data, isLoading } = useQuery({
@@ -103,6 +108,18 @@ export default function AdminUsersPage() {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.error || "Failed to update role");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (userId: string) => deleteUser(userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      toast.success("Admin user removed successfully");
+      setDeleteDialog({ open: false, user: null });
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || "Failed to remove admin user");
     },
   });
 
@@ -250,6 +267,18 @@ export default function AdminUsersPage() {
                                 Activate User
                               </DropdownMenuItem>
                             )}
+                            {isSuperAdmin && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-red-600 focus:text-red-600"
+                                  onClick={() => setDeleteDialog({ open: true, user })}
+                                  disabled={user.isSuperAdmin}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" /> Remove Role
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -315,6 +344,51 @@ export default function AdminUsersPage() {
               disabled={!shiftRoleDialog.role || updateRoleMutation.isPending}
             >
               Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialog.open}
+        onOpenChange={(open) =>
+          setDeleteDialog((d) => ({ ...d, open, user: open ? d.user : null }))
+        }
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Admin Role</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove the administrative role for{" "}
+              <span className="font-semibold text-gray-900">
+                {deleteDialog.user?.name}
+              </span>
+              ? This will revoke their access to the administration portal.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialog({ open: false, user: null })}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deleteDialog.user?.userId) {
+                  deleteMutation.mutate(deleteDialog.user.userId);
+                }
+              }}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              Remove Role
             </Button>
           </DialogFooter>
         </DialogContent>

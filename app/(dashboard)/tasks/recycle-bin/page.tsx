@@ -80,7 +80,7 @@ export default function RecycleBinPage() {
           </Link>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Recycle Bin</h1>
-            <p className="mt-1 text-sm text-gray-600">Deleted tasks (restorable)</p>
+            <p className="mt-1 text-sm text-gray-600">Deleted works (restorable)</p>
           </div>
         </div>
         <Badge variant="secondary">{pagination.total} deleted</Badge>
@@ -94,7 +94,7 @@ export default function RecycleBinPage() {
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Search deleted tasks..."
+              placeholder="Search deleted works..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -110,20 +110,20 @@ export default function RecycleBinPage() {
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Trash2 className="h-5 w-5 text-gray-600" />
-            Deleted Tasks
+            Deleted Works
           </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <TableSkeleton rows={5} />
           ) : !data || error || tasks.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">No deleted tasks found</div>
+            <div className="text-center py-8 text-gray-500">No deleted works found</div>
           ) : (
             <div className="rounded-md border border-gray-200 overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Task</TableHead>
+                    <TableHead>Work</TableHead>
                     <TableHead className="hidden md:table-cell">Status</TableHead>
                     <TableHead className="hidden md:table-cell">Deleted At</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -152,7 +152,7 @@ export default function RecycleBinPage() {
                             variant="outline"
                             onClick={() => {
                               if (!taskIdentifier) {
-                                toast.error("Task identifier missing");
+                                toast.error("Work identifier missing");
                                 return;
                               }
                               restoreMutation.mutate(taskIdentifier);

@@ -34,7 +34,7 @@ const navigation: Array<{
     permission: 'user.list',
   },
   {
-    name: 'Tasks',
+    name: 'Works',
     href: '/tasks',
     icon: Briefcase,
     permission: 'task.list',

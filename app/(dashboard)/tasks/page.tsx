@@ -216,9 +216,9 @@ export default function TasksPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Tasks</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Works</h1>
           <p className="mt-2 text-sm text-gray-600">
-            Manage and monitor platform tasks
+            Manage and monitor platform works
           </p>
         </div>
         {isSuperAdmin && (
@@ -246,7 +246,7 @@ export default function TasksPage() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   id="search"
-                  placeholder="Search tasks..."
+                  placeholder="Search works..."
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value);
@@ -307,9 +307,9 @@ export default function TasksPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Tasks List</CardTitle>
+            <CardTitle className="text-lg">Works List</CardTitle>
             <Badge variant="secondary">
-              {pagination.total} {pagination.total === 1 ? "task" : "tasks"}
+              {pagination.total} {pagination.total === 1 ? "work" : "works"}
             </Badge>
           </div>
         </CardHeader>
@@ -317,7 +317,7 @@ export default function TasksPage() {
           {isLoading ? (
             <TableSkeleton rows={5} />
           ) : !data || error || tasks.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">No tasks found</div>
+            <div className="text-center py-8 text-gray-500">No works found</div>
           ) : (
             <>
               <div className="rounded-md border border-gray-200 overflow-hidden">
@@ -325,7 +325,7 @@ export default function TasksPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="hidden sm:table-cell">
-                        Task
+                        Work
                       </TableHead>
                       <TableHead className="sm:hidden">Details</TableHead>
                       <TableHead className="hidden md:table-cell">
@@ -421,7 +421,7 @@ export default function TasksPage() {
                                   className="text-red-600"
                                 >
                                   <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete Task
+                                  Delete Work
                                 </DropdownMenuItem>
                               )}
                               {canRequestDelete && (
@@ -468,7 +468,7 @@ export default function TasksPage() {
                   <div className="text-sm text-gray-600">
                     Showing {(page - 1) * limit + 1} to{" "}
                     {Math.min(page * limit, pagination.total)} of{" "}
-                    {pagination.total} tasks
+                    {pagination.total} works
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
@@ -528,7 +528,7 @@ export default function TasksPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Task</DialogTitle>
+            <DialogTitle>Delete Work</DialogTitle>
             <DialogDescription>
               {selectedTask && (
                 <>
@@ -543,7 +543,7 @@ export default function TasksPage() {
             <Label htmlFor="delete-reason">Reason *</Label>
             <Textarea
               id="delete-reason"
-              placeholder="Enter the reason for deleting this task..."
+              placeholder="Enter the reason for deleting this work..."
               value={deleteDialog.reason}
               onChange={(e) =>
                 setDeleteDialog({ ...deleteDialog, reason: e.target.value })
@@ -583,7 +583,7 @@ export default function TasksPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Request Task Deletion</DialogTitle>
+            <DialogTitle>Request Work Deletion</DialogTitle>
             <DialogDescription>
               {selectedTask && (
                 <>
