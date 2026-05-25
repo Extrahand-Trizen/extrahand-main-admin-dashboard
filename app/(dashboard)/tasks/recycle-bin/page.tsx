@@ -9,6 +9,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
   Table,
   TableBody,
   TableCell,
@@ -16,7 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { listDeletedTasks, restoreTask } from "@/lib/api/tasks";
+import { listDeletedTasks, permanentlyDeleteTask, restoreTask } from "@/lib/api/tasks";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { formatDate } from "@/lib/utils";
 import { toast } from "sonner";
@@ -32,6 +42,14 @@ export default function RecycleBinPage() {
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
   const [search, setSearch] = useState("");
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [permanentDeleteDialog, setPermanentDeleteDialog] = useState<{
+    open: boolean;
+    reason: string;
+  }>({
+    open: false,
+    reason: "",
+  });
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["tasks", "recycle-bin", page, limit, search],
@@ -54,6 +72,21 @@ export default function RecycleBinPage() {
     },
     onError: (error: any) => {
       toast.error(error.message || "Failed to restore task");
+    },
+  });
+
+  const permanentDeleteMutation = useMutation({
+    mutationFn: ({ taskId, reason }: { taskId: string; reason?: string }) =>
+      permanentlyDeleteTask(taskId, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["tasks", "recycle-bin"] });
+      toast.success("Task permanently deleted");
+      setPermanentDeleteDialog({ open: false, reason: "" });
+      setSelectedTask(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to permanently delete task");
     },
   });
 
@@ -80,7 +113,7 @@ export default function RecycleBinPage() {
           </Link>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Recycle Bin</h1>
-            <p className="mt-1 text-sm text-gray-600">Deleted works (restorable)</p>
+            <p className="mt-1 text-sm text-gray-600">Deleted tasks (restorable)</p>
           </div>
         </div>
         <Badge variant="secondary">{pagination.total} deleted</Badge>
@@ -94,7 +127,7 @@ export default function RecycleBinPage() {
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Search deleted works..."
+              placeholder="Search deleted tasks..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -110,7 +143,7 @@ export default function RecycleBinPage() {
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Trash2 className="h-5 w-5 text-gray-600" />
-            Deleted Works
+            Deleted Tasks
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -123,7 +156,7 @@ export default function RecycleBinPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Work</TableHead>
+                    <TableHead>Task</TableHead>
                     <TableHead className="hidden md:table-cell">Status</TableHead>
                     <TableHead className="hidden md:table-cell">Deleted At</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -147,21 +180,39 @@ export default function RecycleBinPage() {
                           {formatDate((task as any).deletedAt || task.updatedAt)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              if (!taskIdentifier) {
-                                toast.error("Work identifier missing");
-                                return;
-                              }
-                              restoreMutation.mutate(taskIdentifier);
-                            }}
-                            disabled={restoreMutation.isPending}
-                          >
-                            <RotateCcw className="mr-2 h-4 w-4" />
-                            Restore
-                          </Button>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                if (!taskIdentifier) {
+                                  toast.error("Task identifier missing");
+                                  return;
+                                }
+                                restoreMutation.mutate(taskIdentifier);
+                              }}
+                              disabled={restoreMutation.isPending}
+                            >
+                              <RotateCcw className="mr-2 h-4 w-4" />
+                              Restore
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                if (!taskIdentifier) {
+                                  toast.error("Task identifier missing");
+                                  return;
+                                }
+                                setSelectedTask(task as Task);
+                                setPermanentDeleteDialog({ open: true, reason: "" });
+                              }}
+                              disabled={permanentDeleteMutation.isPending}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -172,6 +223,77 @@ export default function RecycleBinPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={permanentDeleteDialog.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPermanentDeleteDialog({ open: false, reason: "" });
+            setSelectedTask(null);
+          } else {
+            setPermanentDeleteDialog((d) => ({ ...d, open: true }));
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete permanently</DialogTitle>
+            <DialogDescription>
+              {selectedTask ? (
+                <>This will permanently delete "{selectedTask.title}".</>
+              ) : (
+                <>This will permanently delete the selected task.</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="permanent-delete-reason">Reason (optional)</Label>
+            <Textarea
+              id="permanent-delete-reason"
+              placeholder="Add a reason for the permanent delete..."
+              value={permanentDeleteDialog.reason}
+              onChange={(e) =>
+                setPermanentDeleteDialog({
+                  ...permanentDeleteDialog,
+                  reason: e.target.value,
+                })
+              }
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPermanentDeleteDialog({ open: false, reason: "" })}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!selectedTask || permanentDeleteMutation.isPending}
+              onClick={() => {
+                if (!selectedTask) {
+                  return;
+                }
+                const taskIdentifier = getTaskIdentifier(
+                  selectedTask as Partial<Task> & { _id?: string; id?: string },
+                );
+                if (!taskIdentifier) {
+                  toast.error("Task identifier missing");
+                  return;
+                }
+                const reason = permanentDeleteDialog.reason.trim();
+                permanentDeleteMutation.mutate({
+                  taskId: taskIdentifier,
+                  reason: reason || undefined,
+                });
+              }}
+            >
+              Delete permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -90,9 +90,9 @@ export default function DashboardPage() {
       permission: 'user.list',
     },
     {
-      title: 'Open Works',
+      title: 'Open Tasks',
       value: stats.openTasks,
-      subtitle: `${stats.totalTasks} total works`,
+      subtitle: `${stats.totalTasks} total tasks`,
       icon: Briefcase,
       color: 'text-blue-600',
       bg: 'bg-blue-50',
@@ -130,8 +130,8 @@ export default function DashboardPage() {
       permission: 'user.list',
     },
     {
-      title: 'View All Works',
-      description: 'Monitor and manage works',
+      title: 'View All Tasks',
+      description: 'Monitor and manage tasks',
       href: '/tasks',
       icon: Briefcase,
       permission: 'task.list',

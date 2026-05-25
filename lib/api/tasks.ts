@@ -124,6 +124,22 @@ export async function restoreTask(taskId: string): Promise<ApiResponse<Task>> {
   return result;
 }
 
+export async function permanentlyDeleteTask(
+  taskId: string,
+  reason?: string
+): Promise<ApiResponse<void>> {
+  const result = await apiRequest<ApiResponse<void>>(`/api/v1/tasks/${taskId}/permanent`, {
+    method: 'DELETE',
+    body: reason ? JSON.stringify({ reason }) : undefined,
+  });
+  if (!result || result.success === false) {
+    const msg =
+      (result as ApiResponse<void> | null)?.error || 'Failed to permanently delete task';
+    throw new Error(msg);
+  }
+  return result;
+}
+
 export async function listTaskDeleteRequests(params?: {
   page?: number;
   limit?: number;

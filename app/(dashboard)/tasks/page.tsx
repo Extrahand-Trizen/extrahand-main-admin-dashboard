@@ -216,9 +216,9 @@ export default function TasksPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Works</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Tasks</h1>
           <p className="mt-2 text-sm text-gray-600">
-            Manage and monitor platform works
+            Manage and monitor platform tasks
           </p>
         </div>
         {isSuperAdmin && (
@@ -246,7 +246,7 @@ export default function TasksPage() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   id="search"
-                  placeholder="Search works..."
+                  placeholder="Search tasks..."
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value);
@@ -307,9 +307,9 @@ export default function TasksPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Works List</CardTitle>
+            <CardTitle className="text-lg">Tasks List</CardTitle>
             <Badge variant="secondary">
-              {pagination.total} {pagination.total === 1 ? "work" : "works"}
+              {pagination.total} {pagination.total === 1 ? "task" : "tasks"}
             </Badge>
           </div>
         </CardHeader>
@@ -325,7 +325,7 @@ export default function TasksPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="hidden sm:table-cell">
-                        Work
+                        Task
                       </TableHead>
                       <TableHead className="sm:hidden">Details</TableHead>
                       <TableHead className="hidden md:table-cell">
@@ -421,13 +421,13 @@ export default function TasksPage() {
                                   className="text-red-600"
                                 >
                                   <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete Work
+                                  Delete Task
                                 </DropdownMenuItem>
                               )}
                               {canRequestDelete && (
                                 <DropdownMenuItem onClick={() => handleRequestDelete(task)}>
                                   <Send className="mr-2 h-4 w-4" />
-                                  Request Delete
+                                  Request Task Delete
                                 </DropdownMenuItem>
                               )}
                             </DropdownMenuContent>
@@ -468,7 +468,7 @@ export default function TasksPage() {
                   <div className="text-sm text-gray-600">
                     Showing {(page - 1) * limit + 1} to{" "}
                     {Math.min(page * limit, pagination.total)} of{" "}
-                    {pagination.total} works
+                    {pagination.total} tasks
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
@@ -528,7 +528,7 @@ export default function TasksPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Work</DialogTitle>
+            <DialogTitle>Delete Task</DialogTitle>
             <DialogDescription>
               {selectedTask && (
                 <>
@@ -583,7 +583,7 @@ export default function TasksPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Request Work Deletion</DialogTitle>
+            <DialogTitle>Request Task Deletion</DialogTitle>
             <DialogDescription>
               {selectedTask && (
                 <>
