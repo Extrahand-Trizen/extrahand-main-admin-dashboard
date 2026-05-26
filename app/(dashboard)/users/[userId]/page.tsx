@@ -42,6 +42,7 @@ import {
   unbanUser,
   suspendUser,
   unsuspendUser,
+  getUserRegistrationSource,
 } from "@/lib/api/users";
 import { listTasks, listApplications } from "@/lib/api/tasks";
 import { usePermissions } from "@/lib/hooks/usePermissions";
@@ -67,6 +68,20 @@ const OFFERS_PER_PAGE = 5;
 
 const getTaskIdentifier = (task: any): string =>
   task?.taskId || task?._id || task?.id || "";
+
+const formatKycStatus = (status: boolean | string | null | undefined): string => {
+  if (typeof status === "boolean") {
+    return status ? "Verified" : "Not Verified";
+  }
+
+  if (!status) {
+    return "Not Verified";
+  }
+
+  return status
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
 
 export default function UserDetailsPage() {
   const params = useParams();
@@ -96,6 +111,15 @@ export default function UserDetailsPage() {
     enabled: !!userId && hasPermission("user.view"),
     retry: false,
   });
+
+  const { data: registrationSourceResponse, isLoading: registrationSourceLoading } = useQuery({
+    queryKey: ["user-registration-source", userId],
+    queryFn: () => getUserRegistrationSource(userId),
+    enabled: !!userId && hasPermission("user.view"),
+    retry: false,
+  });
+
+  const registrationSource = registrationSourceResponse?.data;
 
   const banMutation = useMutation({
     mutationFn: ({ userId, reason }: { userId: string; reason: string }) =>
@@ -194,6 +218,22 @@ export default function UserDetailsPage() {
     typeof user?.phoneVerified === "boolean"
       ? user.phoneVerified
       : Boolean(user?.phone);
+  const aadhaarKyc = user?.aadhaarKyc;
+  const aadhaarRawStatus =
+    user?.isAadhaarVerified
+      ? "verified"
+      : aadhaarKyc?.visibleStatus ||
+        aadhaarKyc?.internalStatus ||
+        aadhaarKyc?.status;
+  const aadhaarStatus = formatKycStatus(aadhaarRawStatus);
+  const isAadhaarFailed =
+    !user?.isAadhaarVerified &&
+    String(aadhaarKyc?.visibleStatus || aadhaarKyc?.internalStatus || "")
+      .toLowerCase()
+      .trim() === "failed";
+  const hasAadhaarKycStatus = Boolean(
+    aadhaarKyc?.visibleStatus || aadhaarKyc?.internalStatus
+  );
 
   const statusColors: Record<string, string> = {
     active: "success",
@@ -444,6 +484,20 @@ export default function UserDetailsPage() {
                   <Badge variant={statusColors[user.status] as any}>
                     {user.status}
                   </Badge>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-gray-600">Source:</span>
+                  {registrationSourceLoading ? (
+                    <Skeleton className="h-4 w-24" />
+                  ) : registrationSource?.source === "partner_portal" ? (
+                    <span className="text-gray-900 font-medium">
+                      Partner Portal
+                    </span>
+                  ) : (
+                    <span className="text-gray-900 font-medium">
+                      Self Registered
+                    </span>
+                  )}
                 </div>
                 <Separator />
                 <div className="flex items-center gap-2 text-sm">
@@ -883,11 +937,15 @@ export default function UserDetailsPage() {
                     </div>
                     {user.isAadhaarVerified ? (
                       <Badge variant="success">Verified</Badge>
+                    ) : isAadhaarFailed ? (
+                      <Badge variant="destructive">Failed</Badge>
+                    ) : hasAadhaarKycStatus ? (
+                      <Badge variant="warning">{aadhaarStatus}</Badge>
                     ) : (
                       <Badge variant="secondary">Not Verified</Badge>
                     )}
                   </div>
-                  {user.isAadhaarVerified && (
+                  {(user.isAadhaarVerified || aadhaarKyc) && (
                     <div className="mt-2 space-y-1 text-sm">
                       {user.maskedAadhaar && (
                         <p className="text-gray-600">
@@ -900,6 +958,36 @@ export default function UserDetailsPage() {
                           <span className="font-medium">Verified:</span>{" "}
                           {formatDateTime(user.aadhaarVerifiedAt)}
                         </p>
+                      )}
+                      {!user.isAadhaarVerified && aadhaarKyc && (
+                        <>
+                          <p className="text-gray-600">
+                            <span className="font-medium">Status:</span>{" "}
+                            {aadhaarStatus}
+                          </p>
+                          {isAadhaarFailed && aadhaarKyc.failureReason && (
+                            <p className="text-red-700 break-words">
+                              <span className="font-medium">
+                                Failure reason:
+                              </span>{" "}
+                              {aadhaarKyc.failureReason}
+                            </p>
+                          )}
+                          {aadhaarKyc.visibleFailureAt && (
+                            <p className="text-gray-600">
+                              <span className="font-medium">Failed:</span>{" "}
+                              {formatDateTime(aadhaarKyc.visibleFailureAt)}
+                            </p>
+                          )}
+                          {aadhaarKyc.updatedAt && (
+                            <p className="text-gray-600">
+                              <span className="font-medium">
+                                Last updated:
+                              </span>{" "}
+                              {formatDateTime(aadhaarKyc.updatedAt)}
+                            </p>
+                          )}
+                        </>
                       )}
                     </div>
                   )}

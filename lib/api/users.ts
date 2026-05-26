@@ -126,3 +126,21 @@ export async function deleteUsersWithoutRoles(): Promise<{
     body: JSON.stringify({ dry_run: false }),
   });
 }
+
+/**
+ * Get registration source for a user
+ */
+export async function getUserRegistrationSource(
+  userId: string
+): Promise<ApiResponse<{ source: 'partner_portal' | 'self_registered'; addedByName: string | null; leadId: string | null }>> {
+  const segment = encodeURIComponent(userId);
+  const res = await apiRequest<ApiResponse<{ source: 'partner_portal' | 'self_registered'; addedByName: string | null; leadId: string | null }> | null>(
+    `/api/v1/users/${segment}/registration-source`
+  );
+  if (res == null || res.success === false) {
+    throw new Error(
+      (res as any)?.error || 'Registration source could not be loaded'
+    );
+  }
+  return res;
+}

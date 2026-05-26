@@ -83,6 +83,18 @@ export interface User {
   isAadhaarVerified?: boolean;
   aadhaarVerifiedAt?: string;
   maskedAadhaar?: string;
+  aadhaarKyc?: {
+    id?: string;
+    verificationId?: string | null;
+    sessionType?: string | null;
+    status?: boolean | string | null;
+    internalStatus?: string | null;
+    visibleStatus?: string | null;
+    failureReason?: string | null;
+    visibleFailureAt?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+  } | null;
   isPANVerified?: boolean;
   panVerifiedAt?: string;
   maskedPan?: string;
