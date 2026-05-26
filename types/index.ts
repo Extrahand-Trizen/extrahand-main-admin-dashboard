@@ -302,6 +302,17 @@ export interface AdminUser {
   permissions: string[];
 }
 
+export interface AdminNotification {
+  id: string;
+  type: 'aadhaar_verification_failed' | 'task_posted';
+  title: string;
+  message: string;
+  linkUrl?: string;
+  createdAt: string;
+  isRead: boolean;
+  readAt?: string | null;
+}
+
 // Auth Types
 export interface AuthTokens {
   accessToken: string;

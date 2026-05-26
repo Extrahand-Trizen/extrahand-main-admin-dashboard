@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,9 +10,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Menu, ChevronDown } from 'lucide-react';
+import { LogOut, Menu, ChevronDown, Bell } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  getNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from '@/lib/api/notifications';
+import { AdminNotification } from '@/types';
+import { formatDateTime } from '@/lib/utils';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -22,6 +29,10 @@ interface HeaderProps {
 export function Header({ onMenuClick }: HeaderProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isNotifLoading, setIsNotifLoading] = useState(false);
 
   const displayRole = (role?: string) => {
     if (!role) return '';
@@ -37,6 +48,54 @@ export function Header({ onMenuClick }: HeaderProps) {
       toast.error('Failed to logout');
     }
   };
+
+  const unreadBadgeCount = useMemo(
+    () => notifications.filter((notification) => !notification.isRead).length,
+    [notifications]
+  );
+
+  const loadNotifications = async () => {
+    setIsNotifLoading(true);
+    try {
+      const response = await getNotifications(15);
+      if (response?.success && Array.isArray(response.data)) {
+        setNotifications(response.data);
+        setUnreadCount(response.unreadCount ?? response.data.filter((item) => !item.isRead).length);
+      }
+    } catch (error) {
+      console.error('Failed to load notifications', error);
+    } finally {
+      setIsNotifLoading(false);
+    }
+  };
+
+  const handleNotificationClick = async (notification: AdminNotification) => {
+    if (!notification.isRead) {
+      await markNotificationRead(notification.id);
+    }
+
+    if (notification.linkUrl) {
+      router.push(notification.linkUrl);
+    }
+
+    setIsNotifOpen(false);
+    loadNotifications();
+  };
+
+  const handleMarkAllRead = async () => {
+    await markAllNotificationsRead();
+    loadNotifications();
+  };
+
+  useEffect(() => {
+    loadNotifications();
+  }, []);
+
+  useEffect(() => {
+    if (isNotifOpen) {
+      loadNotifications();
+    }
+  }, [isNotifOpen]);
 
   return (
     <header className="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-4 sm:px-6 shadow-sm">
@@ -65,6 +124,79 @@ export function Header({ onMenuClick }: HeaderProps) {
         </div> */}
       </div>
       <div className="flex items-center gap-2 sm:gap-3">
+        {user && (
+          <DropdownMenu open={isNotifOpen} onOpenChange={setIsNotifOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="relative h-10 w-10 rounded-full p-0 hover:bg-gray-100"
+                aria-label="Notifications"
+              >
+                <Bell className="h-5 w-5 text-gray-600" />
+                {(unreadCount || unreadBadgeCount) > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-semibold text-white">
+                    {Math.min(unreadCount || unreadBadgeCount, 99)}
+                  </span>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-96">
+              <DropdownMenuLabel className="flex items-center justify-between">
+                <span>Notifications</span>
+                <Button
+                  variant="ghost"
+                  className="h-7 px-2 text-xs text-gray-500 hover:text-gray-900"
+                  onClick={handleMarkAllRead}
+                  disabled={unreadBadgeCount === 0}
+                >
+                  Mark all read
+                </Button>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <div className="max-h-96 overflow-y-auto">
+                {isNotifLoading && (
+                  <div className="px-3 py-4 text-sm text-gray-500">Loading notifications...</div>
+                )}
+                {!isNotifLoading && notifications.length === 0 && (
+                  <div className="px-3 py-4 text-sm text-gray-500">
+                    No notifications yet.
+                  </div>
+                )}
+                {!isNotifLoading &&
+                  notifications.map((notification) => (
+                    <DropdownMenuItem
+                      key={notification.id}
+                      onClick={() => handleNotificationClick(notification)}
+                      className="cursor-pointer gap-2"
+                    >
+                      <div className="flex flex-1 flex-col">
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={
+                              notification.isRead
+                                ? 'text-sm text-gray-700'
+                                : 'text-sm font-semibold text-gray-900'
+                            }
+                          >
+                            {notification.title}
+                          </span>
+                          {!notification.isRead && (
+                            <span className="ml-2 h-2 w-2 rounded-full bg-amber-500" />
+                          )}
+                        </div>
+                        <span className="text-xs text-gray-500 line-clamp-2">
+                          {notification.message}
+                        </span>
+                        <span className="mt-1 text-[11px] text-gray-400">
+                          {formatDateTime(notification.createdAt)}
+                        </span>
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
         {user && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
