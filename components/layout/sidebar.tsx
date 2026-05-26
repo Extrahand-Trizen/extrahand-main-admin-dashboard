@@ -14,11 +14,12 @@ import {
   ChevronDown,
   ChevronRight,
   Shield,
+  PhoneCall,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissions } from '@/lib/hooks/usePermissions';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 
 const navigation: Array<{
   name: string;
@@ -66,6 +67,9 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
   const { isSuperAdmin, user } = useAuth();
   const { hasPermission } = usePermissions();
   const isPaymentsOnlyRole = user?.role === 'payments_admin' && !isSuperAdmin;
+  const isOperationsAdminRole = ['operations_admin', 'operation_admin', 'operations'].includes(
+    user?.role || ''
+  );
   const [superAdminSectionOpen, setSuperAdminSectionOpen] = useState(
     pathname?.startsWith('/admin')
   );
@@ -137,25 +141,48 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
             const isActive =
               pathname === item.href || pathname?.startsWith(item.href + '/');
             return (
-              <Link
-                key={item.name}
-                href={item.href}
-                onClick={handleLinkClick}
-                className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
-                  isActive
-                    ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
-                    : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
-                )}
-              >
-                <item.icon
+              <Fragment key={item.name}>
+                <Link
+                  href={item.href}
+                  onClick={handleLinkClick}
                   className={cn(
-                    'h-5 w-5',
-                    isActive ? 'text-yellow-600' : 'text-gray-400'
+                    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                    isActive
+                      ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
+                      : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
                   )}
-                />
-                {item.name}
-              </Link>
+                >
+                  <item.icon
+                    className={cn(
+                      'h-5 w-5',
+                      isActive ? 'text-yellow-600' : 'text-gray-400'
+                    )}
+                  />
+                  {item.name}
+                </Link>
+                {item.href === '/dashboard' && isOperationsAdminRole && (
+                  <Link
+                    href="/task-calls"
+                    onClick={handleLinkClick}
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                      pathname === '/task-calls' || pathname?.startsWith('/task-calls/')
+                        ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
+                        : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
+                    )}
+                  >
+                    <PhoneCall
+                      className={cn(
+                        'h-5 w-5',
+                        pathname === '/task-calls' || pathname?.startsWith('/task-calls/')
+                          ? 'text-yellow-600'
+                          : 'text-gray-400'
+                      )}
+                    />
+                    My Task Calls
+                  </Link>
+                )}
+              </Fragment>
             );
           })}
 

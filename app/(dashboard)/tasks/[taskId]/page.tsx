@@ -20,6 +20,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Send,
+  Edit,
+  MessageSquare,
 } from "lucide-react";
 import {
   Card,
@@ -38,8 +40,15 @@ import {
   getTaskApplications,
   updateApplicationStatus,
 } from "@/lib/api/tasks";
+import {
+  addTaskCallNote,
+  getTaskCall,
+  TaskCallStatus,
+  updateTaskCallStatus,
+} from "@/lib/api/task-calls";
 import { getUser } from "@/lib/api/users";
 import { usePermissions } from "@/lib/hooks/usePermissions";
+import { useAuth } from "@/lib/hooks/useAuth";
 import { formatDate, formatCurrency, formatDateTime } from "@/lib/utils";
 import { toast } from "sonner";
 import {
@@ -104,13 +113,34 @@ const extractHelperProfileId = (application: any): string => {
   return String(raw).trim();
 };
 
+const taskCallStatusLabels: Record<TaskCallStatus, string> = {
+  not_updated: "Not updated",
+  genuine: "Genuine",
+  not_genuine: "Not genuine",
+  call_not_lifted: "Call not lifted",
+  follow_up: "Follow up",
+};
+
+const taskCallStatusClasses: Record<TaskCallStatus, string> = {
+  not_updated: "bg-amber-50 text-amber-700 border-amber-200",
+  genuine: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  not_genuine: "bg-red-50 text-red-700 border-red-200",
+  call_not_lifted: "bg-gray-100 text-gray-700 border-gray-200",
+  follow_up: "bg-blue-50 text-blue-700 border-blue-200",
+};
+
+const isOperationsRole = (role?: string | null) =>
+  ["operations_admin", "operation_admin", "operations"].includes(role || "");
+
 export default function TaskDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { hasPermission, isSuperAdmin } = usePermissions();
+  const { user } = useAuth();
   const taskId = params.taskId as string;
   const isValidTaskId = Boolean(taskId && taskId !== "undefined" && taskId !== "null");
+  const canManageTaskCalls = isOperationsRole(user?.role);
 
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
@@ -127,6 +157,19 @@ export default function TaskDetailsPage() {
     reason: "",
   });
   const [applicationsPage, setApplicationsPage] = useState(1);
+  const [stageDialog, setStageDialog] = useState<{
+    open: boolean;
+    status: TaskCallStatus;
+    followUpDate: string;
+  }>({
+    open: false,
+    status: "not_updated",
+    followUpDate: "",
+  });
+  const [noteDialog, setNoteDialog] = useState({
+    open: false,
+    note: "",
+  });
 
   const {
     data: taskData,
@@ -146,6 +189,13 @@ export default function TaskDetailsPage() {
       isValidTaskId &&
       hasPermission("task.view") &&
       hasPermission("task.application.list"),
+  });
+
+  const { data: taskCallData, isLoading: taskCallLoading } = useQuery({
+    queryKey: ["task-call", taskId],
+    queryFn: () => getTaskCall(taskId),
+    enabled: isValidTaskId && canManageTaskCalls,
+    retry: false,
   });
 
   const deleteMutation = useMutation({
@@ -192,6 +242,38 @@ export default function TaskDetailsPage() {
     },
   });
 
+  const updateTaskCallStatusMutation = useMutation({
+    mutationFn: ({
+      status,
+      followUpDate,
+    }: {
+      status: TaskCallStatus;
+      followUpDate?: string;
+    }) => updateTaskCallStatus(taskId, status, followUpDate),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["task-call", taskId] });
+      queryClient.invalidateQueries({ queryKey: ["task-calls"] });
+      toast.success("Task call stage updated");
+      setStageDialog({ open: false, status: "not_updated", followUpDate: "" });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to update task call stage");
+    },
+  });
+
+  const addTaskCallNoteMutation = useMutation({
+    mutationFn: (note: string) => addTaskCallNote(taskId, note),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["task-call", taskId] });
+      queryClient.invalidateQueries({ queryKey: ["task-calls"] });
+      toast.success("Note added");
+      setNoteDialog({ open: false, note: "" });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to add note");
+    },
+  });
+
   const handleDelete = () => {
     setDeleteDialog({ open: true, reason: "" });
   };
@@ -231,7 +313,40 @@ export default function TaskDetailsPage() {
     updateApplicationStatusMutation.mutate({ applicationId, status });
   };
 
+  const openStageDialog = () => {
+    const existingStatus = taskCallData?.data?.status || "not_updated";
+    const existingDate = taskCallData?.data?.followUpDate
+      ? new Date(taskCallData.data.followUpDate).toISOString().slice(0, 10)
+      : "";
+    setStageDialog({
+      open: true,
+      status: existingStatus,
+      followUpDate: existingDate,
+    });
+  };
+
+  const confirmStageUpdate = () => {
+    if (stageDialog.status === "follow_up" && !stageDialog.followUpDate) {
+      toast.error("Follow-up date is required");
+      return;
+    }
+    updateTaskCallStatusMutation.mutate({
+      status: stageDialog.status,
+      followUpDate:
+        stageDialog.status === "follow_up" ? stageDialog.followUpDate : undefined,
+    });
+  };
+
+  const confirmNote = () => {
+    if (!noteDialog.note.trim()) {
+      toast.error("Note is required");
+      return;
+    }
+    addTaskCallNoteMutation.mutate(noteDialog.note.trim());
+  };
+
   const task = taskData?.data;
+  const taskCall = taskCallData?.data;
   const applications = applicationsData?.data || [];
   const customerProfileId = extractCustomerProfileId(task);
   const uniqueHelperProfileIds = Array.from(
@@ -378,6 +493,21 @@ export default function TaskDetailsPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {canManageTaskCalls && (
+            <>
+              <Button variant="outline" onClick={openStageDialog}>
+                <Edit className="mr-2 h-4 w-4" />
+                Move Stage
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setNoteDialog({ open: true, note: "" })}
+              >
+                <MessageSquare className="mr-2 h-4 w-4" />
+                Add Note
+              </Button>
+            </>
+          )}
           {/* Task editing disabled for all roles */}
           {isSuperAdmin && hasPermission("task.delete") && (
             <Button variant="destructive" onClick={handleDelete}>
@@ -673,8 +803,208 @@ export default function TaskDetailsPage() {
               </div>
             </CardContent>
           </Card>
+
+          {canManageTaskCalls && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="text-lg">Onboarder Verification</CardTitle>
+                  {!taskCallLoading && (
+                    <span
+                      className={`inline-flex rounded-md border px-2 py-1 text-xs font-medium ${
+                        taskCallStatusClasses[taskCall?.status || "not_updated"]
+                      }`}
+                    >
+                      {taskCallStatusLabels[taskCall?.status || "not_updated"]}
+                    </span>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {taskCallLoading ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                    <Skeleton className="h-16 w-full" />
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <Label className="text-xs font-medium text-gray-500">
+                        Call status
+                      </Label>
+                      <p className="mt-1 text-sm font-medium text-gray-900">
+                        {taskCallStatusLabels[taskCall?.status || "not_updated"]}
+                      </p>
+                    </div>
+                    {taskCall?.followUpDate && (
+                      <div>
+                        <Label className="text-xs font-medium text-gray-500">
+                          Follow-up date
+                        </Label>
+                        <p className="mt-1 text-sm font-medium text-blue-700">
+                          {formatDate(taskCall.followUpDate)}
+                        </p>
+                      </div>
+                    )}
+                    <div>
+                      <Label className="text-xs font-medium text-gray-500">
+                        Internal notes
+                      </Label>
+                      {taskCall?.notes?.length ? (
+                        <div className="mt-2 space-y-3">
+                          {taskCall.notes.map((item, index) => (
+                            <div
+                              key={`${item.createdAt}-${index}`}
+                              className="rounded-md border border-gray-200 bg-gray-50 p-3"
+                            >
+                              <p className="text-sm text-gray-900 whitespace-pre-wrap">
+                                {item.note}
+                              </p>
+                              <p className="mt-2 text-xs text-gray-500">
+                                {item.createdBy?.name || "Operations"} ·{" "}
+                                {formatDateTime(item.createdAt)}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-1 text-sm text-gray-500">No notes added.</p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
+
+      {/* Task Call Stage Dialog */}
+      <Dialog
+        open={stageDialog.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            setStageDialog({ open: false, status: "not_updated", followUpDate: "" });
+          } else {
+            setStageDialog((dialog) => ({ ...dialog, open: true }));
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Move Stage</DialogTitle>
+            <DialogDescription>
+              Update the verification call outcome for this posted task.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select
+                value={stageDialog.status}
+                onValueChange={(value) =>
+                  setStageDialog((dialog) => ({
+                    ...dialog,
+                    status: value as TaskCallStatus,
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="not_updated">Not Updated</SelectItem>
+                  <SelectItem value="genuine">Genuine</SelectItem>
+                  <SelectItem value="not_genuine">Not Genuine</SelectItem>
+                  <SelectItem value="call_not_lifted">Call Not Lifted</SelectItem>
+                  <SelectItem value="follow_up">Follow Up / Callback</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {stageDialog.status === "follow_up" && (
+              <div className="space-y-2">
+                <Label htmlFor="follow-up-date">Follow-up date *</Label>
+                <input
+                  id="follow-up-date"
+                  type="date"
+                  value={stageDialog.followUpDate}
+                  onChange={(event) =>
+                    setStageDialog((dialog) => ({
+                      ...dialog,
+                      followUpDate: event.target.value,
+                    }))
+                  }
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() =>
+                setStageDialog({ open: false, status: "not_updated", followUpDate: "" })
+              }
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmStageUpdate}
+              disabled={updateTaskCallStatusMutation.isPending}
+            >
+              Save Stage
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Task Call Note Dialog */}
+      <Dialog
+        open={noteDialog.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            setNoteDialog({ open: false, note: "" });
+          } else {
+            setNoteDialog((dialog) => ({ ...dialog, open: true }));
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Internal Note</DialogTitle>
+            <DialogDescription>
+              Save a note for operations follow-up on this task.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="task-call-note">Note</Label>
+            <Textarea
+              id="task-call-note"
+              placeholder="Enter your note..."
+              value={noteDialog.note}
+              onChange={(event) =>
+                setNoteDialog({ ...noteDialog, note: event.target.value })
+              }
+              rows={5}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setNoteDialog({ open: false, note: "" })}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmNote}
+              disabled={!noteDialog.note.trim() || addTaskCallNoteMutation.isPending}
+            >
+              Add Note
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog
