@@ -3,7 +3,7 @@
   "dockerfilePath": "./Dockerfile",
 
   "buildArguments": {
-    "CACHE_BUST": "build-2026-05-27-1512",
+    "CACHE_BUST": "build-2026-05-27-1545-force-builder-rebuild",
     "NEXT_PUBLIC_API_URL": "https://extrahand-main-admin-service.apps.extrahand.in"
   },
 

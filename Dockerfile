@@ -30,7 +30,7 @@ ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 # Make Docker consider this layer unique
-RUN echo "CACHE_BUST=${CACHE_BUST}"
+RUN echo "CACHE_BUST=${CACHE_BUST}" > /tmp/cache_bust
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
