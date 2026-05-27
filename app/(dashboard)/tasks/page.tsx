@@ -53,6 +53,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { listTasks, deleteTask, requestTaskDelete } from "@/lib/api/tasks";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { formatDate, formatCurrency } from "@/lib/utils";
+import { CATEGORY_OPTIONS } from "@/lib/category-options";
 import { toast } from "sonner";
 import { Task } from "@/types";
 import Link from "next/link";
@@ -69,6 +70,22 @@ const statusColors: Record<string, string> = {
   cancelled: "destructive",
 };
 
+const followUpStatusLabels: Record<string, string> = {
+  not_updated: "Not updated",
+  genuine: "Genuine",
+  not_genuine: "Not genuine",
+  call_not_lifted: "Call not lifted",
+  follow_up: "Follow up",
+};
+
+const followUpStatusColors: Record<string, string> = {
+  not_updated: "secondary",
+  genuine: "success",
+  not_genuine: "destructive",
+  call_not_lifted: "warning",
+  follow_up: "default",
+};
+
 export default function TasksPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -77,6 +94,7 @@ export default function TasksPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("open");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [followUpFilter, setFollowUpFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -96,12 +114,22 @@ export default function TasksPage() {
   });
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["tasks", search, statusFilter, categoryFilter, page, limit],
+    queryKey: [
+      "tasks",
+      search,
+      statusFilter,
+      categoryFilter,
+      followUpFilter,
+      page,
+      limit,
+    ],
     queryFn: () =>
       listTasks({
         search: search || undefined,
         status: statusFilter !== "all" ? statusFilter : undefined,
         category: categoryFilter !== "all" ? categoryFilter : undefined,
+        followUpStatus:
+          followUpFilter !== "all" ? followUpFilter : undefined,
         page,
         limit,
       }),
@@ -196,11 +224,6 @@ export default function TasksPage() {
     return hasPermission("task.delete");
   }, [hasPermission, isSuperAdmin]);
 
-  // Extract unique categories from tasks
-  const categories = Array.from(
-    new Set(tasks.map((task: Task) => task.category).filter(Boolean)),
-  );
-
   if (!hasPermission("task.list")) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -239,7 +262,7 @@ export default function TasksPage() {
           <CardTitle className="text-lg">Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="space-y-2">
               <Label htmlFor="search">Search</Label>
               <div className="relative">
@@ -291,11 +314,33 @@ export default function TasksPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
+                  {CATEGORY_OPTIONS.map((category) => (
+                    <SelectItem key={category.value} value={category.value}>
+                      {category.label}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="followUpStatus">Follow-up status</Label>
+              <Select
+                value={followUpFilter}
+                onValueChange={(value) => {
+                  setFollowUpFilter(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger id="followUpStatus">
+                  <SelectValue placeholder="All follow-up statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Follow-up Statuses</SelectItem>
+                  <SelectItem value="not_updated">Not updated</SelectItem>
+                  <SelectItem value="genuine">Genuine</SelectItem>
+                  <SelectItem value="not_genuine">Not genuine</SelectItem>
+                  <SelectItem value="call_not_lifted">Call not lifted</SelectItem>
+                  <SelectItem value="follow_up">Follow up</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -333,6 +378,9 @@ export default function TasksPage() {
                       </TableHead>
                       <TableHead className="hidden lg:table-cell">
                         Status
+                      </TableHead>
+                      <TableHead className="hidden xl:table-cell">
+                        Follow-up
                       </TableHead>
                       <TableHead className="hidden lg:table-cell">
                         Budget
@@ -377,6 +425,19 @@ export default function TasksPage() {
                               <Badge variant={statusColors[task.status] as any}>
                                 {task.status}
                               </Badge>
+                              <Badge
+                                variant={
+                                  followUpStatusColors[
+                                    task.taskCallStatus || "not_updated"
+                                  ] as any
+                                }
+                              >
+                                {
+                                  followUpStatusLabels[
+                                    task.taskCallStatus || "not_updated"
+                                  ]
+                                }
+                              </Badge>
                               {task.category && (
                                 <Badge variant="outline">{task.category}</Badge>
                               )}
@@ -392,6 +453,29 @@ export default function TasksPage() {
                           <Badge variant={statusColors[task.status] as any}>
                             {task.status}
                           </Badge>
+                        </TableCell>
+                        <TableCell className="hidden xl:table-cell">
+                          <div className="space-y-1">
+                            <Badge
+                              variant={
+                                followUpStatusColors[
+                                  task.taskCallStatus || "not_updated"
+                                ] as any
+                              }
+                            >
+                              {
+                                followUpStatusLabels[
+                                  task.taskCallStatus || "not_updated"
+                                ]
+                              }
+                            </Badge>
+                            {task.taskCallStatus === "follow_up" &&
+                              task.taskCallFollowUpDate && (
+                                <div className="text-xs text-gray-500">
+                                  {formatDate(task.taskCallFollowUpDate)}
+                                </div>
+                              )}
+                          </div>
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-sm font-medium">
                           {formatCurrency(task.budget)}

@@ -11,8 +11,12 @@ export async function listUsers(filters?: UserFilters): Promise<ApiResponse<User
   if (filters?.search) params.append('search', filters.search);
   if (filters?.status) params.append('status', filters.status);
   if (filters?.role) params.append('role', filters.role);
+  if (filters?.category) params.append('category', filters.category);
   if (typeof filters?.isAadhaarVerified === 'boolean') {
     params.append('isAadhaarVerified', String(filters.isAadhaarVerified));
+  }
+  if (typeof filters?.isCertified === 'boolean') {
+    params.append('isCertified', String(filters.isCertified));
   }
   if (filters?.createdFrom) params.append('createdFrom', filters.createdFrom);
   if (filters?.createdTo) params.append('createdTo', filters.createdTo);
@@ -99,22 +103,22 @@ export async function unsuspendUser(userId: string): Promise<ApiResponse<User>> 
 export async function previewUsersWithoutRoles(): Promise<{
   success: boolean;
   data: {
-    dryRun: boolean;
     count: number;
     users: Array<{ uid: string; name: string; email: string; createdAt: string }>;
   };
   message: string;
 }> {
-  return apiRequest(`/api/v1/users/cleanup/no-role?dry_run=true`);
+  return apiRequest(`/api/v1/users/cleanup/no-role`, {
+    method: 'GET',
+  });
 }
 
 /**
- * Delete all users with no role saved (cascades to Firebase + Task Service)
+ * Cascade delete users with no roles (destructive!)
  */
 export async function deleteUsersWithoutRoles(): Promise<{
   success: boolean;
   data: {
-    dryRun: boolean;
     count: number;
     deletedCount: number;
     users: Array<{ uid: string; name: string; email: string; createdAt: string }>;

@@ -189,6 +189,14 @@ export interface Task {
   description: string;
   category: string;
   status: 'open' | 'in_progress' | 'completed' | 'cancelled';
+  taskCallStatus?:
+    | 'not_updated'
+    | 'genuine'
+    | 'not_genuine'
+    | 'call_not_lifted'
+    | 'follow_up';
+  taskCallFollowUpDate?: string | null;
+  taskCallUpdatedAt?: string | null;
   customerId: string;
   budget: number;
   location?: string;
@@ -396,7 +404,9 @@ export interface UserFilters {
   search?: string;
   status?: string;
   role?: string;
+  category?: string;
   isAadhaarVerified?: boolean;
+  isCertified?: boolean;
   createdFrom?: string;
   createdTo?: string;
   page?: number;
@@ -407,6 +417,7 @@ export interface TaskFilters {
   search?: string;
   status?: string;
   category?: string;
+  followUpStatus?: string;
   customerId?: string;
   assigneeId?: string;
   page?: number;

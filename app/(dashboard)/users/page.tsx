@@ -59,6 +59,7 @@ import {
 } from "@/lib/api/users";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { formatDate } from "@/lib/utils";
+import { CATEGORY_OPTIONS } from "@/lib/category-options";
 import { toast } from "sonner";
 import { User } from "@/types";
 import Link from "next/link";
@@ -116,6 +117,8 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [aadhaarFilter, setAadhaarFilter] = useState<string>("all");
+  const [certifiedFilter, setCertifiedFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [createdFrom, setCreatedFrom] = useState<string>("");
   const [createdTo, setCreatedTo] = useState<string>("");
   const [page, setPage] = useState(1);
@@ -139,6 +142,8 @@ export default function UsersPage() {
       statusFilter,
       roleFilter,
       aadhaarFilter,
+      certifiedFilter,
+      categoryFilter,
       createdFrom,
       createdTo,
       page,
@@ -148,11 +153,18 @@ export default function UsersPage() {
       listUsers({
         search: search || undefined,
         status: statusFilter !== "all" ? statusFilter : undefined,
-        role: aadhaarFilter !== "all" ? "helper" : (roleFilter !== "all" ? roleFilter : undefined),
+        role: roleFilter !== "all" ? roleFilter : undefined,
+        category: categoryFilter !== "all" ? categoryFilter : undefined,
         isAadhaarVerified:
           aadhaarFilter === "verified"
             ? true
             : aadhaarFilter === "not_verified"
+              ? false
+              : undefined,
+        isCertified:
+          certifiedFilter === "certified"
+            ? true
+            : certifiedFilter === "not_certified"
               ? false
               : undefined,
         createdFrom: createdFrom || undefined,
@@ -319,7 +331,7 @@ export default function UsersPage() {
           <CardTitle className="text-lg">Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
             <div className="space-y-2">
               <Label htmlFor="search">Search</Label>
               <div className="relative">
@@ -396,6 +408,47 @@ export default function UsersPage() {
               </Select>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="certified">Certified</Label>
+              <Select
+                value={certifiedFilter}
+                onValueChange={(value) => {
+                  setCertifiedFilter(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger id="certified">
+                  <SelectValue placeholder="All users" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All users</SelectItem>
+                  <SelectItem value="certified">Certified only</SelectItem>
+                  <SelectItem value="not_certified">Not certified</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="category">Category</Label>
+              <Select
+                value={categoryFilter}
+                onValueChange={(value) => {
+                  setCategoryFilter(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger id="category">
+                  <SelectValue placeholder="All categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {CATEGORY_OPTIONS.map((category) => (
+                    <SelectItem key={category.value} value={category.value}>
+                      {category.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="createdFrom">Created from</Label>
               <Input
                 id="createdFrom"
@@ -429,6 +482,8 @@ export default function UsersPage() {
                   setStatusFilter("all");
                   setRoleFilter("all");
                   setAadhaarFilter("all");
+                  setCertifiedFilter("all");
+                  setCategoryFilter("all");
                   setCreatedFrom("");
                   setCreatedTo("");
                   setPage(1);
