@@ -89,6 +89,8 @@ export function Header({ onMenuClick }: HeaderProps) {
 
   useEffect(() => {
     loadNotifications();
+    const intervalId = window.setInterval(loadNotifications, 45_000);
+    return () => window.clearInterval(intervalId);
   }, []);
 
   useEffect(() => {
