@@ -232,6 +232,18 @@ export default function UserDetailsPage() {
     String(aadhaarKyc?.visibleStatus || aadhaarKyc?.internalStatus || "")
       .toLowerCase()
       .trim() === "failed";
+  const aadhaarVisibleFailureDate = aadhaarKyc?.visibleFailureAt
+    ? new Date(aadhaarKyc.visibleFailureAt)
+    : null;
+  const aadhaarFailureDisplayAt =
+    isAadhaarFailed &&
+    aadhaarVisibleFailureDate &&
+    !Number.isNaN(aadhaarVisibleFailureDate.getTime()) &&
+    aadhaarVisibleFailureDate.getTime() <= Date.now()
+      ? aadhaarKyc?.visibleFailureAt
+      : isAadhaarFailed
+        ? aadhaarKyc?.updatedAt
+        : null;
   const hasAadhaarKycStatus = Boolean(
     aadhaarKyc?.visibleStatus || aadhaarKyc?.internalStatus
   );
@@ -978,10 +990,10 @@ export default function UserDetailsPage() {
                               {aadhaarKyc.failureReason}
                             </p>
                           )}
-                          {aadhaarKyc.visibleFailureAt && (
+                          {aadhaarFailureDisplayAt && (
                             <p className="text-gray-600">
                               <span className="font-medium">Failed:</span>{" "}
-                              {formatDateTime(aadhaarKyc.visibleFailureAt)}
+                              {formatDateTime(aadhaarFailureDisplayAt)}
                             </p>
                           )}
                           {aadhaarKyc.updatedAt && (
