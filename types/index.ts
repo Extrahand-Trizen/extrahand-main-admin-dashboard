@@ -325,7 +325,10 @@ export interface AdminUser {
 
 export interface AdminNotification {
   id: string;
-  type: 'aadhaar_verification_failed' | 'task_posted';
+  type:
+    | 'aadhaar_verification_failed'
+    | 'aadhaar_verification_under_review'
+    | 'task_posted';
   title: string;
   message: string;
   linkUrl?: string;
