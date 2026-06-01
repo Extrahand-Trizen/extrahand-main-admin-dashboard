@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   Mail,
@@ -86,6 +86,7 @@ const formatKycStatus = (status: boolean | string | null | undefined): string =>
 export default function UserDetailsPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { hasPermission } = usePermissions();
   const rawUserId = params.userId as string;
@@ -359,6 +360,10 @@ export default function UserDetailsPage() {
     );
   }
 
+  const requestedTab = (searchParams.get("tab") || "").toLowerCase();
+  const allowedTabs = new Set(["overview", "profile", "verification", "statistics", "business"]);
+  const initialTab = allowedTabs.has(requestedTab) ? requestedTab : "overview";
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -426,7 +431,7 @@ export default function UserDetailsPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="overview" className="space-y-6">
+      <Tabs defaultValue={initialTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 lg:grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="profile">Profile</TabsTrigger>

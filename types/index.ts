@@ -202,6 +202,7 @@ export interface Task {
   location?: string;
   createdAt: string;
   updatedAt: string;
+  assignedTo?: { userId: string; name: string } | null;
 }
 
 export interface TaskApplication {
@@ -420,6 +421,7 @@ export interface TaskFilters {
   followUpStatus?: string;
   customerId?: string;
   assigneeId?: string;
+  assignedTo?: string;
   page?: number;
   limit?: number;
 }

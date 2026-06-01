@@ -14,6 +14,7 @@ export async function listTasks(filters?: TaskFilters): Promise<ApiResponse<Task
   if (filters?.followUpStatus) params.append('followUpStatus', filters.followUpStatus);
   if (filters?.customerId) params.append('customerId', filters.customerId);
   if (filters?.assigneeId) params.append('assigneeId', filters.assigneeId);
+  if (filters?.assignedTo && filters.assignedTo !== 'all') params.append('assignedTo', filters.assignedTo);
 
   const query = params.toString();
   return apiRequest<ApiResponse<Task[]>>(`/api/v1/tasks${query ? `?${query}` : ''}`);

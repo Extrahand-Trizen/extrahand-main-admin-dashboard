@@ -95,6 +95,7 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = useState<string>("open");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [followUpFilter, setFollowUpFilter] = useState<string>("all");
+  const [assignedToFilter, setAssignedToFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -120,6 +121,7 @@ export default function TasksPage() {
       statusFilter,
       categoryFilter,
       followUpFilter,
+      assignedToFilter,
       page,
       limit,
     ],
@@ -130,6 +132,7 @@ export default function TasksPage() {
         category: categoryFilter !== "all" ? categoryFilter : undefined,
         followUpStatus:
           followUpFilter !== "all" ? followUpFilter : undefined,
+        assignedTo: assignedToFilter !== "all" ? assignedToFilter : undefined,
         page,
         limit,
       }),
@@ -262,7 +265,7 @@ export default function TasksPage() {
           <CardTitle className="text-lg">Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <div className="space-y-2">
               <Label htmlFor="search">Search</Label>
               <div className="relative">
@@ -344,6 +347,26 @@ export default function TasksPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="assignedTo">Assigned To</Label>
+              <Select
+                value={assignedToFilter}
+                onValueChange={(value) => {
+                  setAssignedToFilter(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger id="assignedTo">
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="santhosh reddy">santhosh reddy</SelectItem>
+                  <SelectItem value="durgamshiva">durgamshiva</SelectItem>
+                  <SelectItem value="tadembharath">tadembharath</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -381,6 +404,9 @@ export default function TasksPage() {
                       </TableHead>
                       <TableHead className="hidden xl:table-cell">
                         Follow-up
+                      </TableHead>
+                      <TableHead className="hidden lg:table-cell">
+                        Assigned To
                       </TableHead>
                       <TableHead className="hidden lg:table-cell">
                         Budget
@@ -476,6 +502,15 @@ export default function TasksPage() {
                                 </div>
                               )}
                           </div>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-sm">
+                          {task.assignedTo ? (
+                            <span className="font-medium text-gray-800 capitalize">
+                              {task.assignedTo.name}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-sm font-medium">
                           {formatCurrency(task.budget)}
