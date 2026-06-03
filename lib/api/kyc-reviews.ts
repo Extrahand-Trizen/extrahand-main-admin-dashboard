@@ -38,6 +38,11 @@ export interface KycReviewRow {
   sessionId?: string;
   verificationId?: string;
   isAadhaarVerified?: boolean;
+  /** True when photos were uploaded manually by an admin (not via DigiLocker/OCR) */
+  isManualUpload?: boolean;
+  /** Admin who uploaded the photos manually */
+  uploadedBy?: KycReviewAssignee | null;
+  uploadedAt?: string | null;
   documents: KycReviewDocument[];
   profileUrl: string;
 }
@@ -104,5 +109,57 @@ export async function rejectKycReview(row: {
         followUpDate: row.followUpDate || null,
       }),
     },
+  );
+}
+
+export async function uploadAadhaarDocument(
+  userId: string,
+  side: "front" | "back",
+  file: File,
+  sessionId: string,
+): Promise<ApiResponse<{ side: string; objectKey: string; sessionId: string; message: string }>> {
+  const token = localStorage.getItem("accessToken");
+  if (!token) throw new Error("Not authenticated. Please login.");
+
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("side", side);
+  formData.append("sessionId", sessionId);
+
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/kyc-reviews/${encodeURIComponent(userId)}/upload-aadhaar`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        // Do NOT set Content-Type — browser sets it with boundary for FormData
+      },
+      body: formData,
+    },
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(errorData.error || "Upload failed");
+  }
+
+  return response.json();
+}
+
+export interface AadhaarUploadStatus {
+  hasUpload: boolean;
+  sessionId: string | null;
+  uploadedAt: string | null;
+  reviewStatus: KycReviewStatus | null;
+  /** Use this as the sessionId for the next upload batch */
+  nextSessionId: string;
+}
+
+export async function getAadhaarUploadStatus(
+  userId: string,
+): Promise<ApiResponse<AadhaarUploadStatus>> {
+  return apiRequest<ApiResponse<AadhaarUploadStatus>>(
+    `/api/v1/kyc-reviews/${encodeURIComponent(userId)}/upload-status`,
   );
 }

@@ -62,6 +62,9 @@ import { Separator } from "@/components/ui/separator";
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { Upload, RefreshCw } from "lucide-react";
+import { AadhaarUploadDialog } from "@/components/kyc/AadhaarUploadDialog";
+import { getAadhaarUploadStatus } from "@/lib/api/kyc-reviews";
 
 const TASKS_PER_PAGE = 5;
 const OFFERS_PER_PAGE = 5;
@@ -105,6 +108,17 @@ export default function UserDetailsPage() {
   const [postedTasksPage, setPostedTasksPage] = useState(1);
   const [activeTasksPage, setActiveTasksPage] = useState(1);
   const [offersPage, setOffersPage] = useState(1);
+  const [aadhaarUploadOpen, setAadhaarUploadOpen] = useState(false);
+
+  // ── Aadhaar upload status — drives button label and "Re-upload" mode ────────
+  const { data: uploadStatusRes, isLoading: uploadStatusLoading } = useQuery({
+    queryKey: ["aadhaar-upload-status", userId],
+    queryFn: () => getAadhaarUploadStatus(userId),
+    enabled: !!userId && hasPermission("user.view"),
+    retry: false,
+    staleTime: 30_000,
+  });
+  const uploadStatus = uploadStatusRes?.data ?? null;
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["user", userId],
@@ -1006,6 +1020,41 @@ export default function UserDetailsPage() {
                           )}
                         </>
                       )}
+                    </div>
+                  )}
+                  {/* Upload button — shown for any non-verified Aadhaar status */}
+                  {!user.isAadhaarVerified && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      {/* "Photos submitted" badge when a previous upload exists */}
+                      {uploadStatus?.hasUpload && !uploadStatusLoading && (
+                        <div className="mb-2 flex items-center gap-1.5 rounded-md bg-amber-50 border border-amber-200 px-2.5 py-1.5">
+                          <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                          <span className="text-xs text-amber-700 font-medium">
+                            Photos uploaded · pending review
+                          </span>
+                        </div>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full gap-2 border-amber-300 text-amber-700 hover:bg-amber-50 hover:border-amber-400"
+                        disabled={uploadStatusLoading}
+                        onClick={() => setAadhaarUploadOpen(true)}
+                      >
+                        {uploadStatusLoading ? (
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                        ) : uploadStatus?.hasUpload ? (
+                          <>
+                            <RefreshCw className="h-4 w-4" />
+                            Re-upload photos
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4" />
+                            Upload photos for verification
+                          </>
+                        )}
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -1916,6 +1965,16 @@ export default function UserDetailsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Aadhaar Upload Dialog */}
+      <AadhaarUploadDialog
+        open={aadhaarUploadOpen}
+        onOpenChange={setAadhaarUploadOpen}
+        userId={userId}
+        userName={user.name}
+        sessionId={uploadStatus?.nextSessionId ?? `admin_upload_${userId}_${Date.now()}`}
+        isReupload={uploadStatus?.hasUpload ?? false}
+      />
     </div>
   );
 }

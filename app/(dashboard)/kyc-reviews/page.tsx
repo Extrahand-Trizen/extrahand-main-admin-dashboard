@@ -147,10 +147,23 @@ function ReviewDialog({
                 <p className="text-gray-500">Aadhaar</p>
                 <p className="font-medium text-gray-900">{row.aadhaar || "-"}</p>
               </div>
-              <div>
-                <p className="text-gray-500">Failure reason</p>
-                <p className="font-medium text-gray-900">{row.failureReason || "-"}</p>
-              </div>
+              {/* Show "Uploaded by" for manual uploads, "Failure reason" otherwise */}
+              {row.isManualUpload ? (
+                <div>
+                  <p className="text-gray-500">Uploaded by</p>
+                  <p className="font-medium text-gray-900">
+                    {row.uploadedBy?.name || "-"}
+                  </p>
+                  {row.uploadedBy?.email && (
+                    <p className="text-xs text-gray-400">{row.uploadedBy.email}</p>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <p className="text-gray-500">Failure reason</p>
+                  <p className="font-medium text-gray-900">{row.failureReason || "-"}</p>
+                </div>
+              )}
               <div>
                 <p className="text-gray-500">Last updated</p>
                 <p className="font-medium text-gray-900">
@@ -399,8 +412,8 @@ export default function KycReviewsPage() {
                   <TableRow>
                     <TableHead>User</TableHead>
                     <TableHead>Aadhaar</TableHead>
-                    <TableHead>Failure reason</TableHead>
-                    <TableHead>Failed on</TableHead>
+                    <TableHead>Failure reason / Uploaded by</TableHead>
+                    <TableHead>Date</TableHead>
                     <TableHead>Follow-up status</TableHead>
                     <TableHead>Assigned to</TableHead>
                     <TableHead>Status</TableHead>
@@ -415,10 +428,27 @@ export default function KycReviewsPage() {
                         <div className="text-xs text-gray-500">{row.userPhone || row.userEmail || row.userId}</div>
                       </TableCell>
                       <TableCell>{row.aadhaar || "-"}</TableCell>
-                      <TableCell className="max-w-[260px] whitespace-normal">
-                        {row.failureReason || "-"}
+                      <TableCell className="max-w-[240px] whitespace-normal">
+                        {row.isManualUpload ? (
+                          <div>
+                            <span className="text-xs text-indigo-600 font-medium">
+                              {row.uploadedBy?.name || "Admin"}
+                            </span>
+                            {row.uploadedBy?.email && (
+                              <p className="text-xs text-gray-400 truncate">
+                                {row.uploadedBy.email}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          row.failureReason || "-"
+                        )}
                       </TableCell>
-                      <TableCell>{row.failedOn ? formatDate(row.failedOn) : "-"}</TableCell>
+                      <TableCell>
+                        {row.isManualUpload
+                          ? (row.uploadedAt ? formatDate(row.uploadedAt) : "-")
+                          : (row.failedOn ? formatDate(row.failedOn) : "-")}
+                      </TableCell>
                       <TableCell>
                         {row.followUpStatus === "follow_up" && row.followUpDate ? (
                           <span className="text-blue-700">
