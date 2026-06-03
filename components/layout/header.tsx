@@ -74,7 +74,18 @@ export function Header({ onMenuClick }: HeaderProps) {
       await markNotificationRead(notification.id);
     }
 
-    if (notification.linkUrl) {
+    const isAadhaarNotification =
+      notification.type === 'aadhaar_verification_failed' ||
+      notification.type === 'aadhaar_verification_under_review';
+
+    if (isAadhaarNotification) {
+      const userId = notification.kycUserId?.trim();
+      if (userId) {
+        router.push(`/kyc-reviews?userId=${encodeURIComponent(userId)}`);
+      } else if (notification.linkUrl?.includes('/kyc-reviews')) {
+        router.push(notification.linkUrl);
+      }
+    } else if (notification.linkUrl) {
       router.push(notification.linkUrl);
     }
 

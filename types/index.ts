@@ -94,6 +94,8 @@ export interface User {
     visibleFailureAt?: string | null;
     createdAt?: string | null;
     updatedAt?: string | null;
+    documents?: Array<{ label: string; url: string }>;
+    imageUrls?: string[];
   } | null;
   isPANVerified?: boolean;
   panVerifiedAt?: string;
@@ -332,6 +334,8 @@ export interface AdminNotification {
   title: string;
   message: string;
   linkUrl?: string;
+  /** Firebase uid for Aadhaar KYC — used when linkUrl is missing (legacy notifications). */
+  kycUserId?: string;
   createdAt: string;
   isRead: boolean;
   readAt?: string | null;

@@ -14,6 +14,7 @@ import {
   ChevronDown,
   ChevronRight,
   Shield,
+  ShieldCheck,
   PhoneCall,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -70,6 +71,7 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
   const isOperationsAdminRole = ['operations_admin', 'operation_admin', 'operations'].includes(
     user?.role || ''
   );
+  const canSeeAllKycReviews = isSuperAdmin || user?.role === 'platform_admin';
   const [superAdminSectionOpen, setSuperAdminSectionOpen] = useState(
     pathname?.startsWith('/admin')
   );
@@ -116,7 +118,7 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
               alt="ExtraHand Logo"
               width={40}
               height={40}
-              className="rounded-lg"
+              className="h-10 w-10 rounded-lg"
             />
             <div>
               <p className="text-xs font-medium text-gray-700 leading-tight">
@@ -161,30 +163,75 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
                   {item.name}
                 </Link>
                 {item.href === '/dashboard' && isOperationsAdminRole && (
-                  <Link
-                    href="/task-calls"
-                    onClick={handleLinkClick}
-                    className={cn(
-                      'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
-                      pathname === '/task-calls' || pathname?.startsWith('/task-calls/')
-                        ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
-                        : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
-                    )}
-                  >
-                    <PhoneCall
+                  <>
+                    <Link
+                      href="/task-calls"
+                      onClick={handleLinkClick}
                       className={cn(
-                        'h-5 w-5',
+                        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
                         pathname === '/task-calls' || pathname?.startsWith('/task-calls/')
-                          ? 'text-yellow-600'
-                          : 'text-gray-400'
+                          ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
+                          : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
                       )}
-                    />
-                    My Task Calls
-                  </Link>
+                    >
+                      <PhoneCall
+                        className={cn(
+                          'h-5 w-5',
+                          pathname === '/task-calls' || pathname?.startsWith('/task-calls/')
+                            ? 'text-yellow-600'
+                            : 'text-gray-400'
+                        )}
+                      />
+                      My Task Calls
+                    </Link>
+                    <Link
+                      href="/kyc-reviews"
+                      onClick={handleLinkClick}
+                      className={cn(
+                        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                        pathname === '/kyc-reviews' || pathname?.startsWith('/kyc-reviews/')
+                          ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
+                          : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
+                      )}
+                    >
+                      <ShieldCheck
+                        className={cn(
+                          'h-5 w-5',
+                          pathname === '/kyc-reviews' || pathname?.startsWith('/kyc-reviews/')
+                            ? 'text-yellow-600'
+                            : 'text-gray-400'
+                        )}
+                      />
+                      KYC Reviews
+                    </Link>
+                  </>
                 )}
               </Fragment>
             );
           })}
+
+          {canSeeAllKycReviews && (
+            <Link
+              href="/kyc-reviews"
+              onClick={handleLinkClick}
+              className={cn(
+                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                pathname === '/kyc-reviews' || pathname?.startsWith('/kyc-reviews/')
+                  ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
+                  : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
+              )}
+            >
+              <ShieldCheck
+                className={cn(
+                  'h-5 w-5',
+                  pathname === '/kyc-reviews' || pathname?.startsWith('/kyc-reviews/')
+                    ? 'text-yellow-600'
+                    : 'text-gray-400'
+                )}
+              />
+              KYC Reviews
+            </Link>
+          )}
 
           {hasPermission('payment.list') && (
             <div className="space-y-1">

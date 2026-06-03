@@ -89,7 +89,7 @@ export default function LoginPage() {
               alt="ExtraHand Logo"
               width={56}
               height={56}
-              className="rounded-lg"
+              className="h-14 w-14 rounded-lg"
             />
           </div>
           <CardTitle className="text-2xl font-bold text-gray-900">ExtraHand Operations Portal</CardTitle>
