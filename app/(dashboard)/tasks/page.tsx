@@ -412,6 +412,9 @@ export default function TasksPage() {
                         Budget
                       </TableHead>
                       <TableHead className="hidden lg:table-cell">
+                        Deadline
+                      </TableHead>
+                      <TableHead className="hidden lg:table-cell">
                         Created
                       </TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -514,6 +517,16 @@ export default function TasksPage() {
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-sm font-medium">
                           {formatCurrency(task.budget)}
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-sm text-gray-500">
+                          {task.dateOption === "flexible" || !task.dateOption || !task.scheduledDate ? (
+                            <span className="text-gray-400">Flexible</span>
+                          ) : (
+                            <span className="capitalize text-gray-700">
+                              {task.dateOption === "on-date" ? "On " : task.dateOption === "before-date" ? "Before " : ""}
+                              {formatDate(task.scheduledDate)}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-sm text-gray-500">
                           {formatDate(task.createdAt)}

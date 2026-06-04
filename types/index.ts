@@ -205,6 +205,9 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
   assignedTo?: { userId: string; name: string } | null;
+  scheduledDate?: string;
+  dateOption?: string;
+  timeSlot?: string;
 }
 
 export interface TaskApplication {
