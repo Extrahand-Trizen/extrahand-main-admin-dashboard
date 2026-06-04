@@ -647,44 +647,56 @@ export default function TaskDetailsPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {applications.map((app: any) => (
+                          {applications.map((app: any) => {
+                          const proposedAmount =
+                            app.proposedAmount ??
+                            app.proposed_amount ??
+                            app.proposedBudget?.amount;
+                          return (
                             <TableRow key={app.applicationId}>
                               <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-amber-100 text-amber-700 font-medium text-sm">
-                                    {(
-                                      helperDetailsByProfileId.get(
-                                        extractHelperProfileId(app),
-                                      )?.name ||
-                                      app.helperName ||
-                                      app.HelperName ||
-                                      extractHelperProfileId(app) ||
-                                      "H"
-                                    )
-                                      ?.charAt(0)
-                                      .toUpperCase()}
-                                  </div>
-                                  {hasPermission("user.view") &&
-                                  extractHelperProfileId(app) ? (
-                                    <Link
-                                      href={`/users/${encodeURIComponent(extractHelperProfileId(app))}`}
-                                      className="text-sm font-medium text-blue-700 hover:underline"
-                                    >
-                                      {helperDetailsByProfileId.get(
-                                        extractHelperProfileId(app),
-                                      )?.name || "View helper details"}
-                                    </Link>
-                                  ) : (
-                                    <span className="text-sm font-medium text-gray-900">
-                                      {helperDetailsByProfileId.get(
-                                        extractHelperProfileId(app),
-                                      )?.name ||
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-amber-100 text-amber-700 font-medium text-sm">
+                                      {(
+                                        helperDetailsByProfileId.get(
+                                          extractHelperProfileId(app),
+                                        )?.name ||
                                         app.helperName ||
                                         app.HelperName ||
                                         extractHelperProfileId(app) ||
-                                        "Unknown"}
-                                    </span>
-                                  )}
+                                        "H"
+                                      )
+                                        ?.charAt(0)
+                                        .toUpperCase()}
+                                    </div>
+                                    {hasPermission("user.view") &&
+                                    extractHelperProfileId(app) ? (
+                                      <Link
+                                        href={`/users/${encodeURIComponent(extractHelperProfileId(app))}`}
+                                        className="text-sm font-medium text-blue-700 hover:underline"
+                                      >
+                                        {helperDetailsByProfileId.get(
+                                          extractHelperProfileId(app),
+                                        )?.name || "View helper details"}
+                                      </Link>
+                                    ) : (
+                                      <span className="text-sm font-medium text-gray-900">
+                                        {helperDetailsByProfileId.get(
+                                          extractHelperProfileId(app),
+                                        )?.name ||
+                                          app.helperName ||
+                                          app.HelperName ||
+                                          extractHelperProfileId(app) ||
+                                          "Unknown"}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {proposedAmount !== undefined ? (
+                                    <p className="text-xs text-gray-500 md:hidden">
+                                      Proposed: {formatCurrency(proposedAmount)}
+                                    </p>
+                                  ) : null}
                                 </div>
                               </TableCell>
                               <TableCell>
@@ -697,9 +709,9 @@ export default function TaskDetailsPage() {
                                 </Badge>
                               </TableCell>
                               <TableCell className="hidden md:table-cell">
-                                {app.proposedAmount ? (
+                                {proposedAmount !== undefined ? (
                                   <span className="text-sm font-medium">
-                                    {formatCurrency(app.proposedAmount)}
+                                    {formatCurrency(proposedAmount)}
                                   </span>
                                 ) : (
                                   <span className="text-sm text-gray-500">
@@ -711,7 +723,8 @@ export default function TaskDetailsPage() {
                                 {formatDate(app.createdAt)}
                               </TableCell>
                             </TableRow>
-                          ))}
+                          );
+                          })}
                         </TableBody>
                       </Table>
                     </div>

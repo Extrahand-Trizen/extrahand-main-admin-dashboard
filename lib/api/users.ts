@@ -12,6 +12,7 @@ export async function listUsers(filters?: UserFilters): Promise<ApiResponse<User
   if (filters?.status) params.append('status', filters.status);
   if (filters?.role) params.append('role', filters.role);
   if (filters?.category) params.append('category', filters.category);
+  if (filters?.area && filters.area !== 'all') params.append('area', filters.area);
   if (typeof filters?.isAadhaarVerified === 'boolean') {
     params.append('isAadhaarVerified', String(filters.isAadhaarVerified));
   }
@@ -23,6 +24,10 @@ export async function listUsers(filters?: UserFilters): Promise<ApiResponse<User
 
   const query = params.toString();
   return apiRequest<ApiResponse<User[]>>(`/api/v1/users${query ? `?${query}` : ''}`);
+}
+
+export async function getHyderabadSubAreas(): Promise<ApiResponse<string[]>> {
+  return apiRequest<ApiResponse<string[]>>('/api/v1/users/areas/hyderabad');
 }
 
 /**

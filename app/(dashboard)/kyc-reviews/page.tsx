@@ -47,17 +47,32 @@ import {
   rejectKycReview,
 } from "@/lib/api/kyc-reviews";
 
-const reviewStatusLabels: Record<KycReviewStatus, string> = {
+const reviewStatusLabels: Record<KycReviewStatus | "failed", string> = {
   pending: "Pending",
   accepted: "Accepted",
   rejected: "Rejected",
+  failed: "Failed",
 };
 
-const reviewStatusClasses: Record<KycReviewStatus, string> = {
+const reviewStatusClasses: Record<KycReviewStatus | "failed", string> = {
   pending: "bg-amber-50 text-amber-700 border-amber-200",
   accepted: "bg-emerald-50 text-emerald-700 border-emerald-200",
   rejected: "bg-red-50 text-red-700 border-red-200",
+  failed: "bg-rose-50 text-rose-700 border-rose-200",
 };
+
+function getDisplayReviewStatus(row: KycReviewRow): KycReviewStatus | "failed" {
+  if (row.reviewStatus === "rejected") return "rejected";
+  if (row.isAadhaarVerified) return "accepted";
+  const aadhaarStatus = String(row.aadhaar || "").toLowerCase();
+  if (/(failed|failure|rejected|not verified|not_verified)/.test(aadhaarStatus)) {
+    return "failed";
+  }
+  if (row.failureReason && row.reviewStatus !== "accepted" && !row.isAadhaarVerified) {
+    return "failed";
+  }
+  return row.reviewStatus || "pending";
+}
 
 const followUpLabels: Record<KycFollowUpStatus, string> = {
   none: "-",
@@ -85,9 +100,18 @@ function ReviewDialog({
 }) {
   const queryClient = useQueryClient();
   const [reason, setReason] = useState("");
+  const [confirmAccept, setConfirmAccept] = useState(false);
   const [followUpStatus, setFollowUpStatus] =
     useState<Exclude<KycFollowUpStatus, "none">>("follow_up");
   const [followUpDate, setFollowUpDate] = useState("");
+
+  useEffect(() => {
+    if (!open) {
+      setConfirmAccept(false);
+      setReason("");
+      setFollowUpDate("");
+    }
+  }, [open, row?.userId]);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["kyc-reviews"] });
 
@@ -275,6 +299,14 @@ function ReviewDialog({
               </div>
             </div>
             ) : null}
+
+            {canAccept && confirmAccept ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                By accepting, you confirm that the Aadhaar photos match the user and meet
+                ExtraHand verification standards. This will mark the user as Aadhaar verified
+                and close this review.
+              </div>
+            ) : null}
           </div>
         )}
 
@@ -294,11 +326,17 @@ function ReviewDialog({
           </Button>
           ) : null}
           <Button
-            onClick={() => acceptMutation.mutate()}
+            onClick={() => {
+              if (!confirmAccept) {
+                setConfirmAccept(true);
+                return;
+              }
+              acceptMutation.mutate();
+            }}
             disabled={loading || !row || !canAccept}
           >
             <Check className="mr-2 h-4 w-4" />
-            {isVerified ? "Already verified" : "Accept"}
+            {isVerified ? "Already verified" : confirmAccept ? "Confirm Accept" : "Accept"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -421,7 +459,9 @@ export default function KycReviewsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((row) => (
+                  {rows.map((row) => {
+                    const displayReviewStatus = getDisplayReviewStatus(row);
+                    return (
                     <TableRow key={`${row.notificationId}-${row.userId}`}>
                       <TableCell>
                         <div className="font-medium text-gray-900">{row.userName}</div>
@@ -465,9 +505,9 @@ export default function KycReviewsPage() {
                       </TableCell>
                       <TableCell>
                         <span
-                          className={`inline-flex rounded-md border px-2 py-1 text-xs font-medium ${reviewStatusClasses[row.reviewStatus]}`}
+                          className={`inline-flex rounded-md border px-2 py-1 text-xs font-medium ${reviewStatusClasses[displayReviewStatus]}`}
                         >
-                          {reviewStatusLabels[row.reviewStatus]}
+                          {reviewStatusLabels[displayReviewStatus]}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
@@ -481,7 +521,8 @@ export default function KycReviewsPage() {
                         </Button>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

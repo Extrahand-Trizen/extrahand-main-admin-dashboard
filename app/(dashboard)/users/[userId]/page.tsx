@@ -1529,6 +1529,7 @@ export default function UserDetailsPage() {
                     {offers.map((offer: any) => {
                       const task = offer.taskId;
                       const taskIdentifier = getTaskIdentifier(task);
+                      const proposedAmount = offer.proposedAmount ?? offer.proposed_amount;
                       return (
                         <div
                           key={offer.id || offer._id}
@@ -1541,6 +1542,9 @@ export default function UserDetailsPage() {
                               </p>
                               <p className="text-xs text-gray-500">
                                 Offer status: {offer.status || "pending"}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Proposed: {proposedAmount !== undefined ? formatCurrency(proposedAmount) : "-"}
                               </p>
                             </div>
                             <div className="flex items-center gap-2">

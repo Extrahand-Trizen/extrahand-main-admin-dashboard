@@ -262,6 +262,8 @@ export interface PaymentPayout {
   amount: string;
   netAmount: string;
   status: string;
+  source?: string;
+  type?: string;
   createdAt: string;
 }
 
@@ -413,6 +415,7 @@ export interface UserFilters {
   status?: string;
   role?: string;
   category?: string;
+  area?: string;
   isAadhaarVerified?: boolean;
   isCertified?: boolean;
   createdFrom?: string;

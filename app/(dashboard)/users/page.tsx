@@ -52,6 +52,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   listUsers,
+  getHyderabadSubAreas,
   banUser,
   unbanUser,
   suspendUser,
@@ -119,6 +120,7 @@ export default function UsersPage() {
   const [aadhaarFilter, setAadhaarFilter] = useState<string>("all");
   const [certifiedFilter, setCertifiedFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [areaFilter, setAreaFilter] = useState<string>("all");
   const [createdFrom, setCreatedFrom] = useState<string>("");
   const [createdTo, setCreatedTo] = useState<string>("");
   const [page, setPage] = useState(1);
@@ -144,6 +146,7 @@ export default function UsersPage() {
       aadhaarFilter,
       certifiedFilter,
       categoryFilter,
+      areaFilter,
       createdFrom,
       createdTo,
       page,
@@ -155,6 +158,7 @@ export default function UsersPage() {
         status: statusFilter !== "all" ? statusFilter : undefined,
         role: roleFilter !== "all" ? roleFilter : undefined,
         category: categoryFilter !== "all" ? categoryFilter : undefined,
+        area: areaFilter !== "all" ? areaFilter : undefined,
         isAadhaarVerified:
           aadhaarFilter === "verified"
             ? true
@@ -175,6 +179,16 @@ export default function UsersPage() {
     enabled: hasPermission("user.list"),
     retry: false,
   });
+
+  const { data: hyderabadSubAreasData } = useQuery({
+    queryKey: ["users-hyderabad-sub-areas"],
+    queryFn: getHyderabadSubAreas,
+    enabled: hasPermission("user.list"),
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+
+  const hyderabadSubAreas = hyderabadSubAreasData?.data || [];
 
   const banMutation = useMutation({
     mutationFn: ({ userId, reason }: { userId: string; reason: string }) =>
@@ -449,6 +463,28 @@ export default function UsersPage() {
               </Select>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="area">Hyderabad sub-area</Label>
+              <Select
+                value={areaFilter}
+                onValueChange={(value) => {
+                  setAreaFilter(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger id="area">
+                  <SelectValue placeholder="All sub-areas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Hyderabad sub-areas</SelectItem>
+                  {hyderabadSubAreas.map((area) => (
+                    <SelectItem key={area} value={area}>
+                      {area}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="createdFrom">Created from</Label>
               <Input
                 id="createdFrom"
@@ -484,6 +520,7 @@ export default function UsersPage() {
                   setAadhaarFilter("all");
                   setCertifiedFilter("all");
                   setCategoryFilter("all");
+                  setAreaFilter("all");
                   setCreatedFrom("");
                   setCreatedTo("");
                   setPage(1);
