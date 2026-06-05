@@ -355,13 +355,14 @@ export default function KycReviewsPage() {
   const [search, setSearch] = useState("");
   const [reviewStatus, setReviewStatus] = useState("all");
   const [followUpStatus, setFollowUpStatus] = useState("all");
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const [selectedRow, setSelectedRow] = useState<KycReviewRow | null>(null);
 
   const allowed = isAllReviewsRole(user?.role, isSuperAdmin) || isOperationsRole(user?.role);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["kyc-reviews", search, reviewStatus, followUpStatus],
-    queryFn: () => listKycReviews({ search, reviewStatus, followUpStatus, includeVerified: true }),
+    queryKey: ["kyc-reviews", search, reviewStatus, followUpStatus, sortOrder],
+    queryFn: () => listKycReviews({ search, reviewStatus, followUpStatus, includeVerified: true, sortOrder }),
     enabled: allowed,
     retry: false,
   });
@@ -395,7 +396,7 @@ export default function KycReviewsPage() {
         </p>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-[1fr_220px_240px]">
+      <div className="grid gap-3 lg:grid-cols-[1fr_180px_200px_160px]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input
@@ -425,6 +426,15 @@ export default function KycReviewsPage() {
             <SelectItem value="follow_up">Follow up</SelectItem>
             <SelectItem value="not_interested">Not interested</SelectItem>
             <SelectItem value="followup_uploaded">Follow-up uploaded</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={sortOrder} onValueChange={(val) => setSortOrder(val as "newest" | "oldest")}>
+          <SelectTrigger className="h-11">
+            <SelectValue placeholder="Sort order" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest">Newest</SelectItem>
+            <SelectItem value="oldest">Oldest</SelectItem>
           </SelectContent>
         </Select>
       </div>

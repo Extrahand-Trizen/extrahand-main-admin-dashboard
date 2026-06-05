@@ -62,10 +62,10 @@ import {
   KycFollowUpStatus,
   KycReviewRow,
   KycReviewStatus,
-  listKycReviews,
   rejectKycReview,
   updateKycFollowUp,
 } from "@/lib/api/kyc-reviews";
+import { listAadhaarFollowUps } from "@/lib/api/aadhaar-followups";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
@@ -274,7 +274,7 @@ function ReviewDialog({
     setReason("");
   }, [open, row?.userId]);
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["kyc-reviews"] });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["aadhaar-followups"] });
 
   const acceptMutation = useMutation({
     mutationFn: () => {
@@ -531,11 +531,11 @@ export default function AadhaarFollowUpsPage() {
         reviewStatus: variables.reviewStatus,
       }),
     onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: ["kyc-reviews"] });
-      const previousData = queryClient.getQueriesData({ queryKey: ["kyc-reviews"] });
+      await queryClient.cancelQueries({ queryKey: ["aadhaar-followups"] });
+      const previousData = queryClient.getQueriesData({ queryKey: ["aadhaar-followups"] });
 
       queryClient.setQueriesData(
-        { queryKey: ["kyc-reviews"] },
+        { queryKey: ["aadhaar-followups"] },
         (old: any) => {
           if (!old?.data) return old;
           return {
@@ -572,7 +572,7 @@ export default function AadhaarFollowUpsPage() {
       toast.error(error.message || "Failed to update follow-up status");
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["kyc-reviews"] });
+      queryClient.invalidateQueries({ queryKey: ["aadhaar-followups"] });
     },
   });
 
@@ -617,8 +617,8 @@ export default function AadhaarFollowUpsPage() {
   }, [search, statusFilter, page, limit, sortOrder]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["kyc-reviews", search, statusFilter, page, limit, sortOrder],
-    queryFn: () => listKycReviews(kycReviewQuery),
+    queryKey: ["aadhaar-followups", search, statusFilter, page, limit, sortOrder],
+    queryFn: () => listAadhaarFollowUps(kycReviewQuery),
     enabled: allowed,
     retry: false,
     placeholderData: (prev) => prev, // keep previous page data while fetching next
@@ -741,6 +741,8 @@ export default function AadhaarFollowUpsPage() {
                     {rows.map((row) => (
                       <TableRow
                         key={`${row.notificationId}-${row.userId}`}
+                        className="cursor-pointer hover:bg-gray-50 transition-colors"
+                        onClick={() => router.push(`/users/${encodeURIComponent(row.userId)}`)}
                       >
                         <TableCell>
                           <div className="flex items-center gap-3">
