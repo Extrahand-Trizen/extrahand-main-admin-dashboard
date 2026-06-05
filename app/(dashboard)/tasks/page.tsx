@@ -96,6 +96,7 @@ export default function TasksPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [followUpFilter, setFollowUpFilter] = useState<string>("all");
   const [assignedToFilter, setAssignedToFilter] = useState<string>("all");
+  const [deadlineSortOrder, setDeadlineSortOrder] = useState<'asc' | 'desc'>("desc");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -122,6 +123,7 @@ export default function TasksPage() {
       categoryFilter,
       followUpFilter,
       assignedToFilter,
+      deadlineSortOrder,
       page,
       limit,
     ],
@@ -133,6 +135,8 @@ export default function TasksPage() {
         followUpStatus:
           followUpFilter !== "all" ? followUpFilter : undefined,
         assignedTo: assignedToFilter !== "all" ? assignedToFilter : undefined,
+        sortBy: "scheduledDate",
+        sortOrder: deadlineSortOrder,
         page,
         limit,
       }),
@@ -265,7 +269,7 @@ export default function TasksPage() {
           <CardTitle className="text-lg">Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
             <div className="space-y-2">
               <Label htmlFor="search">Search</Label>
               <div className="relative">
@@ -364,6 +368,24 @@ export default function TasksPage() {
                   <SelectItem value="santhosh reddy">santhosh reddy</SelectItem>
                   <SelectItem value="durgamshiva">durgamshiva</SelectItem>
                   <SelectItem value="tadembharath">tadembharath</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="deadlineSort">Deadline order</Label>
+              <Select
+                value={deadlineSortOrder}
+                onValueChange={(value) => {
+                  setDeadlineSortOrder(value as 'asc' | 'desc');
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger id="deadlineSort">
+                  <SelectValue placeholder="Latest to old" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="desc">Latest to oldest</SelectItem>
+                  <SelectItem value="asc">Oldest to latest</SelectItem>
                 </SelectContent>
               </Select>
             </div>

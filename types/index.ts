@@ -247,6 +247,8 @@ export interface PaymentTransaction {
   paymentStatus: string | null;
   amountInRupees: string | null;
   createdAt: string;
+  teamTest?: boolean;
+  teamTestTransferred?: boolean;
   links?: {
     customerUserId?: string;
     helperUserId?: string;
@@ -435,6 +437,8 @@ export interface TaskFilters {
   customerId?: string;
   assigneeId?: string;
   assignedTo?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
   page?: number;
   limit?: number;
 }

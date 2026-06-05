@@ -31,6 +31,7 @@ export interface KycReviewRow {
   aadhaarUpdatedAt?: string;
   followUpStatus: KycFollowUpStatus;
   followUpDate?: string | null;
+  registeredAt?: string | null;
   assignedTo: KycReviewAssignee[];
   reviewStatus: KycReviewStatus;
   reviewedBy?: KycReviewAssignee | null;
@@ -60,11 +61,21 @@ export async function listKycReviews(params: {
   search?: string;
   reviewStatus?: string;
   followUpStatus?: string;
+  includeVerified?: boolean;
+  page?: number;
+  limit?: number;
+  sortOrder?: "newest" | "oldest";
+  assignedTo?: string;
 } = {}): Promise<KycReviewsResponse> {
   const query = new URLSearchParams();
   if (params.search) query.set("search", params.search);
   if (params.reviewStatus) query.set("reviewStatus", params.reviewStatus);
   if (params.followUpStatus) query.set("followUpStatus", params.followUpStatus);
+  if (params.includeVerified) query.set("includeVerified", "true");
+  if (params.page) query.set("page", String(params.page));
+  if (params.limit) query.set("limit", String(params.limit));
+  if (params.sortOrder) query.set("sortOrder", params.sortOrder);
+  if (params.assignedTo && params.assignedTo !== "all") query.set("assignedTo", params.assignedTo);
 
   const queryString = query.toString();
   return apiRequest<KycReviewsResponse>(
@@ -94,7 +105,7 @@ export async function rejectKycReview(row: {
   sessionId?: string;
   verificationId?: string;
   reason?: string;
-  followUpStatus: Exclude<KycFollowUpStatus, "none">;
+  followUpStatus: KycFollowUpStatus;
   followUpDate?: string;
 }): Promise<ApiResponse<unknown>> {
   return apiRequest<ApiResponse<unknown>>(
@@ -161,5 +172,28 @@ export async function getAadhaarUploadStatus(
 ): Promise<ApiResponse<AadhaarUploadStatus>> {
   return apiRequest<ApiResponse<AadhaarUploadStatus>>(
     `/api/v1/kyc-reviews/${encodeURIComponent(userId)}/upload-status`,
+  );
+}
+
+export async function updateKycFollowUp(row: {
+  userId: string;
+  sessionId?: string;
+  verificationId?: string;
+  followUpStatus: KycFollowUpStatus;
+  reviewStatus?: KycReviewStatus;
+  followUpDate?: string | null;
+}): Promise<ApiResponse<unknown>> {
+  return apiRequest<ApiResponse<unknown>>(
+    `/api/v1/kyc-reviews/${encodeURIComponent(row.userId)}/follow-up`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        sessionId: row.sessionId || "",
+        verificationId: row.verificationId || "",
+        followUpStatus: row.followUpStatus,
+        reviewStatus: row.reviewStatus,
+        followUpDate: row.followUpDate || null,
+      }),
+    },
   );
 }

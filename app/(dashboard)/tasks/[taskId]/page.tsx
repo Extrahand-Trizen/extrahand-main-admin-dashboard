@@ -575,22 +575,6 @@ export default function TaskDetailsPage() {
                     {formatCurrency(task.budget)}
                   </div>
                 </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">
-                    Deadline
-                  </Label>
-                  <div className="mt-1 text-sm font-medium text-gray-900">
-                    {task.dateOption === "flexible" || !task.dateOption || !task.scheduledDate ? (
-                      <span className="text-gray-500">Flexible</span>
-                    ) : (
-                      <span className="capitalize">
-                        {task.dateOption === "on-date" ? "On " : task.dateOption === "before-date" ? "Before " : ""}
-                        {formatDate(task.scheduledDate)}
-                        {task.timeSlot ? ` (${task.timeSlot})` : ""}
-                      </span>
-                    )}
-                  </div>
-                </div>
                 {task.location && (
                   <div>
                     <Label className="text-sm font-medium text-gray-700">
@@ -664,10 +648,7 @@ export default function TaskDetailsPage() {
                         </TableHeader>
                         <TableBody>
                           {applications.map((app: any) => {
-                          const proposedAmount =
-                            app.proposedAmount ??
-                            app.proposed_amount ??
-                            app.proposedBudget?.amount;
+                          const proposedAmount = app.proposedAmount ?? app.proposed_amount;
                           return (
                             <TableRow key={app.applicationId}>
                               <TableCell>
@@ -827,25 +808,6 @@ export default function TaskDetailsPage() {
                   <IndianRupee className="h-4 w-4 text-gray-400" />
                   <span className="text-sm font-semibold text-gray-900">
                     {formatCurrency(task.budget)}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <Label className="text-xs font-medium text-gray-500">
-                  Deadline
-                </Label>
-                <div className="mt-1 flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm font-semibold text-gray-900">
-                    {task.dateOption === "flexible" || !task.dateOption || !task.scheduledDate ? (
-                      <span className="text-gray-500 font-normal">Flexible</span>
-                    ) : (
-                      <span className="capitalize">
-                        {task.dateOption === "on-date" ? "On " : task.dateOption === "before-date" ? "Before " : ""}
-                        {formatDate(task.scheduledDate)}
-                        {task.timeSlot ? ` (${task.timeSlot})` : ""}
-                      </span>
-                    )}
                   </span>
                 </div>
               </div>

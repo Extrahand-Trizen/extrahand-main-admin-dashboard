@@ -45,7 +45,7 @@ const navigation: Array<{
 
 const paymentItems = [
   { name: 'Overview', href: '/payments/overview' },
-  { name: 'Transactions', href: '/payments/transactions' },
+  { name: 'Pay-ins', href: '/payments/transactions' },
   { name: 'Payouts', href: '/payments/payouts' },
   { name: 'Refunds', href: '/payments/refunds' },
   { name: 'Ledger', href: '/payments/ledger' },
@@ -204,6 +204,26 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
                       />
                       KYC Reviews
                     </Link>
+                    <Link
+                      href="/aadhaar-followups"
+                      onClick={handleLinkClick}
+                      className={cn(
+                        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                        pathname === '/aadhaar-followups' || pathname?.startsWith('/aadhaar-followups/')
+                          ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
+                          : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
+                      )}
+                    >
+                      <ShieldCheck
+                        className={cn(
+                          'h-5 w-5',
+                          pathname === '/aadhaar-followups' || pathname?.startsWith('/aadhaar-followups/')
+                            ? 'text-yellow-600'
+                            : 'text-gray-400'
+                        )}
+                      />
+                      Aadhaar Follow-ups
+                    </Link>
                   </>
                 )}
               </Fragment>
@@ -211,26 +231,48 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
           })}
 
           {canSeeAllKycReviews && (
-            <Link
-              href="/kyc-reviews"
-              onClick={handleLinkClick}
-              className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
-                pathname === '/kyc-reviews' || pathname?.startsWith('/kyc-reviews/')
-                  ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
-                  : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
-              )}
-            >
-              <ShieldCheck
+            <>
+              <Link
+                href="/kyc-reviews"
+                onClick={handleLinkClick}
                 className={cn(
-                  'h-5 w-5',
+                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
                   pathname === '/kyc-reviews' || pathname?.startsWith('/kyc-reviews/')
-                    ? 'text-yellow-600'
-                    : 'text-gray-400'
+                    ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
+                    : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
                 )}
-              />
-              KYC Reviews
-            </Link>
+              >
+                <ShieldCheck
+                  className={cn(
+                    'h-5 w-5',
+                    pathname === '/kyc-reviews' || pathname?.startsWith('/kyc-reviews/')
+                      ? 'text-yellow-600'
+                      : 'text-gray-400'
+                  )}
+                />
+                KYC Reviews
+              </Link>
+              <Link
+                href="/aadhaar-followups"
+                onClick={handleLinkClick}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                  pathname === '/aadhaar-followups' || pathname?.startsWith('/aadhaar-followups/')
+                    ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
+                    : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
+                )}
+              >
+                <ShieldCheck
+                  className={cn(
+                    'h-5 w-5',
+                    pathname === '/aadhaar-followups' || pathname?.startsWith('/aadhaar-followups/')
+                      ? 'text-yellow-600'
+                      : 'text-gray-400'
+                  )}
+                />
+                Aadhaar Follow-ups
+              </Link>
+            </>
           )}
 
           {hasPermission('payment.list') && (

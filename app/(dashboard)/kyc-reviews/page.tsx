@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Eye, ExternalLink, ImageIcon, Search, XCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -102,7 +102,7 @@ function ReviewDialog({
   const [reason, setReason] = useState("");
   const [confirmAccept, setConfirmAccept] = useState(false);
   const [followUpStatus, setFollowUpStatus] =
-    useState<Exclude<KycFollowUpStatus, "none">>("follow_up");
+    useState<KycFollowUpStatus>("none");
   const [followUpDate, setFollowUpDate] = useState("");
 
   useEffect(() => {
@@ -110,6 +110,7 @@ function ReviewDialog({
       setConfirmAccept(false);
       setReason("");
       setFollowUpDate("");
+      setFollowUpStatus("none");
     }
   }, [open, row?.userId]);
 
@@ -260,34 +261,36 @@ function ReviewDialog({
             ) : null}
 
             {canReject ? (
-            <div className="grid gap-4 rounded-lg border border-gray-200 p-4 md:grid-cols-[220px_180px_1fr]">
+            <>
               <div className="space-y-2">
                 <Label>Rejected stage</Label>
                 <Select
                   value={followUpStatus}
                   onValueChange={(value) =>
-                    setFollowUpStatus(value as Exclude<KycFollowUpStatus, "none">)
+                    setFollowUpStatus(value as KycFollowUpStatus)
                   }
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">Pending</SelectItem>
                     <SelectItem value="follow_up">Follow up</SelectItem>
                     <SelectItem value="not_interested">Not interested</SelectItem>
                     <SelectItem value="followup_uploaded">Follow-up uploaded</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Follow-up date</Label>
-                <Input
-                  type="date"
-                  value={followUpDate}
-                  onChange={(event) => setFollowUpDate(event.target.value)}
-                  disabled={followUpStatus !== "follow_up"}
-                />
-              </div>
+              {followUpStatus === "follow_up" && (
+                <div className="space-y-2">
+                  <Label>Follow-up date</Label>
+                  <Input
+                    type="date"
+                    value={followUpDate}
+                    onChange={(event) => setFollowUpDate(event.target.value)}
+                  />
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Reject note</Label>
                 <Textarea
@@ -297,7 +300,7 @@ function ReviewDialog({
                   className="min-h-[72px]"
                 />
               </div>
-            </div>
+            </>
             ) : null}
 
             {canAccept && confirmAccept ? (
@@ -345,6 +348,7 @@ function ReviewDialog({
 }
 
 export default function KycReviewsPage() {
+  const router = useRouter();
   const { user, isSuperAdmin } = useAuth();
   const searchParams = useSearchParams();
   const reviewUserId = searchParams.get("userId");
@@ -357,7 +361,7 @@ export default function KycReviewsPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["kyc-reviews", search, reviewStatus, followUpStatus],
-    queryFn: () => listKycReviews({ search, reviewStatus, followUpStatus }),
+    queryFn: () => listKycReviews({ search, reviewStatus, followUpStatus, includeVerified: true }),
     enabled: allowed,
     retry: false,
   });
@@ -462,7 +466,11 @@ export default function KycReviewsPage() {
                   {rows.map((row) => {
                     const displayReviewStatus = getDisplayReviewStatus(row);
                     return (
-                    <TableRow key={`${row.notificationId}-${row.userId}`}>
+                    <TableRow
+                      key={`${row.notificationId}-${row.userId}`}
+                      className="cursor-pointer hover:bg-gray-50 transition-colors"
+                      onClick={() => router.push(`/users/${encodeURIComponent(row.userId)}`)}
+                    >
                       <TableCell>
                         <div className="font-medium text-gray-900">{row.userName}</div>
                         <div className="text-xs text-gray-500">{row.userPhone || row.userEmail || row.userId}</div>
@@ -514,7 +522,10 @@ export default function KycReviewsPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setSelectedRow(row)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedRow(row);
+                          }}
                         >
                           <Eye className="mr-2 h-4 w-4" />
                           Review
