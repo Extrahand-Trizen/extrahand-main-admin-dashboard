@@ -119,6 +119,7 @@ const taskCallStatusLabels: Record<TaskCallStatus, string> = {
   not_genuine: "Not genuine",
   call_not_lifted: "Call not lifted",
   follow_up: "Follow up",
+  completed: "Completed",
 };
 
 const taskCallStatusClasses: Record<TaskCallStatus, string> = {
@@ -127,6 +128,7 @@ const taskCallStatusClasses: Record<TaskCallStatus, string> = {
   not_genuine: "bg-red-50 text-red-700 border-red-200",
   call_not_lifted: "bg-gray-100 text-gray-700 border-gray-200",
   follow_up: "bg-blue-50 text-blue-700 border-blue-200",
+  completed: "bg-indigo-50 text-indigo-700 border-indigo-200",
 };
 
 const isOperationsRole = (role?: string | null) =>
@@ -929,6 +931,7 @@ export default function TaskDetailsPage() {
                   <SelectItem value="not_genuine">Not Genuine</SelectItem>
                   <SelectItem value="call_not_lifted">Call Not Lifted</SelectItem>
                   <SelectItem value="follow_up">Follow Up / Callback</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
                 </SelectContent>
               </Select>
             </div>

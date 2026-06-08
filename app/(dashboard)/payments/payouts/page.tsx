@@ -325,19 +325,39 @@ export default function PaymentPayoutsPage() {
                   <div key={acc.id || index} className="p-3 border rounded-lg bg-gray-50 space-y-1">
                     <div className="flex justify-between items-center">
                       <span className="font-semibold text-gray-900">{acc.bankName || "Unknown Bank"}</span>
-                      {acc.isDefault && (
-                        <span className="text-xs px-2 py-0.5 bg-green-100 text-green-800 rounded-full font-medium">
-                          Default
-                        </span>
-                      )}
+                      <div className="flex gap-1.5">
+                        {acc.isDefault && (
+                          <span className="text-xs px-2 py-0.5 bg-green-100 text-green-800 rounded-full font-medium">
+                            Default
+                          </span>
+                        )}
+                        {acc.isDecrypted ? (
+                          <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full font-medium">
+                            ✓ Decrypted
+                          </span>
+                        ) : acc.hasEncryptedAccountNumber ? (
+                          <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full font-medium" title="Encryption key not configured in this environment">
+                            ⚠ Masked
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-sm pt-2">
                       <span className="text-gray-500">Account Holder:</span>
                       <span className="text-gray-900 font-medium">{acc.accountHolderName || "—"}</span>
                       <span className="text-gray-500">Account Number:</span>
-                      <span className="text-gray-900 font-mono font-medium">{acc.accountNumber || "—"}</span>
+                      <span className="text-gray-900 font-mono font-medium">
+                        {acc.accountNumber || "—"}
+                        {!acc.isDecrypted && acc.hasEncryptedAccountNumber && (
+                          <span className="ml-1 text-xs text-yellow-600">(masked)</span>
+                        )}
+                      </span>
                       <span className="text-gray-500">IFSC Code:</span>
                       <span className="text-gray-900 font-mono font-medium">{acc.ifscCode || "—"}</span>
+                      <span className="text-gray-500">Verified:</span>
+                      <span className={`font-medium ${acc.isVerified ? 'text-green-700' : 'text-gray-500'}`}>
+                        {acc.isVerified ? 'Yes' : 'No'}
+                      </span>
                     </div>
                   </div>
                 ))}

@@ -94,7 +94,7 @@ const followUpFilterOptions = [
   { value: "contacted", label: "Contacted" },
   { value: "uploaded", label: "Uploaded" },
   { value: "not_lifted", label: "Not Lifted" },
-  { value: "refused", label: "Refused" },
+  { value: "refused", label: "Not Interested" },
 ] as const;
 
 const sortOptions = [
@@ -106,7 +106,7 @@ function formatFollowUpStatusLabel(row: KycReviewRow) {
   if (row.followUpStatus && row.followUpStatus !== "none") {
     return followUpLabels[row.followUpStatus] || "-";
   }
-  if (row.reviewStatus === "rejected") return "Refused";
+  if (row.reviewStatus === "rejected") return "Not Interested";
   return "Pending";
 }
 
@@ -559,7 +559,7 @@ export default function AadhaarFollowUpsPage() {
       if (variables.followUpStatus !== "none") {
         label = followUpLabels[variables.followUpStatus];
       } else if (variables.reviewStatus === "rejected") {
-        label = "Refused";
+        label = "Not Interested";
       }
       toast.success(`Follow-up status updated to ${label}`);
     },
@@ -854,7 +854,7 @@ export default function AadhaarFollowUpsPage() {
                                 }}
                                 className="flex items-center px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer rounded"
                               >
-                                Refused
+                                Not Interested
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>

@@ -6,7 +6,8 @@ export type TaskCallStatus =
   | 'genuine'
   | 'not_genuine'
   | 'call_not_lifted'
-  | 'follow_up';
+  | 'follow_up'
+  | 'completed';
 
 export interface TaskCallListItem {
   notificationId: string;
