@@ -820,7 +820,7 @@ export default function TaskDetailsPage() {
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between gap-3">
-                  <CardTitle className="text-lg">Onboarder Verification</CardTitle>
+                  <CardTitle className="text-lg">Task Verification</CardTitle>
                   {!taskCallLoading && (
                     <span
                       className={`inline-flex rounded-md border px-2 py-1 text-xs font-medium ${
