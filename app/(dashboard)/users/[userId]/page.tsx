@@ -46,6 +46,7 @@ import {
 } from "@/lib/api/users";
 import { listTasks, listApplications } from "@/lib/api/tasks";
 import { usePermissions } from "@/lib/hooks/usePermissions";
+import { useAuth } from "@/lib/hooks/useAuth";
 import { formatDate, formatDateTime, formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import {
@@ -92,6 +93,7 @@ export default function UserDetailsPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { hasPermission } = usePermissions();
+  const { user: currentUser, isSuperAdmin } = useAuth();
   const rawUserId = params.userId as string;
   const userId =
     typeof rawUserId === 'string' ? decodeURIComponent(rawUserId) : '';
@@ -119,6 +121,11 @@ export default function UserDetailsPage() {
     staleTime: 30_000,
   });
   const uploadStatus = uploadStatusRes?.data ?? null;
+  const isClaimedByOther = Boolean(
+    uploadStatus?.claimedBy &&
+    uploadStatus.claimedBy.userId !== currentUser?.userId &&
+    !isSuperAdmin
+  );
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["user", userId],
@@ -1025,20 +1032,26 @@ export default function UserDetailsPage() {
                   {/* Upload button — shown for any non-verified Aadhaar status */}
                   {!user.isAadhaarVerified && (
                     <div className="mt-3 pt-3 border-t border-gray-100">
-                      {/* "Photos submitted" badge when a previous upload exists */}
-                      {uploadStatus?.hasUpload && !uploadStatusLoading && (
+                      {isClaimedByOther ? (
+                        <div className="mb-2 flex items-center gap-1.5 rounded-md bg-red-50 border border-red-200 px-2.5 py-1.5">
+                          <Ban className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                          <span className="text-xs text-red-700 font-medium">
+                            Claimed by {uploadStatus?.claimedBy?.name} · only they can upload
+                          </span>
+                        </div>
+                      ) : uploadStatus?.hasUpload && !uploadStatusLoading ? (
                         <div className="mb-2 flex items-center gap-1.5 rounded-md bg-amber-50 border border-amber-200 px-2.5 py-1.5">
                           <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                           <span className="text-xs text-amber-700 font-medium">
                             Photos uploaded · pending review
                           </span>
                         </div>
-                      )}
+                      ) : null}
                       <Button
                         size="sm"
                         variant="outline"
                         className="w-full gap-2 border-amber-300 text-amber-700 hover:bg-amber-50 hover:border-amber-400"
-                        disabled={uploadStatusLoading}
+                        disabled={uploadStatusLoading || isClaimedByOther}
                         onClick={() => setAadhaarUploadOpen(true)}
                       >
                         {uploadStatusLoading ? (

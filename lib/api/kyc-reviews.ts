@@ -33,6 +33,8 @@ export interface KycReviewRow {
   followUpDate?: string | null;
   registeredAt?: string | null;
   assignedTo: KycReviewAssignee[];
+  claimedBy?: KycReviewAssignee | null;
+  claimedAt?: string | null;
   reviewStatus: KycReviewStatus;
   reviewedBy?: KycReviewAssignee | null;
   reviewedAt?: string | null;
@@ -165,6 +167,8 @@ export interface AadhaarUploadStatus {
   reviewStatus: KycReviewStatus | null;
   /** Use this as the sessionId for the next upload batch */
   nextSessionId: string;
+  claimedBy?: KycReviewAssignee | null;
+  claimedAt?: string | null;
 }
 
 export async function getAadhaarUploadStatus(
@@ -195,5 +199,86 @@ export async function updateKycFollowUp(row: {
         followUpDate: row.followUpDate || null,
       }),
     },
+  );
+}
+
+export async function claimKycReview(
+  userId: string,
+  sessionId?: string,
+): Promise<ApiResponse<unknown>> {
+  return apiRequest<ApiResponse<unknown>>(
+    `/api/v1/kyc-reviews/${encodeURIComponent(userId)}/claim`,
+    {
+      method: "POST",
+      body: JSON.stringify({ sessionId: sessionId || "" }),
+    },
+  );
+}
+
+export async function unclaimKycReview(
+  userId: string,
+  sessionId?: string,
+): Promise<ApiResponse<unknown>> {
+  return apiRequest<ApiResponse<unknown>>(
+    `/api/v1/kyc-reviews/${encodeURIComponent(userId)}/unclaim`,
+    {
+      method: "POST",
+      body: JSON.stringify({ sessionId: sessionId || "" }),
+    },
+  );
+}
+
+export async function transferKycReview(
+  userId: string,
+  targetAdminUserId: string,
+  sessionId?: string,
+): Promise<ApiResponse<unknown>> {
+  return apiRequest<ApiResponse<unknown>>(
+    `/api/v1/kyc-reviews/${encodeURIComponent(userId)}/transfer`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        targetAdminUserId,
+        sessionId: sessionId || "",
+      }),
+    },
+  );
+}
+
+export async function listMyClaims(params: {
+  search?: string;
+  reviewStatus?: string;
+  followUpStatus?: string;
+  includeVerified?: boolean;
+  page?: number;
+  limit?: number;
+  sortOrder?: "newest" | "oldest";
+} = {}): Promise<KycReviewsResponse> {
+  const query = new URLSearchParams();
+  if (params.search) query.set("search", params.search);
+  if (params.reviewStatus) query.set("reviewStatus", params.reviewStatus);
+  if (params.followUpStatus) query.set("followUpStatus", params.followUpStatus);
+  if (params.includeVerified) query.set("includeVerified", "true");
+  if (params.page) query.set("page", String(params.page));
+  if (params.limit) query.set("limit", String(params.limit));
+  if (params.sortOrder) query.set("sortOrder", params.sortOrder);
+
+  const queryString = query.toString();
+  return apiRequest<KycReviewsResponse>(
+    `/api/v1/kyc-reviews/my-claims${queryString ? `?${queryString}` : ""}`,
+  );
+}
+
+export async function listOpsAdmins(): Promise<ApiResponse<KycReviewAssignee[]>> {
+  return apiRequest<ApiResponse<KycReviewAssignee[]>>("/api/v1/kyc-reviews/ops-admins");
+}
+
+export async function getKycReviewDocuments(
+  userId: string,
+  sessionId: string,
+  verificationId: string,
+): Promise<ApiResponse<KycReviewDocument[]>> {
+  return apiRequest<ApiResponse<KycReviewDocument[]>>(
+    `/api/v1/kyc-reviews/${encodeURIComponent(userId)}/documents?sessionId=${encodeURIComponent(sessionId)}&verificationId=${encodeURIComponent(verificationId)}`,
   );
 }

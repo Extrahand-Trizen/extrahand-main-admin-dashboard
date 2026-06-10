@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Eye, ExternalLink, ImageIcon, Search, XCircle } from "lucide-react";
+import { Check, Eye, ExternalLink, ImageIcon, Search, XCircle, ArrowLeftRight, Ban } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,9 +43,11 @@ import {
   KycFollowUpStatus,
   KycReviewRow,
   KycReviewStatus,
-  listKycReviews,
+  listMyClaims,
   rejectKycReview,
-  claimKycReview,
+  transferKycReview,
+  unclaimKycReview,
+  listOpsAdmins,
   getKycReviewDocuments,
 } from "@/lib/api/kyc-reviews";
 
@@ -87,10 +89,6 @@ function isOperationsRole(role?: string | null) {
   return ["operations_admin", "operation_admin", "operations"].includes(role || "");
 }
 
-function isAllReviewsRole(role?: string | null, isSuperAdmin?: boolean) {
-  return Boolean(isSuperAdmin || role === "platform_admin");
-}
-
 function ReviewDialog({
   row,
   open,
@@ -123,7 +121,10 @@ function ReviewDialog({
     }
   }, [open, row?.userId]);
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["kyc-reviews"] });
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["kyc-reviews"] });
+    queryClient.invalidateQueries({ queryKey: ["my-claims"] });
+  };
 
   const acceptMutation = useMutation({
     mutationFn: () => {
@@ -181,7 +182,6 @@ function ReviewDialog({
                 <p className="text-gray-500">Aadhaar</p>
                 <p className="font-medium text-gray-900">{row.aadhaar || "-"}</p>
               </div>
-              {/* Show "Uploaded by" for manual uploads, "Failure reason" otherwise */}
               {row.isManualUpload ? (
                 <div>
                   <p className="text-gray-500">Uploaded by</p>
@@ -361,42 +361,135 @@ function ReviewDialog({
   );
 }
 
-export default function KycReviewsPage() {
+function TransferDialog({
+  row,
+  open,
+  onOpenChange,
+}: {
+  row: KycReviewRow | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const queryClient = useQueryClient();
+  const [selectedAdminId, setSelectedAdminId] = useState<string>("");
+  
+  const { data: adminsResponse, isLoading: loadingAdmins } = useQuery({
+    queryKey: ["ops-admins"],
+    queryFn: () => listOpsAdmins(),
+    enabled: open,
+  });
+
+  const admins = useMemo(() => adminsResponse?.data || [], [adminsResponse]);
+
+  const transferMutation = useMutation({
+    mutationFn: () => {
+      if (!row) throw new Error("No review selected");
+      if (!selectedAdminId) throw new Error("Please select an admin");
+      return transferKycReview(row.userId, selectedAdminId, row.sessionId);
+    },
+    onSuccess: () => {
+      toast.success("KYC review transferred successfully");
+      queryClient.invalidateQueries({ queryKey: ["kyc-reviews"] });
+      queryClient.invalidateQueries({ queryKey: ["my-claims"] });
+      onOpenChange(false);
+    },
+    onError: (error: any) => toast.error(error.message || "Failed to transfer review"),
+  });
+
+  useEffect(() => {
+    if (open) {
+      setSelectedAdminId("");
+    }
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Transfer KYC Claim</DialogTitle>
+          <DialogDescription>
+            Select another active operations admin to transfer the review for {row?.userName || "this user"}.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="admin-select">Select Operations Admin</Label>
+            {loadingAdmins ? (
+              <Skeleton className="h-10 w-full" />
+            ) : (
+              <Select value={selectedAdminId} onValueChange={setSelectedAdminId}>
+                <SelectTrigger id="admin-select" className="w-full">
+                  <SelectValue placeholder="Choose an admin..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {admins.map((admin) => (
+                    <SelectItem key={admin.userId} value={admin.userId}>
+                      {admin.name} ({admin.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={transferMutation.isPending}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => transferMutation.mutate()}
+            disabled={transferMutation.isPending || !selectedAdminId}
+          >
+            Transfer
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default function MyClaimsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { user, isSuperAdmin } = useAuth();
-  const searchParams = useSearchParams();
-  const reviewUserId = searchParams.get("userId");
+  const { user } = useAuth();
+  
   const [search, setSearch] = useState("");
   const [reviewStatus, setReviewStatus] = useState("all");
   const [followUpStatus, setFollowUpStatus] = useState("all");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const [selectedRow, setSelectedRow] = useState<KycReviewRow | null>(null);
+  const [transferRow, setTransferRow] = useState<KycReviewRow | null>(null);
 
-  const allowed = isAllReviewsRole(user?.role, isSuperAdmin) || isOperationsRole(user?.role);
+  const isOpsAdmin = isOperationsRole(user?.role);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["kyc-reviews", search, reviewStatus, followUpStatus, sortOrder],
-    queryFn: () => listKycReviews({ search, reviewStatus, followUpStatus, includeVerified: true, sortOrder }),
-    enabled: allowed,
+    queryKey: ["my-claims", search, reviewStatus, followUpStatus, sortOrder],
+    queryFn: () => listMyClaims({ search, reviewStatus, followUpStatus, includeVerified: true, sortOrder }),
+    enabled: isOpsAdmin,
     retry: false,
   });
 
   const rows = useMemo(() => data?.data || [], [data]);
 
-  useEffect(() => {
-    if (!reviewUserId || isLoading || rows.length === 0) return;
-    const match = rows.find((row) => row.userId === reviewUserId);
-    if (match) {
-      setSelectedRow(match);
-    }
-  }, [reviewUserId, rows, isLoading]);
+  const unclaimMutation = useMutation({
+    mutationFn: (row: KycReviewRow) => {
+      return unclaimKycReview(row.userId, row.sessionId);
+    },
+    onSuccess: () => {
+      toast.success("Review unclaimed successfully");
+      queryClient.invalidateQueries({ queryKey: ["kyc-reviews"] });
+      queryClient.invalidateQueries({ queryKey: ["my-claims"] });
+    },
+    onError: (error: any) => toast.error(error.message || "Failed to unclaim review"),
+  });
 
-  if (!allowed) {
+  if (!isOpsAdmin) {
     return (
       <div className="flex h-64 items-center justify-center">
         <p className="text-sm text-gray-500">
-          KYC Reviews is available only for operations admins and super admins.
+          My Claims is available only for operations admins.
         </p>
       </div>
     );
@@ -404,11 +497,18 @@ export default function KycReviewsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">KYC Reviews</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Review Aadhaar verification photos and update follow-up stages
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">My Claims</h1>
+          <p className="mt-2 text-sm text-gray-600">
+            Review and manage KYC cases you have claimed
+          </p>
+        </div>
+        <Button variant="outline" asChild>
+          <Link href="/kyc-reviews">
+            ← All KYC Reviews
+          </Link>
+        </Button>
       </div>
 
       <div className="grid gap-3 lg:grid-cols-[1fr_180px_200px_160px]">
@@ -417,7 +517,7 @@ export default function KycReviewsPage() {
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search by name, phone, Aadhaar status..."
+            placeholder="Search by name, phone, status..."
             className="h-11 pl-9"
           />
         </div>
@@ -456,9 +556,9 @@ export default function KycReviewsPage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Aadhaar Review List</CardTitle>
+          <CardTitle className="text-base">My Claimed Reviews</CardTitle>
           <Badge variant="secondary">
-            {rows.length} {rows.length === 1 ? "review" : "reviews"}
+            {rows.length} {rows.length === 1 ? "claim" : "claims"}
           </Badge>
         </CardHeader>
         <CardContent className="p-0">
@@ -470,7 +570,7 @@ export default function KycReviewsPage() {
             </div>
           ) : rows.length === 0 ? (
             <div className="px-6 py-12 text-center text-sm text-gray-500">
-              No KYC reviews found.
+              You haven't claimed any KYC reviews yet. Go to <Link href="/kyc-reviews" className="text-indigo-600 hover:underline">KYC Reviews</Link> to claim some.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -482,9 +582,8 @@ export default function KycReviewsPage() {
                     <TableHead>Failure reason / Uploaded by</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Follow-up status</TableHead>
-                    {isSuperAdmin && <TableHead>Claimed by</TableHead>}
                     <TableHead>Status</TableHead>
-                    {!isSuperAdmin && <TableHead className="text-right">Action</TableHead>}
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -531,20 +630,6 @@ export default function KycReviewsPage() {
                           followUpLabels[row.followUpStatus]
                         )}
                       </TableCell>
-                      {isSuperAdmin && (
-                        <TableCell>
-                          {row.claimedBy ? (
-                            <div className="flex flex-col">
-                              <span className="font-medium text-gray-900">
-                                {row.claimedBy.userId === user?.userId ? "You" : row.claimedBy.name}
-                              </span>
-                              <span className="text-xs text-gray-400">{row.claimedBy.email}</span>
-                            </div>
-                          ) : (
-                            <span className="text-gray-400 italic">Unclaimed</span>
-                          )}
-                        </TableCell>
-                      )}
                       <TableCell>
                         <span
                           className={`inline-flex rounded-md border px-2 py-1 text-xs font-medium ${reviewStatusClasses[displayReviewStatus]}`}
@@ -552,46 +637,32 @@ export default function KycReviewsPage() {
                           {reviewStatusLabels[displayReviewStatus]}
                         </span>
                       </TableCell>
-                      {!isSuperAdmin && (
-                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                          {!row.claimedBy ? (
-                            isOperationsRole(user?.role) ? (
-                              <Button
-                                size="sm"
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  try {
-                                    await claimKycReview(row.userId, row.sessionId);
-                                    toast.success("KYC review claimed successfully");
-                                    queryClient.invalidateQueries({ queryKey: ["kyc-reviews"] });
-                                  } catch (error: any) {
-                                    toast.error(error.message || "Failed to claim review");
-                                  }
-                                }}
-                              >
-                                Claim
-                              </Button>
-                            ) : (
-                              <span className="text-xs text-gray-400 italic">Unclaimed</span>
-                            )
-                          ) : row.claimedBy.userId === user?.userId ? (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              asChild
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <Link href="/kyc-reviews/my-claims">
-                                My Claims →
-                              </Link>
-                            </Button>
-                          ) : (
-                            <span className="text-xs text-gray-500 font-medium">
-                              Claimed by {row.claimedBy.name}
-                            </span>
-                          )}
-                        </TableCell>
-                      )}
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedRow(row);
+                            }}
+                          >
+                            <Eye className="mr-2 h-4 w-4" />
+                            Review
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTransferRow(row);
+                            }}
+                          >
+                            <ArrowLeftRight className="mr-2 h-4 w-4" />
+                            Transfer
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                     );
                   })}
@@ -607,6 +678,14 @@ export default function KycReviewsPage() {
         open={Boolean(selectedRow)}
         onOpenChange={(open) => {
           if (!open) setSelectedRow(null);
+        }}
+      />
+
+      <TransferDialog
+        row={transferRow}
+        open={Boolean(transferRow)}
+        onOpenChange={(open) => {
+          if (!open) setTransferRow(null);
         }}
       />
     </div>
