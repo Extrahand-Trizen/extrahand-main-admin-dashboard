@@ -163,7 +163,7 @@ function ReviewDialog({
   const loading = acceptMutation.isPending || rejectMutation.isPending;
   const isVerified = Boolean(row?.isAadhaarVerified);
   const canReject = !isVerified && row?.reviewStatus !== "accepted";
-  const canAccept = !isVerified;
+  const canAccept = !isVerified && followUpStatus !== "follow_up";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

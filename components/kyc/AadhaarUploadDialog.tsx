@@ -292,7 +292,12 @@ export function AadhaarUploadDialog({
         queryKey: ["aadhaar-upload-status", userId],
       });
       queryClient.invalidateQueries({ queryKey: ["kyc-reviews"] });
+      queryClient.invalidateQueries({ queryKey: ["my-claims"] });
       queryClient.invalidateQueries({ queryKey: ["user", userId] });
+      // Invalidate the review documents cache so the review dialog shows the
+      // newly uploaded images immediately (not the stale cached ones)
+      queryClient.invalidateQueries({ queryKey: ["kyc-review-documents", userId] });
+
     },
     onError: (err: Error) =>
       toast.error(err.message || "Failed to upload back side"),

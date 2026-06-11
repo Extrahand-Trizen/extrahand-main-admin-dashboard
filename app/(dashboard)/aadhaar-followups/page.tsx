@@ -316,7 +316,7 @@ function ReviewDialog({
     ? "accepted"
     : row?.reviewStatus || "pending";
   const canReject = !isVerified && row?.reviewStatus !== "accepted";
-  const canAccept = !isVerified;
+  const canAccept = !isVerified && followUpStatus !== "follow_up";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
