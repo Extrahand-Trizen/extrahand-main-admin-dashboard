@@ -23,10 +23,12 @@ FROM base AS builder
 # 🚨 THIS ARG CONTROLS CACHE INVALIDATION
 ARG CACHE_BUST
 
-# 🚨 ADD API URL AS BUILD ARG
+# 🚨 CRITICAL: API_BASE_URL FOR BACKEND API CALLS (MUST BE SET AT BUILD TIME)
+# This must be an absolute URL: https://backend-service.domain.in
+# If not provided at build time, the app will throw an error during startup
 ARG NEXT_PUBLIC_API_URL
 
-# 🚨 EXPOSE AS ENVIRONMENT VARIABLE FOR BUILD
+# 🚨 EXPOSE AS ENVIRONMENT VARIABLE FOR BUILD (baked into JavaScript bundle)
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 # Make Docker consider this layer unique

@@ -2,7 +2,19 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 let refreshInFlight: Promise<string | null> | null = null;
 
 if (!API_BASE_URL) {
-  throw new Error('NEXT_PUBLIC_API_URL environment variable is required');
+  throw new Error(
+    'NEXT_PUBLIC_API_URL environment variable is required. ' +
+    'This must be set at build time (not runtime). ' +
+    'For production: pass as Docker build arg --build-arg NEXT_PUBLIC_API_URL=https://your-backend-url'
+  );
+}
+
+// Validate that API_BASE_URL is a proper absolute URL
+if (!API_BASE_URL.startsWith('http://') && !API_BASE_URL.startsWith('https://')) {
+  throw new Error(
+    `NEXT_PUBLIC_API_URL must be an absolute URL with http:// or https:// protocol. ` +
+    `Got: "${API_BASE_URL}"`
+  );
 }
 
 /**

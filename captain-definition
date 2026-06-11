@@ -27,8 +27,7 @@
   "envVars": {
     "NODE_ENV": "production",
     "PORT": "3000",
-    "NEXT_TELEMETRY_DISABLED": "1",
-    "NEXT_PUBLIC_API_URL": "https://extrahand-main-admin-server.backend.extrahand.in"
+    "NEXT_TELEMETRY_DISABLED": "1"
   },
 
   "instanceCount": 1,
@@ -66,5 +65,5 @@
     "caprover"
   ],
 
-  "description": "ExtraHand Main Admin Dashboard - Next.js standalone build deployed via CapRover"
+  "description": "ExtraHand Main Admin Dashboard - Next.js standalone build deployed via CapRover. IMPORTANT: NEXT_PUBLIC_API_URL must be set via buildArguments (at build time) to point to backend API."
 }
