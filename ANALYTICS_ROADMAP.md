@@ -3,7 +3,12 @@
 This document outlines the planned analytics features and metrics to be implemented for the ExtraHand platform.
 
 ## 1. Top Performers
+    
 
+
+
+
+    
 - **Top areas/locations**
   - Tasks by city/state
   - Tasks posted, completed, average budget, completion rate, average rating
