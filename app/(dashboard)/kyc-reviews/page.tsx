@@ -484,7 +484,7 @@ export default function KycReviewsPage() {
                     <TableHead>Follow-up status</TableHead>
                     {isSuperAdmin && <TableHead>Claimed by</TableHead>}
                     <TableHead>Status</TableHead>
-                    {!isSuperAdmin && <TableHead className="text-right">Action</TableHead>}
+                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -552,46 +552,44 @@ export default function KycReviewsPage() {
                           {reviewStatusLabels[displayReviewStatus]}
                         </span>
                       </TableCell>
-                      {!isSuperAdmin && (
-                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                          {!row.claimedBy ? (
-                            isOperationsRole(user?.role) ? (
-                              <Button
-                                size="sm"
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  try {
-                                    await claimKycReview(row.userId, row.sessionId);
-                                    toast.success("KYC review claimed successfully");
-                                    queryClient.invalidateQueries({ queryKey: ["kyc-reviews"] });
-                                  } catch (error: any) {
-                                    toast.error(error.message || "Failed to claim review");
-                                  }
-                                }}
-                              >
-                                Claim
-                              </Button>
-                            ) : (
-                              <span className="text-xs text-gray-400 italic">Unclaimed</span>
-                            )
-                          ) : row.claimedBy.userId === user?.userId ? (
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        {!row.claimedBy ? (
+                          (isOperationsRole(user?.role) || isSuperAdmin) ? (
                             <Button
-                              variant="secondary"
                               size="sm"
-                              asChild
-                              onClick={(e) => e.stopPropagation()}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  await claimKycReview(row.userId, row.sessionId);
+                                  toast.success("KYC review claimed successfully");
+                                  queryClient.invalidateQueries({ queryKey: ["kyc-reviews"] });
+                                } catch (error: any) {
+                                  toast.error(error.message || "Failed to claim review");
+                                }
+                              }}
                             >
-                              <Link href="/kyc-reviews/my-claims">
-                                My Claims →
-                              </Link>
+                              Claim
                             </Button>
                           ) : (
-                            <span className="text-xs text-gray-500 font-medium">
-                              Claimed by {row.claimedBy.name}
-                            </span>
-                          )}
-                        </TableCell>
-                      )}
+                            <span className="text-xs text-gray-400 italic">Unclaimed</span>
+                          )
+                        ) : row.claimedBy.userId === user?.userId ? (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            asChild
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Link href="/kyc-reviews/my-claims">
+                              My Claims →
+                            </Link>
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-gray-500 font-medium">
+                            Claimed by {row.claimedBy.name}
+                          </span>
+                        )}
+                      </TableCell>
                     </TableRow>
                     );
                   })}

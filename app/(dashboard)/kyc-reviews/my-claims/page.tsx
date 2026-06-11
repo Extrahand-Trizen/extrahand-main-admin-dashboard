@@ -453,7 +453,7 @@ function TransferDialog({
 export default function MyClaimsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
   
   const [search, setSearch] = useState("");
   const [reviewStatus, setReviewStatus] = useState("all");
@@ -462,7 +462,7 @@ export default function MyClaimsPage() {
   const [selectedRow, setSelectedRow] = useState<KycReviewRow | null>(null);
   const [transferRow, setTransferRow] = useState<KycReviewRow | null>(null);
 
-  const isOpsAdmin = isOperationsRole(user?.role);
+  const isOpsAdmin = isOperationsRole(user?.role) || isSuperAdmin;
 
   const { data, isLoading } = useQuery({
     queryKey: ["my-claims", search, reviewStatus, followUpStatus, sortOrder],
@@ -489,7 +489,7 @@ export default function MyClaimsPage() {
     return (
       <div className="flex h-64 items-center justify-center">
         <p className="text-sm text-gray-500">
-          My Claims is available only for operations admins.
+          My Claims is available only for operations admins and super admins.
         </p>
       </div>
     );
