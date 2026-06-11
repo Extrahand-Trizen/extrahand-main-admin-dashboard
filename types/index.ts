@@ -307,6 +307,8 @@ export interface SupportTicket {
   updatedAt: string;
 }
 
+
+
 export interface SupportArticle {
   _id: string;
   title: string;
