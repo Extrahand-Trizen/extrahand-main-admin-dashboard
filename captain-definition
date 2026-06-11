@@ -3,8 +3,8 @@
   "dockerfilePath": "./Dockerfile",
 
   "buildArguments": {
-    "CACHE_BUST": "build-2026-05-27-1545-force-builder-rebuild",
-    "NEXT_PUBLIC_API_URL": "https://extrahand-main-admin-service.apps.extrahand.in"
+    "CACHE_BUST": "build-2026-06-11-fix-api-url",
+    "NEXT_PUBLIC_API_URL": "https://extrahand-main-admin-server.backend.extrahand.in"
   },
 
   "expose": {
@@ -28,7 +28,7 @@
     "NODE_ENV": "production",
     "PORT": "3000",
     "NEXT_TELEMETRY_DISABLED": "1",
-    "NEXT_PUBLIC_API_URL": "https://extrahand-main-admin-service.apps.extrahand.in"
+    "NEXT_PUBLIC_API_URL": "https://extrahand-main-admin-server.backend.extrahand.in"
   },
 
   "instanceCount": 1,
