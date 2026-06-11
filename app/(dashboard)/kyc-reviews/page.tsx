@@ -553,8 +553,19 @@ export default function KycReviewsPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                        {!row.claimedBy ? (
-                          (isOperationsRole(user?.role) || isSuperAdmin) ? (
+                        {isSuperAdmin ? (
+                          <Button
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedRow(row);
+                            }}
+                          >
+                            <Eye className="mr-2 h-4 w-4" />
+                            Review
+                          </Button>
+                        ) : !row.claimedBy ? (
+                          isOperationsRole(user?.role) ? (
                             <Button
                               size="sm"
                               onClick={async (e) => {
