@@ -204,26 +204,28 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
                       />
                       KYC Reviews
                     </Link>
-                    <Link
-                      href="/kyc-reviews/my-claims"
-                      onClick={handleLinkClick}
-                      className={cn(
-                        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
-                        pathname === '/kyc-reviews/my-claims' || pathname?.startsWith('/kyc-reviews/my-claims/')
-                          ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
-                          : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
-                      )}
-                    >
-                      <ShieldCheck
+                    {!isSuperAdmin && (
+                      <Link
+                        href="/kyc-reviews/my-claims"
+                        onClick={handleLinkClick}
                         className={cn(
-                          'h-5 w-5',
+                          'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
                           pathname === '/kyc-reviews/my-claims' || pathname?.startsWith('/kyc-reviews/my-claims/')
-                            ? 'text-yellow-600'
-                            : 'text-gray-400'
+                            ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
+                            : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
                         )}
-                      />
-                      My Claims
-                    </Link>
+                      >
+                        <ShieldCheck
+                          className={cn(
+                            'h-5 w-5',
+                            pathname === '/kyc-reviews/my-claims' || pathname?.startsWith('/kyc-reviews/my-claims/')
+                              ? 'text-yellow-600'
+                              : 'text-gray-400'
+                          )}
+                        />
+                        My Claims
+                      </Link>
+                    )}
                     <Link
                       href="/aadhaar-followups"
                       onClick={handleLinkClick}
@@ -272,26 +274,28 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
                 />
                 KYC Reviews
               </Link>
-              <Link
-                href="/kyc-reviews/my-claims"
-                onClick={handleLinkClick}
-                className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
-                  pathname === '/kyc-reviews/my-claims' || pathname?.startsWith('/kyc-reviews/my-claims/')
-                    ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
-                    : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
-                )}
-              >
-                <ShieldCheck
+              {!isSuperAdmin && (
+                <Link
+                  href="/kyc-reviews/my-claims"
+                  onClick={handleLinkClick}
                   className={cn(
-                    'h-5 w-5',
+                    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
                     pathname === '/kyc-reviews/my-claims' || pathname?.startsWith('/kyc-reviews/my-claims/')
-                      ? 'text-yellow-600'
-                      : 'text-gray-400'
+                      ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
+                      : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
                   )}
-                />
-                My Claims
-              </Link>
+                >
+                  <ShieldCheck
+                    className={cn(
+                      'h-5 w-5',
+                      pathname === '/kyc-reviews/my-claims' || pathname?.startsWith('/kyc-reviews/my-claims/')
+                        ? 'text-yellow-600'
+                        : 'text-gray-400'
+                    )}
+                  />
+                  My Claims
+                </Link>
+              )}
               <Link
                 href="/aadhaar-followups"
                 onClick={handleLinkClick}

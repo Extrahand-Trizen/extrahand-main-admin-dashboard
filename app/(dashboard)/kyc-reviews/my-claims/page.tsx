@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Eye, ExternalLink, ImageIcon, Search, XCircle, ArrowLeftRight, Ban } from "lucide-react";
+import { Check, Eye, ExternalLink, ImageIcon, Search, XCircle, ArrowLeftRight, Ban, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -458,20 +458,28 @@ export default function MyClaimsPage() {
   const [search, setSearch] = useState("");
   const [reviewStatus, setReviewStatus] = useState("all");
   const [followUpStatus, setFollowUpStatus] = useState("all");
-  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [sortOrder, setSortOrder] = useState<"latest" | "oldest">("latest");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
   const [selectedRow, setSelectedRow] = useState<KycReviewRow | null>(null);
   const [transferRow, setTransferRow] = useState<KycReviewRow | null>(null);
 
-  const isOpsAdmin = isOperationsRole(user?.role) || isSuperAdmin;
+  const isAllowed = isOperationsRole(user?.role) && !isSuperAdmin;
+
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [search, reviewStatus, followUpStatus, sortOrder]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["my-claims", search, reviewStatus, followUpStatus, sortOrder],
-    queryFn: () => listMyClaims({ search, reviewStatus, followUpStatus, includeVerified: true, sortOrder }),
-    enabled: isOpsAdmin,
+    queryKey: ["my-claims", search, reviewStatus, followUpStatus, sortOrder, page, limit],
+    queryFn: () => listMyClaims({ search, reviewStatus, followUpStatus, includeVerified: true, sortOrder, page, limit }),
+    enabled: isAllowed,
     retry: false,
   });
 
   const rows = useMemo(() => data?.data || [], [data]);
+  const pagination = data?.pagination || { page: 1, limit: 20, total: 0, pages: 1 };
 
   const unclaimMutation = useMutation({
     mutationFn: (row: KycReviewRow) => {
@@ -485,11 +493,11 @@ export default function MyClaimsPage() {
     onError: (error: any) => toast.error(error.message || "Failed to unclaim review"),
   });
 
-  if (!isOpsAdmin) {
+  if (!isAllowed) {
     return (
       <div className="flex h-64 items-center justify-center">
         <p className="text-sm text-gray-500">
-          My Claims is available only for operations admins and super admins.
+          My Claims is available only for operations admins.
         </p>
       </div>
     );
@@ -543,12 +551,12 @@ export default function MyClaimsPage() {
             <SelectItem value="followup_uploaded">Follow-up uploaded</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={sortOrder} onValueChange={(val) => setSortOrder(val as "newest" | "oldest")}>
+        <Select value={sortOrder} onValueChange={(val) => setSortOrder(val as "latest" | "oldest")}>
           <SelectTrigger className="h-11">
             <SelectValue placeholder="Sort order" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="newest">Newest</SelectItem>
+            <SelectItem value="latest">Latest</SelectItem>
             <SelectItem value="oldest">Oldest</SelectItem>
           </SelectContent>
         </Select>
@@ -558,7 +566,7 @@ export default function MyClaimsPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">My Claimed Reviews</CardTitle>
           <Badge variant="secondary">
-            {rows.length} {rows.length === 1 ? "claim" : "claims"}
+            {pagination.total} {pagination.total === 1 ? "claim" : "claims"}
           </Badge>
         </CardHeader>
         <CardContent className="p-0">
@@ -573,102 +581,174 @@ export default function MyClaimsPage() {
               You haven't claimed any KYC reviews yet. Go to <Link href="/kyc-reviews" className="text-indigo-600 hover:underline">KYC Reviews</Link> to claim some.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Aadhaar</TableHead>
-                    <TableHead>Failure reason / Uploaded by</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Follow-up status</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((row) => {
-                    const displayReviewStatus = getDisplayReviewStatus(row);
-                    return (
-                    <TableRow
-                      key={`${row.notificationId}-${row.userId}`}
-                      className="cursor-pointer hover:bg-gray-50 transition-colors"
-                      onClick={() => router.push(`/users/${encodeURIComponent(row.userId)}`)}
-                    >
-                      <TableCell>
-                        <div className="font-medium text-gray-900">{row.userName}</div>
-                        <div className="text-xs text-gray-500">{row.userPhone || row.userEmail || row.userId}</div>
-                      </TableCell>
-                      <TableCell>{row.aadhaar || "-"}</TableCell>
-                      <TableCell className="max-w-[240px] whitespace-normal">
-                        {row.isManualUpload ? (
-                          <div>
-                            <span className="text-xs text-indigo-600 font-medium">
-                              {row.uploadedBy?.name || "Admin"}
-                            </span>
-                            {row.uploadedBy?.email && (
-                              <p className="text-xs text-gray-400 truncate">
-                                {row.uploadedBy.email}
-                              </p>
-                            )}
-                          </div>
-                        ) : (
-                          row.failureReason || "-"
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {row.isManualUpload
-                          ? (row.uploadedAt ? formatDate(row.uploadedAt) : "-")
-                          : (row.failedOn ? formatDate(row.failedOn) : "-")}
-                      </TableCell>
-                      <TableCell>
-                        {row.followUpStatus === "follow_up" && row.followUpDate ? (
-                          <span className="text-blue-700">
-                            {followUpLabels[row.followUpStatus]} - {formatDate(row.followUpDate)}
-                          </span>
-                        ) : (
-                          followUpLabels[row.followUpStatus]
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={`inline-flex rounded-md border px-2 py-1 text-xs font-medium ${reviewStatusClasses[displayReviewStatus]}`}
-                        >
-                          {reviewStatusLabels[displayReviewStatus]}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedRow(row);
-                            }}
-                          >
-                            <Eye className="mr-2 h-4 w-4" />
-                            Review
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setTransferRow(row);
-                            }}
-                          >
-                            <ArrowLeftRight className="mr-2 h-4 w-4" />
-                            Transfer
-                          </Button>
-                        </div>
-                      </TableCell>
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Aadhaar</TableHead>
+                      <TableHead>Failure reason / Uploaded by</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Follow-up status</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((row) => {
+                      const displayReviewStatus = getDisplayReviewStatus(row);
+                      return (
+                      <TableRow
+                        key={`${row.notificationId}-${row.userId}`}
+                        className="cursor-pointer hover:bg-gray-50 transition-colors"
+                        onClick={() => router.push(`/users/${encodeURIComponent(row.userId)}`)}
+                      >
+                        <TableCell>
+                          <div className="font-medium text-gray-900">{row.userName}</div>
+                          <div className="text-xs text-gray-500">{row.userPhone || row.userEmail || row.userId}</div>
+                        </TableCell>
+                        <TableCell>{row.aadhaar || "-"}</TableCell>
+                        <TableCell className="max-w-[240px] whitespace-normal">
+                          {row.isManualUpload ? (
+                            <div>
+                              <span className="text-xs text-indigo-600 font-medium">
+                                {row.uploadedBy?.name || "Admin"}
+                              </span>
+                              {row.uploadedBy?.email && (
+                                <p className="text-xs text-gray-400 truncate">
+                                  {row.uploadedBy.email}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            row.failureReason || "-"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {row.isManualUpload
+                            ? (row.uploadedAt ? formatDate(row.uploadedAt) : "-")
+                            : (row.failedOn ? formatDate(row.failedOn) : "-")}
+                        </TableCell>
+                        <TableCell>
+                          {row.followUpStatus === "follow_up" && row.followUpDate ? (
+                            <span className="text-blue-700">
+                              {followUpLabels[row.followUpStatus]} - {formatDate(row.followUpDate)}
+                            </span>
+                          ) : (
+                            followUpLabels[row.followUpStatus]
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`inline-flex rounded-md border px-2 py-1 text-xs font-medium ${reviewStatusClasses[displayReviewStatus]}`}
+                          >
+                            {reviewStatusLabels[displayReviewStatus]}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedRow(row);
+                              }}
+                            >
+                              <Eye className="mr-2 h-4 w-4" />
+                              Review
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setTransferRow(row);
+                              }}
+                            >
+                              <ArrowLeftRight className="mr-2 h-4 w-4" />
+                              Transfer
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Pagination Controls */}
+              <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-gray-100 gap-4">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-gray-600">Rows per page</p>
+                  <Select
+                    value={limit.toString()}
+                    onValueChange={(value) => {
+                      setLimit(Number(value));
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[70px]">
+                      <SelectValue placeholder={limit.toString()} />
+                    </SelectTrigger>
+                    <SelectContent side="top">
+                      {[10, 20, 30, 40, 50].map((pageSize) => (
+                        <SelectItem key={pageSize} value={pageSize.toString()}>
+                          {pageSize}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-6">
+                  <div className="text-sm text-gray-600">
+                    Showing {(page - 1) * limit + 1} to{" "}
+                    {Math.min(page * limit, pagination.total)} of{" "}
+                    {pagination.total} claims
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(1)}
+                      disabled={page === 1}
+                    >
+                      <ChevronsLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(page - 1)}
+                      disabled={page === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <div className="text-sm text-gray-600 px-2 font-medium">
+                      Page {page} of {pagination.pages}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(page + 1)}
+                      disabled={page >= pagination.pages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(pagination.pages)}
+                      disabled={page >= pagination.pages}
+                    >
+                      <ChevronsRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

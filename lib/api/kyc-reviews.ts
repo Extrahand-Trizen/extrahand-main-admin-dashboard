@@ -63,16 +63,18 @@ export async function listKycReviews(params: {
   search?: string;
   reviewStatus?: string;
   followUpStatus?: string;
+  claimStatus?: string;
   includeVerified?: boolean;
   page?: number;
   limit?: number;
-  sortOrder?: "newest" | "oldest";
+  sortOrder?: "newest" | "latest" | "oldest";
   assignedTo?: string;
 } = {}): Promise<KycReviewsResponse> {
   const query = new URLSearchParams();
   if (params.search) query.set("search", params.search);
   if (params.reviewStatus) query.set("reviewStatus", params.reviewStatus);
   if (params.followUpStatus) query.set("followUpStatus", params.followUpStatus);
+  if (params.claimStatus) query.set("claimStatus", params.claimStatus);
   if (params.includeVerified) query.set("includeVerified", "true");
   if (params.page) query.set("page", String(params.page));
   if (params.limit) query.set("limit", String(params.limit));
@@ -252,7 +254,7 @@ export async function listMyClaims(params: {
   includeVerified?: boolean;
   page?: number;
   limit?: number;
-  sortOrder?: "newest" | "oldest";
+  sortOrder?: "newest" | "latest" | "oldest";
 } = {}): Promise<KycReviewsResponse> {
   const query = new URLSearchParams();
   if (params.search) query.set("search", params.search);
