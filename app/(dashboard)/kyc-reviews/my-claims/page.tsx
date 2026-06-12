@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Eye, ExternalLink, ImageIcon, Search, XCircle, ArrowLeftRight, Ban, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Check, Eye, ExternalLink, ImageIcon, Search, XCircle, ArrowLeftRight, Ban, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -65,6 +65,35 @@ const reviewStatusClasses: Record<KycReviewStatus | "failed", string> = {
   failed: "bg-rose-50 text-rose-700 border-rose-200",
 };
 
+function KycImage({ url, label }: { url: string; label: string }) {
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+
+  return (
+    <div className="relative h-72 w-full bg-gray-50 flex items-center justify-center rounded-b-lg overflow-hidden">
+      {!loaded && !error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+          <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
+        </div>
+      )}
+      {error ? (
+        <div className="flex h-72 w-full flex-col items-center justify-center gap-2 bg-gray-100 text-sm text-gray-400">
+          <ImageIcon className="h-8 w-8 opacity-40" />
+          <p>Image unavailable — click to open in new tab</p>
+        </div>
+      ) : (
+        <img
+          src={url}
+          alt={label}
+          className={`h-72 w-full object-contain transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
+          onLoad={() => setLoaded(true)}
+          onError={() => setError(true)}
+        />
+      )}
+    </div>
+  );
+}
+
 function getDisplayReviewStatus(row: KycReviewRow): KycReviewStatus | "failed" {
   if (row.reviewStatus === "rejected") return "rejected";
   if (row.isAadhaarVerified) return "accepted";
@@ -109,9 +138,8 @@ function ReviewDialog({
     queryKey: ["kyc-review-documents", row?.userId, row?.sessionId, row?.verificationId],
     queryFn: () => getKycReviewDocuments(row!.userId, row!.sessionId || "", row!.verificationId || ""),
     enabled: open && !!row,
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnMount: "always",
+    staleTime: 5 * 60 * 1000, // Cache URL strings for 5 minutes so browser can cache image files
+    gcTime: 10 * 60 * 1000,
   });
   const documents = docsRes?.data || [];
 
@@ -245,26 +273,7 @@ function ReviewDialog({
                           Open
                         </span>
                       </div>
-                      <div className="relative">
-                        <img
-                          src={document.url}
-                          alt={document.label}
-                          className="h-72 w-full object-contain"
-                          onError={(e) => {
-                            const img = e.currentTarget;
-                            img.style.display = "none";
-                            const placeholder = img.nextElementSibling as HTMLElement | null;
-                            if (placeholder) placeholder.style.display = "flex";
-                          }}
-                        />
-                        <div
-                          className="hidden h-72 w-full flex-col items-center justify-center gap-2 bg-gray-100 text-sm text-gray-400"
-                          aria-label="Image failed to load"
-                        >
-                          <ImageIcon className="h-8 w-8 opacity-40" />
-                          <p>Image unavailable — click to open in new tab</p>
-                        </div>
-                      </div>
+                      <KycImage url={document.url} label={document.label} />
                     </a>
                   ))}
                 </div>
