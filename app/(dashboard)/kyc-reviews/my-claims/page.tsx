@@ -109,6 +109,9 @@ function ReviewDialog({
     queryKey: ["kyc-review-documents", row?.userId, row?.sessionId, row?.verificationId],
     queryFn: () => getKycReviewDocuments(row!.userId, row!.sessionId || "", row!.verificationId || ""),
     enabled: open && !!row,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
   });
   const documents = docsRes?.data || [];
 
