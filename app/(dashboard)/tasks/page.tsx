@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
@@ -115,6 +115,48 @@ export default function TasksPage() {
     reason: "",
   });
 
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // Load saved filters on mount
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem("tasks_filters");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.search !== undefined) setSearch(parsed.search);
+        if (parsed.statusFilter !== undefined) setStatusFilter(parsed.statusFilter);
+        if (parsed.categoryFilter !== undefined) setCategoryFilter(parsed.categoryFilter);
+        if (parsed.followUpFilter !== undefined) setFollowUpFilter(parsed.followUpFilter);
+        if (parsed.assignedToFilter !== undefined) setAssignedToFilter(parsed.assignedToFilter);
+        if (parsed.deadlineSortOrder !== undefined) setDeadlineSortOrder(parsed.deadlineSortOrder);
+        if (parsed.page !== undefined) setPage(parsed.page);
+        if (parsed.limit !== undefined) setLimit(parsed.limit);
+      }
+    } catch (e) {
+      console.error("Error loading filters from sessionStorage", e);
+    }
+    setIsLoaded(true);
+  }, []);
+
+  // Save filters on state changes
+  useEffect(() => {
+    if (!isLoaded) return;
+    try {
+      sessionStorage.setItem("tasks_filters", JSON.stringify({
+        search,
+        statusFilter,
+        categoryFilter,
+        followUpFilter,
+        assignedToFilter,
+        deadlineSortOrder,
+        page,
+        limit
+      }));
+    } catch (e) {
+      console.error("Error saving filters to sessionStorage", e);
+    }
+  }, [search, statusFilter, categoryFilter, followUpFilter, assignedToFilter, deadlineSortOrder, page, limit, isLoaded]);
+
   const { data, isLoading, error } = useQuery({
     queryKey: [
       "tasks",
@@ -140,7 +182,7 @@ export default function TasksPage() {
         page,
         limit,
       }),
-    enabled: hasPermission("task.list"),
+    enabled: hasPermission("task.list") && isLoaded,
     retry: false,
   });
 
@@ -149,12 +191,12 @@ export default function TasksPage() {
       deleteTask(taskId, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      toast.success("Task deleted successfully");
+      toast.success("Works deleted successfully");
       setDeleteDialog({ open: false, reason: "" });
       setSelectedTask(null);
     },
     onError: (error: any) => {
-      toast.error(error.message || "Failed to delete task");
+      toast.error(error.message || "Failed to delete works");
     },
   });
 
@@ -190,7 +232,7 @@ export default function TasksPage() {
       selectedTask as Partial<Task> & { _id?: string; id?: string },
     );
     if (!taskIdentifier) {
-      toast.error("Task identifier missing. Please refresh and try again.");
+      toast.error("Works identifier missing. Please refresh and try again.");
       return;
     }
     deleteMutation.mutate({
@@ -208,7 +250,7 @@ export default function TasksPage() {
       selectedTask as Partial<Task> & { _id?: string; id?: string },
     );
     if (!taskIdentifier) {
-      toast.error("Task identifier missing. Please refresh and try again.");
+      toast.error("Works identifier missing. Please refresh and try again.");
       return;
     }
     deleteRequestMutation.mutate({
@@ -235,7 +277,7 @@ export default function TasksPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-gray-500">
-          You don't have permission to view tasks.
+          You don't have permission to view works.
         </p>
       </div>
     );
@@ -246,9 +288,9 @@ export default function TasksPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Tasks</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Works</h1>
           <p className="mt-2 text-sm text-gray-600">
-            Manage and monitor platform tasks
+            Manage and monitor platform works
           </p>
         </div>
         {isSuperAdmin && (
@@ -276,7 +318,7 @@ export default function TasksPage() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   id="search"
-                  placeholder="Search tasks..."
+                  placeholder="Search works..."
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value);
@@ -397,9 +439,9 @@ export default function TasksPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Tasks List</CardTitle>
+            <CardTitle className="text-lg">Works List</CardTitle>
             <Badge variant="secondary">
-              {pagination.total} {pagination.total === 1 ? "task" : "tasks"}
+              {pagination.total} works
             </Badge>
           </div>
         </CardHeader>
@@ -415,7 +457,7 @@ export default function TasksPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="hidden sm:table-cell">
-                        Task
+                        Works
                       </TableHead>
                       <TableHead className="sm:hidden">Details</TableHead>
                       <TableHead className="hidden md:table-cell">
@@ -575,13 +617,13 @@ export default function TasksPage() {
                                   className="text-red-600"
                                 >
                                   <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete Task
+                                  Delete Works
                                 </DropdownMenuItem>
                               )}
                               {canRequestDelete && (
                                 <DropdownMenuItem onClick={() => handleRequestDelete(task)}>
                                   <Send className="mr-2 h-4 w-4" />
-                                  Request Task Delete
+                                  Request Works Delete
                                 </DropdownMenuItem>
                               )}
                             </DropdownMenuContent>
@@ -622,7 +664,7 @@ export default function TasksPage() {
                   <div className="text-sm text-gray-600">
                     Showing {(page - 1) * limit + 1} to{" "}
                     {Math.min(page * limit, pagination.total)} of{" "}
-                    {pagination.total} tasks
+                    {pagination.total} works
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
@@ -682,7 +724,7 @@ export default function TasksPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Task</DialogTitle>
+            <DialogTitle>Delete Works</DialogTitle>
             <DialogDescription>
               {selectedTask && (
                 <>
@@ -697,7 +739,7 @@ export default function TasksPage() {
             <Label htmlFor="delete-reason">Reason *</Label>
             <Textarea
               id="delete-reason"
-              placeholder="Enter the reason for deleting this work..."
+              placeholder="Enter the reason for deleting this works..."
               value={deleteDialog.reason}
               onChange={(e) =>
                 setDeleteDialog({ ...deleteDialog, reason: e.target.value })
@@ -737,7 +779,7 @@ export default function TasksPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Request Task Deletion</DialogTitle>
+            <DialogTitle>Request Works Deletion</DialogTitle>
             <DialogDescription>
               {selectedTask && (
                 <>

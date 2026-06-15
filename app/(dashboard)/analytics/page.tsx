@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { BarChart3, Users, UserCheck, Briefcase, CircleDot, CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -18,9 +19,109 @@ import {
 } from '@/lib/api/analytics';
 
 export default function AnalyticsPage() {
+  const router = useRouter();
   const { hasPermission } = usePermissions();
   const [CustomerIdInput, setCustomerIdInput] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
+
+  const handleCardClick = (title: string) => {
+    if (title === 'Total Customers') {
+      sessionStorage.setItem('users_filters', JSON.stringify({
+        search: '',
+        statusFilter: 'all',
+        roleFilter: 'customer',
+        aadhaarFilter: 'all',
+        certifiedFilter: 'all',
+        categoryFilter: 'all',
+        areaFilter: 'all',
+        createdFrom: '',
+        createdTo: '',
+        page: 1,
+        limit: 20
+      }));
+      router.push('/users');
+    } else if (title === 'Total Helpers') {
+      sessionStorage.setItem('users_filters', JSON.stringify({
+        search: '',
+        statusFilter: 'all',
+        roleFilter: 'helper',
+        aadhaarFilter: 'all',
+        certifiedFilter: 'all',
+        categoryFilter: 'all',
+        areaFilter: 'all',
+        createdFrom: '',
+        createdTo: '',
+        page: 1,
+        limit: 20
+      }));
+      router.push('/users');
+    } else if (title === 'Open Works') {
+      sessionStorage.setItem('tasks_filters', JSON.stringify({
+        search: '',
+        statusFilter: 'open',
+        categoryFilter: 'all',
+        followUpFilter: 'all',
+        assignedToFilter: 'all',
+        deadlineSortOrder: 'desc',
+        page: 1,
+        limit: 20
+      }));
+      router.push('/tasks');
+    } else if (title === 'Total Works') {
+      sessionStorage.setItem('tasks_filters', JSON.stringify({
+        search: '',
+        statusFilter: 'all',
+        categoryFilter: 'all',
+        followUpFilter: 'all',
+        assignedToFilter: 'all',
+        deadlineSortOrder: 'desc',
+        page: 1,
+        limit: 20
+      }));
+      router.push('/tasks');
+    } else if (title === 'In Progress Works') {
+      sessionStorage.setItem('tasks_filters', JSON.stringify({
+        search: '',
+        statusFilter: 'in_progress',
+        categoryFilter: 'all',
+        followUpFilter: 'all',
+        assignedToFilter: 'all',
+        deadlineSortOrder: 'desc',
+        page: 1,
+        limit: 20
+      }));
+      router.push('/tasks');
+    } else if (title === 'Completed Works') {
+      sessionStorage.setItem('tasks_filters', JSON.stringify({
+        search: '',
+        statusFilter: 'completed',
+        categoryFilter: 'all',
+        followUpFilter: 'all',
+        assignedToFilter: 'all',
+        deadlineSortOrder: 'desc',
+        page: 1,
+        limit: 20
+      }));
+      router.push('/tasks');
+    }
+  };
+
+  const handleCategoryClick = (category: string) => {
+    sessionStorage.setItem('users_filters', JSON.stringify({
+      search: '',
+      statusFilter: 'all',
+      roleFilter: 'helper',
+      aadhaarFilter: 'all',
+      certifiedFilter: 'all',
+      categoryFilter: category,
+      areaFilter: 'all',
+      createdFrom: '',
+      createdTo: '',
+      page: 1,
+      limit: 20
+    }));
+    router.push('/users');
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ['analytics', 'overview'],
@@ -143,7 +244,11 @@ export default function AnalyticsPage() {
         {cards.map((card) => {
           const Icon = card.icon;
           return (
-            <Card key={card.title}>
+            <Card
+              key={card.title}
+              className="cursor-pointer hover:border-gray-400 hover:shadow-md transition-all duration-200 hover:scale-[1.02]"
+              onClick={() => handleCardClick(card.title)}
+            >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600">{card.title}</CardTitle>
                 <div className={`${card.bg} rounded-lg p-2`}>
@@ -197,7 +302,8 @@ export default function AnalyticsPage() {
                 {(analytics?.Helpers?.categoryCounts || []).map((row) => (
                   <div
                     key={`helper-category-${row.category}`}
-                    className="flex items-center justify-between rounded-md border p-2"
+                    className="flex items-center justify-between rounded-md border p-2 cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-all duration-200"
+                    onClick={() => handleCategoryClick(row.category)}
                   >
                     <p className="text-sm text-gray-800 capitalize">{row.category}</p>
                     <p className="text-sm font-semibold text-gray-900">{row.helperCount}</p>

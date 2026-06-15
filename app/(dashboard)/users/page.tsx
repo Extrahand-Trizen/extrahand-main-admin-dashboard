@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
@@ -136,6 +136,54 @@ export default function UsersPage() {
     reason: "",
   });
 
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // Load saved filters on mount
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem("users_filters");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.search !== undefined) setSearch(parsed.search);
+        if (parsed.statusFilter !== undefined) setStatusFilter(parsed.statusFilter);
+        if (parsed.roleFilter !== undefined) setRoleFilter(parsed.roleFilter);
+        if (parsed.aadhaarFilter !== undefined) setAadhaarFilter(parsed.aadhaarFilter);
+        if (parsed.certifiedFilter !== undefined) setCertifiedFilter(parsed.certifiedFilter);
+        if (parsed.categoryFilter !== undefined) setCategoryFilter(parsed.categoryFilter);
+        if (parsed.areaFilter !== undefined) setAreaFilter(parsed.areaFilter);
+        if (parsed.createdFrom !== undefined) setCreatedFrom(parsed.createdFrom);
+        if (parsed.createdTo !== undefined) setCreatedTo(parsed.createdTo);
+        if (parsed.page !== undefined) setPage(parsed.page);
+        if (parsed.limit !== undefined) setLimit(parsed.limit);
+      }
+    } catch (e) {
+      console.error("Error loading filters from sessionStorage", e);
+    }
+    setIsLoaded(true);
+  }, []);
+
+  // Save filters on state changes
+  useEffect(() => {
+    if (!isLoaded) return;
+    try {
+      sessionStorage.setItem("users_filters", JSON.stringify({
+        search,
+        statusFilter,
+        roleFilter,
+        aadhaarFilter,
+        certifiedFilter,
+        categoryFilter,
+        areaFilter,
+        createdFrom,
+        createdTo,
+        page,
+        limit
+      }));
+    } catch (e) {
+      console.error("Error saving filters to sessionStorage", e);
+    }
+  }, [search, statusFilter, roleFilter, aadhaarFilter, certifiedFilter, categoryFilter, areaFilter, createdFrom, createdTo, page, limit, isLoaded]);
+
 
   const { data, isLoading, error } = useQuery({
     queryKey: [
@@ -176,7 +224,7 @@ export default function UsersPage() {
         page,
         limit,
       }),
-    enabled: hasPermission("user.list"),
+    enabled: hasPermission("user.list") && isLoaded,
     retry: false,
   });
 
@@ -297,7 +345,7 @@ export default function UsersPage() {
         page: 1,
         limit: 1,
       }),
-    enabled: hasPermission("user.list"),
+    enabled: hasPermission("user.list") && isLoaded,
     retry: false,
   });
 
@@ -312,7 +360,7 @@ export default function UsersPage() {
         page: 1,
         limit: 1,
       }),
-    enabled: hasPermission("user.list"),
+    enabled: hasPermission("user.list") && isLoaded,
     retry: false,
   });
 
@@ -524,6 +572,7 @@ export default function UsersPage() {
                   setCreatedFrom("");
                   setCreatedTo("");
                   setPage(1);
+                  sessionStorage.removeItem("users_filters");
                 }}
               >
                 Reset
@@ -584,6 +633,9 @@ export default function UsersPage() {
                       <TableHead className="hidden md:table-cell">
                         Role
                       </TableHead>
+                      <TableHead className="hidden md:table-cell">
+                        Primary Skill
+                      </TableHead>
                       <TableHead className="hidden lg:table-cell">
                         Status
                       </TableHead>
@@ -628,6 +680,21 @@ export default function UsersPage() {
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
                           <Badge variant="outline">{getRoleLabel(user)}</Badge>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell text-sm text-gray-500">
+                          {getRoleLabel(user).includes("Helper") ? (
+                            user.skills?.list && user.skills.list.length > 0 ? (
+                              <span className="truncate max-w-[150px] sm:max-w-[200px] block font-medium text-gray-700 capitalize" title={user.skills.list.map(s => s.name).join(", ")}>
+                                {user.skills.list.map(s => s.name).join(", ")}
+                              </span>
+                            ) : user.skills?.primaryCategory ? (
+                              <span className="capitalize font-medium text-gray-700">{user.skills.primaryCategory.replace(/_/g, " ")}</span>
+                            ) : (
+                              "—"
+                            )
+                          ) : (
+                            "—"
+                          )}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
                           <Badge variant={statusColors[user.status] as any}>

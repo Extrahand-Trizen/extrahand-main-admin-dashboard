@@ -107,8 +107,8 @@ export default function DeleteRequestsPage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Task Delete Requests</h1>
-            <p className="mt-1 text-sm text-gray-600">Pending task deletion approvals</p>
+            <h1 className="text-3xl font-bold text-gray-900">Works Delete Requests</h1>
+            <p className="mt-1 text-sm text-gray-600">Pending works deletion approvals</p>
           </div>
         </div>
         <Badge variant="secondary">{pagination.total} pending</Badge>
@@ -148,7 +148,7 @@ export default function DeleteRequestsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Task ID</TableHead>
+                    <TableHead>Works ID</TableHead>
                     <TableHead>Reason</TableHead>
                     <TableHead className="hidden md:table-cell">Requested By</TableHead>
                     <TableHead className="text-right">Actions</TableHead>

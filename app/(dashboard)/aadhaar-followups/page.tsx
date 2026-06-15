@@ -512,6 +512,42 @@ export default function AadhaarFollowUpsPage() {
 
   const queryClient = useQueryClient();
 
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // Load saved filters on mount
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem("aadhaar_followups_filters");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.search !== undefined) setSearch(parsed.search);
+        if (parsed.statusFilter !== undefined) setStatusFilter(parsed.statusFilter);
+        if (parsed.sortOrder !== undefined) setSortOrder(parsed.sortOrder);
+        if (parsed.page !== undefined) setPage(parsed.page);
+        if (parsed.limit !== undefined) setLimit(parsed.limit);
+      }
+    } catch (e) {
+      console.error("Error loading filters from sessionStorage", e);
+    }
+    setIsLoaded(true);
+  }, []);
+
+  // Save filters on state changes
+  useEffect(() => {
+    if (!isLoaded) return;
+    try {
+      sessionStorage.setItem("aadhaar_followups_filters", JSON.stringify({
+        search,
+        statusFilter,
+        sortOrder,
+        page,
+        limit
+      }));
+    } catch (e) {
+      console.error("Error saving filters to sessionStorage", e);
+    }
+  }, [search, statusFilter, sortOrder, page, limit, isLoaded]);
+
   // Reset to page 1 when filters change
   const handleStatusFilter = (v: string) => { setStatusFilter(v); setPage(1); };
   const handleSortOrder = (v: "newest" | "oldest") => { setSortOrder(v); setPage(1); };
@@ -619,7 +655,7 @@ export default function AadhaarFollowUpsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["aadhaar-followups", search, statusFilter, page, limit, sortOrder],
     queryFn: () => listAadhaarFollowUps(kycReviewQuery),
-    enabled: allowed,
+    enabled: allowed && isLoaded,
     retry: false,
     placeholderData: (prev) => prev, // keep previous page data while fetching next
   });

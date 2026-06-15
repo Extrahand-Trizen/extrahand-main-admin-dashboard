@@ -205,11 +205,11 @@ export default function TaskDetailsPage() {
       deleteTask(taskId, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      toast.success("Task deleted successfully");
+      toast.success("Works deleted successfully");
       router.push("/tasks");
     },
     onError: (error: any) => {
-      toast.error(error.message || "Failed to delete task");
+      toast.error(error.message || "Failed to delete works");
     },
   });
 
@@ -255,11 +255,11 @@ export default function TaskDetailsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["task-call", taskId] });
       queryClient.invalidateQueries({ queryKey: ["task-calls"] });
-      toast.success("Task call stage updated");
+      toast.success("Works call stage updated");
       setStageDialog({ open: false, status: "not_updated", followUpDate: "" });
     },
     onError: (error: any) => {
-      toast.error(error.message || "Failed to update task call stage");
+      toast.error(error.message || "Failed to update works call stage");
     },
   });
 
@@ -286,7 +286,7 @@ export default function TaskDetailsPage() {
 
   const confirmDelete = () => {
     if (!isValidTaskId) {
-      toast.error("Invalid task id");
+      toast.error("Invalid works id");
       return;
     }
     if (!deleteDialog.reason.trim()) {
@@ -298,7 +298,7 @@ export default function TaskDetailsPage() {
 
   const confirmDeleteRequest = () => {
     if (!isValidTaskId) {
-      toast.error("Invalid task id");
+      toast.error("Invalid works id");
       return;
     }
     if (!deleteRequestDialog.reason.trim()) {
@@ -407,7 +407,7 @@ export default function TaskDetailsPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-gray-500">
-          You don't have permission to view task details.
+          You don't have permission to view works details.
         </p>
       </div>
     );
@@ -419,13 +419,13 @@ export default function TaskDetailsPage() {
         <Link href="/tasks">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Tasks
+            Back to Works
           </Button>
         </Link>
         <Card>
           <CardContent className="py-8">
             <div className="text-center text-red-600">
-              Invalid task id. Please open task details from the list again.
+              Invalid works id. Please open works details from the list again.
             </div>
           </CardContent>
         </Card>
@@ -462,13 +462,13 @@ export default function TaskDetailsPage() {
         <Link href="/tasks">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Tasks
+            Back to Works
           </Button>
         </Link>
         <Card>
           <CardContent className="py-8">
             <div className="text-center text-red-600">
-              Failed to load task details. Please try again.
+              Failed to load works details. Please try again.
             </div>
           </CardContent>
         </Card>
@@ -490,7 +490,7 @@ export default function TaskDetailsPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">{task.title}</h1>
             <p className="mt-1 text-sm text-gray-600">
-              Task ID: {task.taskId || (task as any)._id || taskId}
+              Works ID: {task.taskId || (task as any)._id || taskId}
             </p>
           </div>
         </div>
@@ -520,7 +520,7 @@ export default function TaskDetailsPage() {
           {!isSuperAdmin && hasPermission("task.delete") && (
             <Button variant="outline" onClick={handleRequestDelete}>
               <Send className="mr-2 h-4 w-4" />
-              Request Task Delete
+              Request Works Delete
             </Button>
           )}
         </div>
@@ -529,11 +529,11 @@ export default function TaskDetailsPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Task Details */}
+          {/* Work Details */}
           <Card>
             <CardHeader>
-            <CardTitle>Task Details</CardTitle>
-            <CardDescription>Complete task information</CardDescription>
+            <CardTitle>Works Details</CardTitle>
+            <CardDescription>Complete works information</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
@@ -577,6 +577,24 @@ export default function TaskDetailsPage() {
                     {formatCurrency(task.budget)}
                   </div>
                 </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">
+                    Deadline
+                  </Label>
+                  <div className="mt-1 text-sm text-gray-900 flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-gray-400" />
+                    <span>
+                      {task.dateOption === "flexible" || !task.dateOption || !task.scheduledDate ? (
+                        "Flexible"
+                      ) : (
+                        <>
+                          {task.dateOption === "on-date" ? "On " : task.dateOption === "before-date" ? "Before " : ""}
+                          {formatDate(task.scheduledDate)}
+                        </>
+                      )}
+                    </span>
+                  </div>
+                </div>
                 {task.location && (
                   <div>
                     <Label className="text-sm font-medium text-gray-700">
@@ -618,7 +636,7 @@ export default function TaskDetailsPage() {
                   </Badge>
                 </div>
                 <CardDescription>
-                  Task applications and their status
+                  Works applications and their status
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -820,7 +838,7 @@ export default function TaskDetailsPage() {
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between gap-3">
-                  <CardTitle className="text-lg">Task Verification</CardTitle>
+                  <CardTitle className="text-lg">Works Verification</CardTitle>
                   {!taskCallLoading && (
                     <span
                       className={`inline-flex rounded-md border px-2 py-1 text-xs font-medium ${
@@ -907,7 +925,7 @@ export default function TaskDetailsPage() {
           <DialogHeader>
             <DialogTitle>Move Stage</DialogTitle>
             <DialogDescription>
-              Update the verification call outcome for this posted task.
+              Update the verification call outcome for this posted works.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -987,7 +1005,7 @@ export default function TaskDetailsPage() {
           <DialogHeader>
             <DialogTitle>Add Internal Note</DialogTitle>
             <DialogDescription>
-              Save a note for operations follow-up on this task.
+              Save a note for operations follow-up on this works.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
@@ -1032,7 +1050,7 @@ export default function TaskDetailsPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Task</DialogTitle>
+            <DialogTitle>Delete Works</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete "{task.title}"? This action cannot
               be undone. Please enter a reason below (required for audit).
@@ -1042,7 +1060,7 @@ export default function TaskDetailsPage() {
             <Label htmlFor="delete-reason">Reason *</Label>
             <Textarea
               id="delete-reason"
-              placeholder="Enter the reason for deleting this task..."
+              placeholder="Enter the reason for deleting this works..."
               value={deleteDialog.reason}
               onChange={(e) =>
                 setDeleteDialog({ ...deleteDialog, reason: e.target.value })
@@ -1081,7 +1099,7 @@ export default function TaskDetailsPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Request Task Deletion</DialogTitle>
+            <DialogTitle>Request Works Deletion</DialogTitle>
             <DialogDescription>
               This will send a delete request to Super Admin for "{task.title}".
               Please enter a reason below (required).

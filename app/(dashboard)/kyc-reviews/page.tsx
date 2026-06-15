@@ -390,15 +390,56 @@ export default function KycReviewsPage() {
 
   const allowed = isAllReviewsRole(user?.role, isSuperAdmin) || isOperationsRole(user?.role);
 
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // Load saved filters on mount
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem("kyc_reviews_filters");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.search !== undefined) setSearch(parsed.search);
+        if (parsed.reviewStatus !== undefined) setReviewStatus(parsed.reviewStatus);
+        if (parsed.followUpStatus !== undefined) setFollowUpStatus(parsed.followUpStatus);
+        if (parsed.claimStatus !== undefined) setClaimStatus(parsed.claimStatus);
+        if (parsed.sortOrder !== undefined) setSortOrder(parsed.sortOrder);
+        if (parsed.page !== undefined) setPage(parsed.page);
+        if (parsed.limit !== undefined) setLimit(parsed.limit);
+      }
+    } catch (e) {
+      console.error("Error loading filters from sessionStorage", e);
+    }
+    setIsLoaded(true);
+  }, []);
+
+  // Save filters on state changes
+  useEffect(() => {
+    if (!isLoaded) return;
+    try {
+      sessionStorage.setItem("kyc_reviews_filters", JSON.stringify({
+        search,
+        reviewStatus,
+        followUpStatus,
+        claimStatus,
+        sortOrder,
+        page,
+        limit
+      }));
+    } catch (e) {
+      console.error("Error saving filters to sessionStorage", e);
+    }
+  }, [search, reviewStatus, followUpStatus, claimStatus, sortOrder, page, limit, isLoaded]);
+
   // Reset page to 1 when filters change
   useEffect(() => {
+    if (!isLoaded) return;
     setPage(1);
-  }, [search, reviewStatus, followUpStatus, claimStatus, sortOrder]);
+  }, [search, reviewStatus, followUpStatus, claimStatus, sortOrder, isLoaded]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["kyc-reviews", search, reviewStatus, followUpStatus, claimStatus, sortOrder, page, limit],
     queryFn: () => listKycReviews({ search, reviewStatus, followUpStatus, claimStatus, includeVerified: true, sortOrder, page, limit }),
-    enabled: allowed,
+    enabled: allowed && isLoaded,
     retry: false,
   });
 
