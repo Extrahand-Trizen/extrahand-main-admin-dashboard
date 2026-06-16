@@ -270,6 +270,7 @@ export interface PaymentPayout {
   source?: string;
   type?: string;
   createdAt: string;
+  teamTest?: boolean;
 }
 
 export interface PaymentRefund {
@@ -281,6 +282,7 @@ export interface PaymentRefund {
   refundAmount: string;
   status: string;
   createdAt: string;
+  teamTest?: boolean;
 }
 
 export interface PaymentLedgerEntry {

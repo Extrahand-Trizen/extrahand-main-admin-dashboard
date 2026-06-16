@@ -3,16 +3,9 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { MoreHorizontal } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -137,7 +130,7 @@ export default function PaymentTransactionsPage() {
                   <th className="px-3 py-2 text-left">Payment Status</th>
                   <th className="px-3 py-2 text-left">Hold Status</th>
                   <th className="px-3 py-2 text-left">Transaction ID</th>
-                  <th className="px-3 py-2 text-left">Actions</th>
+                  <th className="px-3 py-2 text-left">Transaction Type</th>
                 </tr>
               </thead>
               <tbody>
@@ -174,22 +167,22 @@ export default function PaymentTransactionsPage() {
                       <td className="px-3 py-2 font-mono text-xs">{row.escrowId}</td>
                       <td className="px-3 py-2">
                         {hasPermission("payment.update") ? (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="outline" size="icon" className="h-8 w-8 p-0">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onSelect={() => handleToggleTeamTest(row.escrowId, !row.teamTest)}
-                              >
-                                {row.teamTest ? "Mark as real" : "Mark as team test"}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <Select
+                            value={row.teamTest ? "team" : "real"}
+                            onValueChange={(value) => 
+                              handleToggleTeamTest(row.escrowId, value === "team")
+                            }
+                          >
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="real">Real</SelectItem>
+                              <SelectItem value="team">Team test</SelectItem>
+                            </SelectContent>
+                          </Select>
                         ) : (
-                          <span className="text-gray-500">No actions</span>
+                          <span className="text-gray-500">{row.teamTest ? "Team test" : "Real"}</span>
                         )}
                       </td>
                     </tr>

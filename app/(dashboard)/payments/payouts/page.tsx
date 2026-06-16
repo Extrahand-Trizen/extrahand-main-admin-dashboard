@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { listPaymentPayouts, updatePaymentPayoutStatus, getUserBankAccounts } from "@/lib/api/payments";
+import { listPaymentPayouts, updatePaymentPayoutStatus, updatePayoutTeamTest, getUserBankAccounts } from "@/lib/api/payments";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { formatDateTime } from "@/lib/utils";
 import { toast } from "sonner";
@@ -34,6 +34,7 @@ type PayoutStatus = (typeof PAYOUT_STATUSES)[number];
 export default function PaymentPayoutsPage() {
   const { hasPermission, isSuperAdmin } = usePermissions();
   const [page, setPage] = useState(1);
+  const [transactionType, setTransactionType] = useState<'all' | 'real' | 'team'>('all');
   const [userMap, setUserMap] = useState(new Map<string, string>());
   const [taskMap, setTaskMap] = useState(new Map<string, string>());
   const [bankAccountsDialog, setBankAccountsDialog] = useState<{
@@ -72,8 +73,8 @@ export default function PaymentPayoutsPage() {
   };
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ["payment-payouts", page],
-    queryFn: () => listPaymentPayouts({ limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE }),
+    queryKey: ["payment-payouts", page, transactionType],
+    queryFn: () => listPaymentPayouts({ limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE, transactionType }),
     enabled: hasPermission("payment.list"),
     retry: false,
   });
@@ -141,6 +142,16 @@ export default function PaymentPayoutsPage() {
     }
   };
 
+  const handleToggleTeamTest = async (payoutId: string, teamTest: boolean) => {
+    try {
+      await updatePayoutTeamTest(payoutId, teamTest);
+      toast.success(teamTest ? "Marked as team test" : "Marked as real transaction");
+      await refetch();
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to update transaction type");
+    }
+  };
+
   return (
     <div className="space-y-6">
       {!hasPermission("payment.list") && (
@@ -155,6 +166,19 @@ export default function PaymentPayoutsPage() {
             <p className="mt-2 text-sm text-gray-600">
               All payout records including manual and automated transfers
             </p>
+          </div>
+          <div className="flex gap-2 items-center">
+            <Select value={transactionType} onValueChange={(value: any) => { setTransactionType(value); setPage(1); }}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="real">Real</SelectItem>
+                <SelectItem value="team">Team tests</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" onClick={() => { setTransactionType('all'); setPage(1); }}>Reset</Button>
           </div>
           <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -176,6 +200,7 @@ export default function PaymentPayoutsPage() {
                   <th className="px-3 py-2 text-left">Gross</th>
                   <th className="px-3 py-2 text-left">Net</th>
                   <th className="px-3 py-2 text-left">Source</th>
+                  <th className="px-3 py-2 text-left">Transaction Type</th>
                   <th className="px-3 py-2 text-left">Status</th>
                   <th className="px-3 py-2 text-left">Bank Details</th>
                 </tr>
@@ -183,13 +208,13 @@ export default function PaymentPayoutsPage() {
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={10} className="px-3 py-8 text-center text-gray-500">
+                    <td colSpan={11} className="px-3 py-8 text-center text-gray-500">
                       Loading payouts...
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-3 py-8 text-center text-gray-500">
+                    <td colSpan={11} className="px-3 py-8 text-center text-gray-500">
                       No payouts found
                     </td>
                   </tr>
@@ -239,6 +264,26 @@ export default function PaymentPayoutsPage() {
                       <td className="px-3 py-2">₹{row.amount}</td>
                       <td className="px-3 py-2">₹{row.netAmount}</td>
                       <td className="px-3 py-2">{row.source || "—"}</td>
+                      <td className="px-3 py-2">
+                        {canUpdatePayout ? (
+                          <Select
+                            value={row.teamTest ? "team" : "real"}
+                            onValueChange={(value) => 
+                              handleToggleTeamTest(row.payoutId, value === "team")
+                            }
+                          >
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="real">Real</SelectItem>
+                              <SelectItem value="team">Team test</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className="text-gray-500">{row.teamTest ? "Team test" : "Real"}</span>
+                        )}
+                      </td>
                       <td className="px-3 py-2">
                         {canUpdatePayout ? (
                           <Select

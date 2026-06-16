@@ -61,12 +61,16 @@ export async function updatePaymentPayoutStatus(
 export async function listPaymentPayouts(filters?: {
   q?: string;
   status?: string;
+  transactionType?: 'all' | 'real' | 'team';
   limit?: number;
   offset?: number;
 }): Promise<PaymentListResponse<PaymentPayout>> {
   const params = new URLSearchParams();
   if (filters?.q) params.append('q', filters.q);
   if (filters?.status) params.append('status', filters.status);
+  if (filters?.transactionType && filters.transactionType !== 'all') {
+    params.append('transactionType', filters.transactionType);
+  }
   if (filters?.limit) params.append('limit', String(filters.limit));
   if (filters?.offset) params.append('offset', String(filters.offset));
   const query = params.toString();
@@ -75,19 +79,43 @@ export async function listPaymentPayouts(filters?: {
   );
 }
 
+export async function updatePayoutTeamTest(
+  payoutId: string,
+  teamTest: boolean
+): Promise<ApiResponse<any>> {
+  return apiRequest<ApiResponse<any>>(`/api/v1/payments/payouts/${payoutId}/team-test`, {
+    method: 'PATCH',
+    body: JSON.stringify({ teamTest }),
+  });
+}
+
 export async function listPaymentRefunds(filters?: {
   status?: string;
+  transactionType?: 'all' | 'real' | 'team';
   limit?: number;
   offset?: number;
 }): Promise<PaymentListResponse<PaymentRefund>> {
   const params = new URLSearchParams();
   if (filters?.status) params.append('status', filters.status);
+  if (filters?.transactionType && filters.transactionType !== 'all') {
+    params.append('transactionType', filters.transactionType);
+  }
   if (filters?.limit) params.append('limit', String(filters.limit));
   if (filters?.offset) params.append('offset', String(filters.offset));
   const query = params.toString();
   return apiRequest<PaymentListResponse<PaymentRefund>>(
     `/api/v1/payments/refunds${query ? `?${query}` : ''}`
   );
+}
+
+export async function updateRefundTeamTest(
+  refundId: string,
+  teamTest: boolean
+): Promise<ApiResponse<any>> {
+  return apiRequest<ApiResponse<any>>(`/api/v1/payments/refunds/${refundId}/team-test`, {
+    method: 'PATCH',
+    body: JSON.stringify({ teamTest }),
+  });
 }
 
 export async function listPaymentLedger(filters?: {
