@@ -16,21 +16,35 @@ import {
 import {
   listPaymentTransactions,
   updateTransactionTeamTest,
+  deletePaymentTransaction,
 } from "@/lib/api/payments";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { toast } from "sonner";
 import { formatDateTime } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+
 
 type TransactionType = "all" | "real" | "team";
 type HoldStatus = "all" | "held" | "cancelled";
 
 export default function PaymentTransactionsPage() {
-  const { hasPermission } = usePermissions();
+  const { hasPermission, isSuperAdmin } = usePermissions();
   const [q, setQ] = useState("");
   const [transactionType, setTransactionType] = useState<TransactionType>("all");
   const [holdStatus, setHoldStatus] = useState<HoldStatus>("all");
   const PAGE_SIZE = 10;
   const [page, setPage] = useState(1);
+
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string } | null>(null);
+  const [confirmDeleteText, setConfirmDeleteText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { data, refetch, isFetching } = useQuery({
     queryKey: ["payment-transactions", q, transactionType, holdStatus, page],
@@ -55,6 +69,26 @@ export default function PaymentTransactionsPage() {
       await refetch();
     } catch (error: any) {
       toast.error(error?.message || "Failed to update transaction type");
+    }
+  };
+
+  const handleDeleteTransaction = async () => {
+    if (!deleteTarget) return;
+    if (confirmDeleteText !== "delete") {
+      toast.error("Please type 'delete' to confirm.");
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      await deletePaymentTransaction(deleteTarget.id);
+      toast.success("Transaction deleted successfully");
+      setDeleteTarget(null);
+      setConfirmDeleteText("");
+      await refetch();
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to delete transaction");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -131,12 +165,15 @@ export default function PaymentTransactionsPage() {
                   <th className="px-3 py-2 text-left">Hold Status</th>
                   <th className="px-3 py-2 text-left">Transaction ID</th>
                   <th className="px-3 py-2 text-left">Transaction Type</th>
+                  {(isSuperAdmin || hasPermission("payment.delete")) && (
+                    <th className="px-3 py-2 text-left w-24">Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-3 py-8 text-center text-gray-500">
+                    <td colSpan={(isSuperAdmin || hasPermission("payment.delete")) ? 10 : 9} className="px-3 py-8 text-center text-gray-500">
                       No transactions found
                     </td>
                   </tr>
@@ -185,6 +222,18 @@ export default function PaymentTransactionsPage() {
                           <span className="text-gray-500">{row.teamTest ? "Team test" : "Real"}</span>
                         )}
                       </td>
+                      {(isSuperAdmin || hasPermission("payment.delete")) && (
+                        <td className="px-3 py-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:text-red-800 hover:bg-red-50 font-medium"
+                            onClick={() => setDeleteTarget({ id: row.escrowId, label: row.escrowId })}
+                          >
+                            Delete
+                          </Button>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
@@ -202,6 +251,61 @@ export default function PaymentTransactionsPage() {
           </div>
         </div>
       </Card>
+
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+            setConfirmDeleteText("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-red-600 flex items-center gap-2">
+              Confirm Permanent Deletion
+            </DialogTitle>
+            <DialogDescription className="space-y-3 pt-2">
+              <span className="block font-semibold text-gray-900">
+                Are you sure you want to delete this transaction record from the database?
+              </span>
+              <span className="block text-sm text-gray-500">
+                This will delete the escrow record (<code className="font-mono bg-gray-100 px-1 py-0.5 rounded text-red-600">{deleteTarget?.label}</code>) permanently. Since this is a production database, you must confirm this action.
+              </span>
+              <span className="block text-sm font-semibold text-gray-900">
+                Please type <span className="underline select-none">delete</span> to proceed:
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              value={confirmDeleteText}
+              onChange={(e) => setConfirmDeleteText(e.target.value)}
+              placeholder="type delete"
+              className="font-mono text-center"
+            />
+          </div>
+          <DialogFooter className="sm:justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteTarget(null);
+                setConfirmDeleteText("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={confirmDeleteText !== "delete" || isDeleting}
+              onClick={handleDeleteTransaction}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

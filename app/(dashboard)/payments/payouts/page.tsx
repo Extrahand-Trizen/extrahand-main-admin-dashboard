@@ -12,18 +12,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { listPaymentPayouts, updatePaymentPayoutStatus, updatePayoutTeamTest, getUserBankAccounts } from "@/lib/api/payments";
+import { listPaymentPayouts, updatePaymentPayoutStatus, updatePayoutTeamTest, getUserBankAccounts, deletePaymentPayout } from "@/lib/api/payments";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { formatDateTime } from "@/lib/utils";
 import { toast } from "sonner";
 import { getUser } from "@/lib/api/users";
 import { getTask } from "@/lib/api/tasks";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 
 const PAGE_SIZE = 10;
@@ -69,6 +71,29 @@ export default function PaymentPayoutsPage() {
     } catch (error: any) {
       toast.error("Failed to load bank details");
       setBankAccountsDialog((prev) => ({ ...prev, loading: false }));
+    }
+  };
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string } | null>(null);
+  const [confirmDeleteText, setConfirmDeleteText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeletePayout = async () => {
+    if (!deleteTarget) return;
+    if (confirmDeleteText !== "delete") {
+      toast.error("Please type 'delete' to confirm.");
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      await deletePaymentPayout(deleteTarget.id);
+      toast.success("Payout deleted successfully");
+      setDeleteTarget(null);
+      setConfirmDeleteText("");
+      await refetch();
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to delete payout");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -203,18 +228,21 @@ export default function PaymentPayoutsPage() {
                   <th className="px-3 py-2 text-left">Transaction Type</th>
                   <th className="px-3 py-2 text-left">Status</th>
                   <th className="px-3 py-2 text-left">Bank Details</th>
+                  {(isSuperAdmin || hasPermission("payment.delete")) && (
+                    <th className="px-3 py-2 text-left w-24">Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={11} className="px-3 py-8 text-center text-gray-500">
+                    <td colSpan={(isSuperAdmin || hasPermission("payment.delete")) ? 12 : 11} className="px-3 py-8 text-center text-gray-500">
                       Loading payouts...
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-3 py-8 text-center text-gray-500">
+                    <td colSpan={(isSuperAdmin || hasPermission("payment.delete")) ? 12 : 11} className="px-3 py-8 text-center text-gray-500">
                       No payouts found
                     </td>
                   </tr>
@@ -318,6 +346,18 @@ export default function PaymentPayoutsPage() {
                           "—"
                         )}
                       </td>
+                      {(isSuperAdmin || hasPermission("payment.delete")) && (
+                        <td className="px-3 py-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:text-red-800 hover:bg-red-50 font-medium"
+                            onClick={() => setDeleteTarget({ id: row.payoutId, label: row.payoutId })}
+                          >
+                            Delete
+                          </Button>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
@@ -409,6 +449,61 @@ export default function PaymentPayoutsPage() {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+            setConfirmDeleteText("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-red-600 flex items-center gap-2">
+              Confirm Permanent Deletion
+            </DialogTitle>
+            <DialogDescription className="space-y-3 pt-2">
+              <span className="block font-semibold text-gray-900">
+                Are you sure you want to delete this payout record from the database?
+              </span>
+              <span className="block text-sm text-gray-500">
+                This will delete the payout record (<code className="font-mono bg-gray-100 px-1 py-0.5 rounded text-red-600">{deleteTarget?.label}</code>) permanently. Since this is a production database, you must confirm this action.
+              </span>
+              <span className="block text-sm font-semibold text-gray-900">
+                Please type <span className="underline select-none">delete</span> to proceed:
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              value={confirmDeleteText}
+              onChange={(e) => setConfirmDeleteText(e.target.value)}
+              placeholder="type delete"
+              className="font-mono text-center"
+            />
+          </div>
+          <DialogFooter className="sm:justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteTarget(null);
+                setConfirmDeleteText("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={confirmDeleteText !== "delete" || isDeleting}
+              onClick={handleDeletePayout}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
         </>

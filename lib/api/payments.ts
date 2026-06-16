@@ -136,3 +136,22 @@ export async function listPaymentLedger(filters?: {
 export async function getUserBankAccounts(userId: string): Promise<ApiResponse<{ bankAccounts: any[] }>> {
   return apiRequest<ApiResponse<{ bankAccounts: any[] }>>(`/api/v1/payments/users/${encodeURIComponent(userId)}/bank-accounts`);
 }
+
+export async function deletePaymentTransaction(escrowId: string): Promise<ApiResponse<any>> {
+  return apiRequest<ApiResponse<any>>(`/api/v1/payments/transactions/${encodeURIComponent(escrowId)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function deletePaymentPayout(payoutId: string): Promise<ApiResponse<any>> {
+  return apiRequest<ApiResponse<any>>(`/api/v1/payments/payouts/${encodeURIComponent(payoutId)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function deletePaymentRefund(refundId: string): Promise<ApiResponse<any>> {
+  return apiRequest<ApiResponse<any>>(`/api/v1/payments/refunds/${encodeURIComponent(refundId)}`, {
+    method: 'DELETE',
+  });
+}
+
