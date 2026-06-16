@@ -65,9 +65,19 @@ const getTaskIdentifier = (task: Partial<Task> & { _id?: string; id?: string }) 
 
 const statusColors: Record<string, string> = {
   open: "success",
+  overdue: "destructive",
   in_progress: "warning",
   completed: "default",
   cancelled: "destructive",
+};
+
+const getDisplayStatus = (task: Task) => {
+  if (task.status === "open" && task.scheduledDate && task.dateOption !== "flexible") {
+    if (new Date(task.scheduledDate) < new Date()) {
+      return "overdue";
+    }
+  }
+  return task.status;
 };
 
 const followUpStatusLabels: Record<string, string> = {
@@ -343,6 +353,7 @@ export default function TasksPage() {
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="open">Open</SelectItem>
+                  <SelectItem value="overdue">Overdue</SelectItem>
                   <SelectItem value="in_progress">In Progress</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
@@ -515,8 +526,8 @@ export default function TasksPage() {
                               </div>
                             </div>
                             <div className="flex items-center gap-2 sm:hidden">
-                              <Badge variant={statusColors[task.status] as any}>
-                                {task.status}
+                              <Badge variant={statusColors[getDisplayStatus(task)] as any}>
+                                {getDisplayStatus(task)}
                               </Badge>
                               <Badge
                                 variant={
@@ -543,8 +554,8 @@ export default function TasksPage() {
                           )}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
-                          <Badge variant={statusColors[task.status] as any}>
-                            {task.status}
+                          <Badge variant={statusColors[getDisplayStatus(task)] as any}>
+                            {getDisplayStatus(task)}
                           </Badge>
                         </TableCell>
                         <TableCell className="hidden xl:table-cell">

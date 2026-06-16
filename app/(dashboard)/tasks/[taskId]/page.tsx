@@ -392,9 +392,19 @@ export default function TaskDetailsPage() {
 
   const statusColors: Record<string, string> = {
     open: "success",
+    overdue: "destructive",
     in_progress: "warning",
     completed: "default",
     cancelled: "destructive",
+  };
+
+  const getDisplayStatus = (t: any) => {
+    if (t?.status === "open" && t?.scheduledDate && t?.dateOption !== "flexible") {
+      if (new Date(t.scheduledDate) < new Date()) {
+        return "overdue";
+      }
+    }
+    return t?.status;
   };
 
   const applicationStatusColors: Record<string, string> = {
@@ -550,8 +560,8 @@ export default function TaskDetailsPage() {
                     Status
                   </Label>
                   <div className="mt-1">
-                    <Badge variant={statusColors[task.status] as any}>
-                      {task.status}
+                    <Badge variant={statusColors[getDisplayStatus(task)] as any}>
+                      {getDisplayStatus(task)}
                     </Badge>
                   </div>
                 </div>
