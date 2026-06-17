@@ -436,9 +436,21 @@ export default function KycReviewsPage() {
     setPage(1);
   }, [search, reviewStatus, followUpStatus, claimStatus, sortOrder, isLoaded]);
 
+  const includeVerified = reviewStatus === "accepted";
+
   const { data, isLoading } = useQuery({
-    queryKey: ["kyc-reviews", search, reviewStatus, followUpStatus, claimStatus, sortOrder, page, limit],
-    queryFn: () => listKycReviews({ search, reviewStatus, followUpStatus, claimStatus, includeVerified: true, sortOrder, page, limit }),
+    queryKey: ["kyc-reviews", search, reviewStatus, followUpStatus, claimStatus, sortOrder, page, limit, includeVerified],
+    queryFn: () =>
+      listKycReviews({
+        search,
+        reviewStatus,
+        followUpStatus,
+        claimStatus,
+        includeVerified,
+        sortOrder,
+        page,
+        limit,
+      }),
     enabled: allowed && isLoaded,
     retry: false,
   });
