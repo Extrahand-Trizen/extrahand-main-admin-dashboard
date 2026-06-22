@@ -102,6 +102,7 @@ export default function TasksPage() {
   const { hasPermission, isSuperAdmin } = usePermissions();
 
   const [search, setSearch] = useState("");
+  const [workTypeFilter, setWorkTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("open");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [followUpFilter, setFollowUpFilter] = useState<string>("all");
@@ -134,6 +135,7 @@ export default function TasksPage() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed.search !== undefined) setSearch(parsed.search);
+        if (parsed.workTypeFilter !== undefined) setWorkTypeFilter(parsed.workTypeFilter);
         if (parsed.statusFilter !== undefined) setStatusFilter(parsed.statusFilter);
         if (parsed.categoryFilter !== undefined) setCategoryFilter(parsed.categoryFilter);
         if (parsed.followUpFilter !== undefined) setFollowUpFilter(parsed.followUpFilter);
@@ -154,6 +156,7 @@ export default function TasksPage() {
     try {
       sessionStorage.setItem("tasks_filters", JSON.stringify({
         search,
+        workTypeFilter,
         statusFilter,
         categoryFilter,
         followUpFilter,
@@ -165,12 +168,13 @@ export default function TasksPage() {
     } catch (e) {
       console.error("Error saving filters to sessionStorage", e);
     }
-  }, [search, statusFilter, categoryFilter, followUpFilter, assignedToFilter, deadlineSortOrder, page, limit, isLoaded]);
+  }, [search, workTypeFilter, statusFilter, categoryFilter, followUpFilter, assignedToFilter, deadlineSortOrder, page, limit, isLoaded]);
 
   const { data, isLoading, error } = useQuery({
     queryKey: [
       "tasks",
       search,
+      workTypeFilter,
       statusFilter,
       categoryFilter,
       followUpFilter,
@@ -182,6 +186,7 @@ export default function TasksPage() {
     queryFn: () =>
       listTasks({
         search: search || undefined,
+        bookingSource: workTypeFilter !== "all" ? workTypeFilter : undefined,
         status: statusFilter !== "all" ? statusFilter : undefined,
         category: categoryFilter !== "all" ? categoryFilter : undefined,
         followUpStatus:
@@ -321,7 +326,7 @@ export default function TasksPage() {
           <CardTitle className="text-lg">Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
             <div className="space-y-2">
               <Label htmlFor="search">Search</Label>
               <div className="relative">
@@ -337,6 +342,25 @@ export default function TasksPage() {
                   className="pl-10"
                 />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="workType">Work Type</Label>
+              <Select
+                value={workTypeFilter}
+                onValueChange={(value) => {
+                  setWorkTypeFilter(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger id="workType">
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="posted_task">Posted Task</SelectItem>
+                  <SelectItem value="book_now">Book Now</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>

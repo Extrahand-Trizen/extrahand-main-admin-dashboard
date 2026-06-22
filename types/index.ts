@@ -208,6 +208,7 @@ export interface Task {
   scheduledDate?: string;
   dateOption?: string;
   timeSlot?: string;
+  bookingSource?: string;
 }
 
 export interface TaskApplication {
@@ -441,6 +442,7 @@ export interface TaskFilters {
   customerId?: string;
   assigneeId?: string;
   assignedTo?: string;
+  bookingSource?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   page?: number;
