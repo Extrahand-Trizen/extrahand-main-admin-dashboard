@@ -209,6 +209,9 @@ export interface Task {
   dateOption?: string;
   timeSlot?: string;
   bookingSource?: string;
+  scheduledTimeStart?: string;
+  scheduledTimeEnd?: string;
+  estimatedDuration?: number;
 }
 
 export interface TaskApplication {

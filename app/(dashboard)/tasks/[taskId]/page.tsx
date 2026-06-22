@@ -589,20 +589,40 @@ export default function TaskDetailsPage() {
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-700">
-                    Deadline
+                    {task.bookingSource === "book_now" ? "Schedule" : "Deadline"}
                   </Label>
-                  <div className="mt-1 text-sm text-gray-900 flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-gray-400" />
-                    <span>
-                      {task.dateOption === "flexible" || !task.dateOption || !task.scheduledDate ? (
-                        "Flexible"
-                      ) : (
-                        <>
-                          {task.dateOption === "on-date" ? "On " : task.dateOption === "before-date" ? "Before " : ""}
-                          {formatDate(task.scheduledDate)}
-                        </>
-                      )}
-                    </span>
+                  <div className="mt-1 text-sm text-gray-900 flex items-start gap-2">
+                    <Calendar className="h-4 w-4 text-gray-400 mt-0.5" />
+                    {task.bookingSource === "book_now" ? (
+                      <div className="flex flex-col gap-0.5">
+                        {task.scheduledDate && (
+                          <span className="font-semibold text-blue-700">
+                            {formatDate(task.scheduledDate)}
+                          </span>
+                        )}
+                        {(task.scheduledTimeStart || task.scheduledTimeEnd) && (
+                          <span>
+                            {task.scheduledTimeStart || "?"} - {task.scheduledTimeEnd || "?"}
+                          </span>
+                        )}
+                        {task.estimatedDuration && (
+                          <span className="text-gray-500 italic text-xs">
+                            Estimated Duration: {task.estimatedDuration} mins
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span>
+                        {task.dateOption === "flexible" || !task.dateOption || !task.scheduledDate ? (
+                          "Flexible"
+                        ) : (
+                          <>
+                            {task.dateOption === "on-date" ? "On " : task.dateOption === "before-date" ? "Before " : ""}
+                            {formatDate(task.scheduledDate)}
+                          </>
+                        )}
+                      </span>
+                    )}
                   </div>
                 </div>
                 {task.location && (

@@ -511,7 +511,7 @@ export default function TasksPage() {
                         Budget
                       </TableHead>
                       <TableHead className="hidden lg:table-cell">
-                        Deadline
+                        Deadline / Schedule
                       </TableHead>
                       <TableHead className="hidden lg:table-cell">
                         Created
@@ -618,7 +618,25 @@ export default function TasksPage() {
                           {formatCurrency(task.budget)}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-sm text-gray-500">
-                          {task.dateOption === "flexible" || !task.dateOption || !task.scheduledDate ? (
+                          {task.bookingSource === "book_now" ? (
+                            <div className="flex flex-col gap-0.5 text-xs text-gray-700">
+                              {task.scheduledDate && (
+                                <span className="font-semibold text-blue-700">
+                                  {formatDate(task.scheduledDate)}
+                                </span>
+                              )}
+                              {(task.scheduledTimeStart || task.scheduledTimeEnd) && (
+                                <span>
+                                  {task.scheduledTimeStart || "?"} - {task.scheduledTimeEnd || "?"}
+                                </span>
+                              )}
+                              {task.estimatedDuration && (
+                                <span className="text-gray-500 italic">
+                                  {task.estimatedDuration} mins
+                                </span>
+                              )}
+                            </div>
+                          ) : task.dateOption === "flexible" || !task.dateOption || !task.scheduledDate ? (
                             <span className="text-gray-400">Flexible</span>
                           ) : (
                             <span className="capitalize text-gray-700">
