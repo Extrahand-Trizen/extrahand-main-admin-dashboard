@@ -1,9 +1,12 @@
 // User Types
 export interface User {
+  _id?: string;
+  profileId?: string;
   userId: string;
   uid?: string; // Firebase UID
   email: string;
   name: string;
+  fullName?: string;
   phone?: string;
   role: 'Helper' | 'Customer' | 'unknown';
   roles?: ('Helper' | 'Customer')[];
@@ -205,6 +208,7 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
   assignedTo?: { userId: string; name: string; email?: string } | null;
+  assigneeId?: string;
   scheduledDate?: string;
   dateOption?: string;
   timeSlot?: string;

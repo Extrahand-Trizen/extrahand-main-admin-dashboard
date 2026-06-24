@@ -235,10 +235,11 @@ export async function updateApplicationStatus(
 export async function assignHelper(
   taskId: string,
   helperUid: string,
-  helperProfileId: string
+  helperProfileId: string,
+  helperName?: string
 ): Promise<ApiResponse<any>> {
   return apiRequest<ApiResponse<any>>(`/api/v1/tasks/${taskId}/assign`, {
     method: 'POST',
-    body: JSON.stringify({ helperUid, helperProfileId }),
+    body: JSON.stringify({ helperUid, helperProfileId, helperName }),
   });
 }

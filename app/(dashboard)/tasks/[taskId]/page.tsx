@@ -354,6 +354,12 @@ export default function TaskDetailsPage() {
   const taskCall = taskCallData?.data;
   const applications = applicationsData?.data || [];
   const customerProfileId = extractCustomerProfileId(task);
+
+  // Extract the actual helper's assigneeId from raw task data (MongoDB field)
+  const assigneeProfileId: string = String(
+    (task as any)?.assigneeId || ""
+  ).trim();
+
   const uniqueHelperProfileIds = Array.from(
     new Set(
       applications
@@ -371,6 +377,18 @@ export default function TaskDetailsPage() {
       hasPermission("task.view"),
     retry: false,
   });
+
+  // Fetch the actual assigned helper details using assigneeId
+  const { data: assignedHelperData } = useQuery({
+    queryKey: ["user-from-task-assignee", assigneeProfileId],
+    queryFn: () => getUser(assigneeProfileId),
+    enabled:
+      Boolean(assigneeProfileId) &&
+      hasPermission("user.view") &&
+      hasPermission("task.view"),
+    retry: false,
+  });
+  const assignedHelper = assignedHelperData?.data;
 
   const helperDetailQueries = useQueries({
     queries: uniqueHelperProfileIds.map((profileId) => ({
@@ -661,7 +679,7 @@ export default function TaskDetailsPage() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle>Helper Assignment</CardTitle>
-                  {task.assignedTo ? (
+                  {assigneeProfileId ? (
                     <Badge variant="success" className="bg-emerald-50 text-emerald-700 border-emerald-200">
                       Assigned
                     </Badge>
@@ -674,22 +692,35 @@ export default function TaskDetailsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {task.assignedTo ? (
+                {assigneeProfileId ? (
                   <div className="space-y-4">
-                    <div className="flex items-center gap-3 p-4 rounded-lg border border-emerald-200 bg-emerald-50">
-                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 font-medium text-sm">
-                        {(task.assignedTo.name || "H").charAt(0).toUpperCase()}
+                    <Link
+                      href={`/users/${assigneeProfileId}`}
+                      className="block"
+                    >
+                      <div className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors cursor-pointer">
+                        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 text-gray-700 font-medium text-sm">
+                          {(
+                            assignedHelper?.name ||
+                            assignedHelper?.fullName ||
+                            "H"
+                          )
+                            .charAt(0)
+                            .toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">
+                            {assignedHelper?.name ||
+                              assignedHelper?.fullName ||
+                              "Loading..."}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {assignedHelper?.email || "Assigned helper"}
+                          </p>
+                        </div>
+                        <CheckCircle className="ml-auto h-5 w-5 text-emerald-600" />
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {task.assignedTo.name}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {task.assignedTo.email || "Assigned helper"}
-                        </p>
-                      </div>
-                      <CheckCircle className="ml-auto h-5 w-5 text-emerald-600" />
-                    </div>
+                    </Link>
                     <Button
                       variant="outline"
                       size="sm"

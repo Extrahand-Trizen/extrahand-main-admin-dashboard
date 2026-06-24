@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -51,6 +51,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { listTasks, deleteTask, requestTaskDelete } from "@/lib/api/tasks";
+import { getUser } from "@/lib/api/users";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { CATEGORY_OPTIONS } from "@/lib/category-options";
@@ -275,6 +276,34 @@ export default function TasksPage() {
   };
 
   const tasks = data?.data || [];
+
+  const uniqueHelperProfileIds = useMemo(() => {
+    return Array.from(
+      new Set(
+        tasks
+          .map((task: any) => task.assigneeId)
+          .filter(Boolean)
+      )
+    ) as string[];
+  }, [tasks]);
+
+  const helperDetailQueries = useQueries({
+    queries: uniqueHelperProfileIds.map((profileId) => ({
+      queryKey: ["user-from-task-helper", profileId],
+      queryFn: () => getUser(profileId),
+      enabled: Boolean(profileId),
+    })),
+  });
+
+  const helperDetailsByProfileId = useMemo(() => {
+    const map = new Map<string, any>();
+    uniqueHelperProfileIds.forEach((profileId, index) => {
+      const payload = helperDetailQueries[index]?.data?.data;
+      if (payload) map.set(profileId, payload);
+    });
+    return map;
+  }, [uniqueHelperProfileIds, helperDetailQueries]);
+
   const pagination = data?.pagination || {
     page: 1,
     limit: 20,
@@ -606,12 +635,20 @@ export default function TasksPage() {
                           </div>
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-sm">
-                          {task.assignedTo ? (
-                            <span className="font-medium text-gray-800 capitalize">
-                              {task.assignedTo.name}
-                            </span>
+                          {task.assigneeId ? (
+                            <Link
+                              href={`/users/${task.assigneeId}`}
+                              className="font-medium text-blue-600 hover:text-blue-800 hover:underline capitalize"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {helperDetailsByProfileId.get(task.assigneeId)?.name ||
+                                helperDetailsByProfileId.get(task.assigneeId)?.fullName ||
+                                "Loading..."}
+                            </Link>
                           ) : (
-                            <span className="text-gray-400">—</span>
+                            <span className="text-amber-600 font-medium italic hover:underline">
+                              Assign Helper
+                            </span>
                           )}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-sm font-medium">

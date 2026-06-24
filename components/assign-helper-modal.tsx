@@ -58,8 +58,9 @@ export default function AssignHelperModal({
     setAssigning(true);
     try {
       const helperUid = selectedHelper.uid || selectedHelper.userId;
-      const helperProfileId = selectedHelper.userId;
-      await assignHelper(taskId, helperUid, helperProfileId);
+      const helperProfileId = selectedHelper._id || selectedHelper.profileId || selectedHelper.userId;
+      const helperName = selectedHelper.name;
+      await assignHelper(taskId, helperUid, helperProfileId, helperName);
       setAssigned(true);
       toast.success(`Helper "${selectedHelper.name}" assigned successfully`);
       onAssigned();

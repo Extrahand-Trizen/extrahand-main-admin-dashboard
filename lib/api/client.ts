@@ -107,6 +107,7 @@ export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
+  const isMutation = options.method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method.toUpperCase());
   const token = await getAdminToken();
   
   if (!token) {
@@ -153,11 +154,6 @@ export async function apiRequest<T>(
     }
 
     if (!retryResponse.ok) {
-      if (retryResponse.status === 404) {
-        console.warn(`API endpoint not found: ${endpoint}`);
-        return null as T;
-      }
-
       const retryErrorData = await retryResponse
         .json()
         .catch(() => ({ error: retryResponse.statusText }));
@@ -165,8 +161,13 @@ export async function apiRequest<T>(
         retryErrorData.error || `API request failed: ${retryResponse.statusText}`;
       console.error(`API Error (${retryResponse.status}):`, retryErrorMessage);
 
-      if (retryResponse.status >= 500) {
+      if (isMutation || retryResponse.status >= 500) {
         throw new Error(retryErrorMessage);
+      }
+
+      if (retryResponse.status === 404) {
+        console.warn(`API endpoint not found: ${endpoint}`);
+        return null as T;
       }
 
       return null as T;
@@ -176,20 +177,18 @@ export async function apiRequest<T>(
   }
 
   if (!response.ok) {
-    // Handle 404 gracefully - return null instead of throwing
-    if (response.status === 404) {
-      console.warn(`API endpoint not found: ${endpoint}`);
-      return null as T;
-    }
-    
-    // For other errors, try to get error message but don't break the UI
     const errorData = await response.json().catch(() => ({ error: response.statusText }));
     const errorMessage = errorData.error || `API request failed: ${response.statusText}`;
     console.error(`API Error (${response.status}):`, errorMessage);
     
-    // Only throw for critical errors (5xx), return null for client errors (4xx except 401)
-    if (response.status >= 500) {
+    // Only throw for critical errors (5xx) or mutations, return null for client errors (4xx except 401)
+    if (isMutation || response.status >= 500) {
       throw new Error(errorMessage);
+    }
+    
+    if (response.status === 404) {
+      console.warn(`API endpoint not found: ${endpoint}`);
+      return null as T;
     }
     
     // For 4xx errors (except 401), return null to allow UI to show empty state
