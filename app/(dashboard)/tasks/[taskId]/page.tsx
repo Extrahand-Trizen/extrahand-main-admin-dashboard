@@ -22,6 +22,7 @@ import {
   Send,
   Edit,
   MessageSquare,
+  Search,
 } from "lucide-react";
 import {
   Card,
@@ -47,6 +48,7 @@ import {
   updateTaskCallStatus,
 } from "@/lib/api/task-calls";
 import { getUser } from "@/lib/api/users";
+import AssignHelperModal from "@/components/assign-helper-modal";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { formatDate, formatCurrency, formatDateTime } from "@/lib/utils";
@@ -159,6 +161,7 @@ export default function TaskDetailsPage() {
     reason: "",
   });
   const [applicationsPage, setApplicationsPage] = useState(1);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [stageDialog, setStageDialog] = useState<{
     open: boolean;
     status: TaskCallStatus;
@@ -652,8 +655,64 @@ export default function TaskDetailsPage() {
             </CardContent>
           </Card>
 
-          {/* Applications */}
-          {hasPermission("task.application.list") && (
+          {/* Applications / Helper Assignment */}
+          {task.bookingSource === "book_now" ? (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Helper Assignment</CardTitle>
+                  {task.assignedTo ? (
+                    <Badge variant="success" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                      Assigned
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary">Unassigned</Badge>
+                  )}
+                </div>
+                <CardDescription>
+                  Assign a helper to this Book Now task
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {task.assignedTo ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 p-4 rounded-lg border border-emerald-200 bg-emerald-50">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 font-medium text-sm">
+                        {(task.assignedTo.name || "H").charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {task.assignedTo.name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {task.assignedTo.email || "Assigned helper"}
+                        </p>
+                      </div>
+                      <CheckCircle className="ml-auto h-5 w-5 text-emerald-600" />
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAssignModalOpen(true)}
+                    >
+                      Reassign
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Search className="mx-auto h-8 w-8 text-gray-300 mb-3" />
+                    <p className="text-sm text-gray-500 mb-4">
+                      No helper assigned yet. Search and assign a helper to this task.
+                    </p>
+                    <Button onClick={() => setAssignModalOpen(true)}>
+                      <Search className="mr-2 h-4 w-4" />
+                      Assign Helper
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ) : hasPermission("task.application.list") ? (
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -819,7 +878,7 @@ export default function TaskDetailsPage() {
                 )}
               </CardContent>
             </Card>
-          )}
+          ) : null}
         </div>
 
         {/* Sidebar */}
@@ -939,6 +998,16 @@ export default function TaskDetailsPage() {
           )}
         </div>
       </div>
+
+      {/* Assign Helper Modal */}
+      <AssignHelperModal
+        open={assignModalOpen}
+        onOpenChange={setAssignModalOpen}
+        taskId={taskId}
+        onAssigned={() => {
+          queryClient.invalidateQueries({ queryKey: ["task", taskId] });
+        }}
+      />
 
       {/* Task Call Stage Dialog */}
       <Dialog

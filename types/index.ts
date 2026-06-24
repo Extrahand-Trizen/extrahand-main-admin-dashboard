@@ -204,7 +204,7 @@ export interface Task {
   location?: string;
   createdAt: string;
   updatedAt: string;
-  assignedTo?: { userId: string; name: string } | null;
+  assignedTo?: { userId: string; name: string; email?: string } | null;
   scheduledDate?: string;
   dateOption?: string;
   timeSlot?: string;

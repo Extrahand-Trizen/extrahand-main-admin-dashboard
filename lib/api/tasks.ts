@@ -1,5 +1,5 @@
 import { apiRequest } from './client';
-import { ApiResponse, Task, TaskFilters, TaskApplication } from '@/types';
+import { ApiResponse, Task, TaskFilters, TaskApplication, User } from '@/types';
 
 /**
  * List tasks with filters
@@ -227,4 +227,18 @@ export async function updateApplicationStatus(
       body: JSON.stringify({ status }),
     }
   );
+}
+
+/**
+ * Assign a helper to a Book Now task
+ */
+export async function assignHelper(
+  taskId: string,
+  helperUid: string,
+  helperProfileId: string
+): Promise<ApiResponse<any>> {
+  return apiRequest<ApiResponse<any>>(`/api/v1/tasks/${taskId}/assign`, {
+    method: 'POST',
+    body: JSON.stringify({ helperUid, helperProfileId }),
+  });
 }
