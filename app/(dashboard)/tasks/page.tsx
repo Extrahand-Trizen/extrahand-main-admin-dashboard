@@ -193,8 +193,8 @@ export default function TasksPage() {
         followUpStatus:
           followUpFilter !== "all" ? followUpFilter : undefined,
         assignedTo: assignedToFilter !== "all" ? assignedToFilter : undefined,
-        sortBy: "scheduledDate",
-        sortOrder: deadlineSortOrder,
+        sortBy: workTypeFilter === "book_now" ? "createdAt" : "scheduledDate",
+        sortOrder: workTypeFilter === "book_now" ? "desc" : deadlineSortOrder,
         page,
         limit,
       }),

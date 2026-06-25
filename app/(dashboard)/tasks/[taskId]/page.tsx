@@ -49,6 +49,7 @@ import {
 } from "@/lib/api/task-calls";
 import { getUser } from "@/lib/api/users";
 import AssignHelperModal from "@/components/assign-helper-modal";
+import { unassignHelper } from "@/lib/api/tasks";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { formatDate, formatCurrency, formatDateTime } from "@/lib/utils";
@@ -180,6 +181,7 @@ export default function TaskDetailsPage() {
     data: taskData,
     isLoading: taskLoading,
     error: taskError,
+    refetch,
   } = useQuery({
     queryKey: ["task", taskId],
     queryFn: () => getTask(taskId),
@@ -356,9 +358,10 @@ export default function TaskDetailsPage() {
   const customerProfileId = extractCustomerProfileId(task);
 
   // Extract the actual helper's assigneeId from raw task data (MongoDB field)
-  const assigneeProfileId: string = String(
-    (task as any)?.assigneeId || ""
-  ).trim();
+  const rawAssigneeId = (task as any)?.assigneeId;
+  const assigneeProfileId: string = rawAssigneeId && rawAssigneeId !== "null"
+    ? String(rawAssigneeId).trim()
+    : "";
 
   const uniqueHelperProfileIds = Array.from(
     new Set(
@@ -721,13 +724,31 @@ export default function TaskDetailsPage() {
                         <CheckCircle className="ml-auto h-5 w-5 text-emerald-600" />
                       </div>
                     </Link>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setAssignModalOpen(true)}
-                    >
-                      Reassign
-                    </Button>
+                    <div className="flex gap-2">
+                      {/* <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAssignModalOpen(true)}
+                      >
+                        Reassign
+                      </Button> */}
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={async () => {
+                          if (!confirm('Unassign this helper from the task?')) return;
+                          try {
+                            await unassignHelper(taskId);
+                            toast.success('Helper unassigned successfully');
+                            refetch();
+                          } catch (err: any) {
+                            toast.error(err?.message || 'Failed to unassign helper');
+                          }
+                        }}
+                      >
+                        Unassign
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <div className="text-center py-8">

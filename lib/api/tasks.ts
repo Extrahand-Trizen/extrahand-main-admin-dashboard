@@ -243,3 +243,13 @@ export async function assignHelper(
     body: JSON.stringify({ helperUid, helperProfileId, helperName }),
   });
 }
+
+export async function unassignHelper(
+  taskId: string,
+  escrowId?: string
+): Promise<ApiResponse<any>> {
+  return apiRequest<ApiResponse<any>>(`/api/v1/tasks/${taskId}/unassign`, {
+    method: 'POST',
+    body: JSON.stringify({ escrowId }),
+  });
+}
