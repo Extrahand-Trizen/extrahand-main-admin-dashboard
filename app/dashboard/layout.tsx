@@ -42,15 +42,11 @@ export default function DashboardLayout({
     }
   }, [isAuthenticated, loading, router]);
 
-  // Prefetch payments data at app load if user has payments view permission
+  // Prefetch only overview metrics at app load (lightweight aggregate query).
+  // Individual list pages (transactions, payouts, refunds, ledger) fetch their own data lazily.
   useEffect(() => {
     if (!loading && isAuthenticated && hasPermission('payment.list')) {
-      // Prefetch overview and small slices for faster navigation
       queryClient.prefetchQuery({ queryKey: ['payments', 'overview'], queryFn: getPaymentsOverview });
-      queryClient.prefetchQuery({ queryKey: ['payments', 'transactions', { limit: 10, offset: 0 }], queryFn: () => listPaymentTransactions({ limit: 10, offset: 0 }) });
-      queryClient.prefetchQuery({ queryKey: ['payments', 'payouts', { limit: 10, offset: 0 }], queryFn: () => listPaymentPayouts({ limit: 10, offset: 0 }) });
-      queryClient.prefetchQuery({ queryKey: ['payments', 'refunds', { limit: 10, offset: 0 }], queryFn: () => listPaymentRefunds({ limit: 10, offset: 0 }) });
-      queryClient.prefetchQuery({ queryKey: ['payments', 'ledger', { limit: 10, offset: 0 }], queryFn: () => listPaymentLedger({ limit: 10, offset: 0 }) });
     }
   }, [loading, isAuthenticated, hasPermission, queryClient]);
 

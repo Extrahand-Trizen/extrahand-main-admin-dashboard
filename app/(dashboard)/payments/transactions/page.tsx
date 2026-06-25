@@ -156,11 +156,12 @@ export default function PaymentTransactionsPage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-3 py-2 text-left w-36">Date</th>
+                  <th className="px-3 py-2 text-left">Date</th>
                   <th className="px-3 py-2 text-left">Task Title</th>
                   <th className="px-3 py-2 text-left">Customer Name</th>
                   <th className="px-3 py-2 text-left">Helper Name</th>
                   <th className="px-3 py-2 text-left">Amount</th>
+                  <th className="px-3 py-2 text-left">Payout Amount</th>
                   <th className="px-3 py-2 text-left">Payment Status</th>
                   <th className="px-3 py-2 text-left">Hold Status</th>
                   <th className="px-3 py-2 text-left">Transaction ID</th>
@@ -173,7 +174,7 @@ export default function PaymentTransactionsPage() {
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={(isSuperAdmin || hasPermission("payment.delete")) ? 10 : 9} className="px-3 py-8 text-center text-gray-500">
+                    <td colSpan={(isSuperAdmin || hasPermission("payment.delete")) ? 11 : 10} className="px-3 py-8 text-center text-gray-500">
                       No transactions found
                     </td>
                   </tr>
@@ -194,11 +195,18 @@ export default function PaymentTransactionsPage() {
                         </Link>
                       </td>
                       <td className="px-3 py-2">
-                        <Link href={`/users/${encodeURIComponent(row.links?.helperUserId || row.performerUid)}`} className="text-blue-600 hover:underline">
-                          {row.links?.helperName || row.performerUid}
-                        </Link>
+                        {(!row.links?.helperUserId || row.links.helperUserId === 'pending_assignment') ? (
+                          <span className="text-gray-400 italic text-xs">Pending Assignment</span>
+                        ) : (
+                          <Link href={`/users/${encodeURIComponent(row.links.helperUserId)}`} className="text-blue-600 hover:underline">
+                            {row.links.helperName || row.links.helperUserId}
+                          </Link>
+                        )}
                       </td>
                       <td className="px-3 py-2 font-medium">₹{row.amountInRupees ?? "0.00"}</td>
+                      <td className="px-3 py-2 font-medium text-gray-900">
+                        {row.payoutAmount ? `₹${row.payoutAmount}` : <span className="text-gray-400 text-xs">—</span>}
+                      </td>
                       <td className="px-3 py-2">{row.paymentStatus || "unknown"}</td>
                       <td className="px-3 py-2">{row.status}</td>
                       <td className="px-3 py-2 font-mono text-xs">{row.escrowId}</td>
