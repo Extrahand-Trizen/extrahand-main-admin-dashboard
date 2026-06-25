@@ -254,6 +254,7 @@ export interface PaymentTransaction {
   status: string;
   paymentStatus: string | null;
   amountInRupees: string | null;
+  payoutAmount?: string | null;
   createdAt: string;
   teamTest?: boolean;
   teamTestTransferred?: boolean;
