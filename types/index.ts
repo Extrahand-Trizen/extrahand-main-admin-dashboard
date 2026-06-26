@@ -193,7 +193,14 @@ export interface Task {
   title: string;
   description: string;
   category: string;
-  status: 'open' | 'in_progress' | 'completed' | 'cancelled';
+  status:
+    | 'open'
+    | 'assigned'
+    | 'started'
+    | 'in_progress'
+    | 'review'
+    | 'completed'
+    | 'cancelled';
   taskCallStatus?:
     | 'not_updated'
     | 'genuine'
@@ -209,6 +216,7 @@ export interface Task {
   updatedAt: string;
   assignedTo?: { userId: string; name: string; email?: string } | null;
   assigneeId?: string;
+  assigneeName?: string | null;
   scheduledDate?: string;
   dateOption?: string;
   timeSlot?: string;
@@ -216,6 +224,21 @@ export interface Task {
   scheduledTimeStart?: string;
   scheduledTimeEnd?: string;
   estimatedDuration?: number;
+  assignedAt?: string | null;
+  startedAt?: string | null;
+  inProgressAt?: string | null;
+  completedAt?: string | null;
+  cancelledAt?: string | null;
+  cancelledById?: string | null;
+  cancellationReason?: string | null;
+  completionProof?: { url: string; type: string }[] | null;
+  completionStatus?: string | null;
+  completionNotes?: string | null;
+  customerRating?: number | null;
+  customerReview?: string | null;
+  paymentStatus?: string | null;
+  escrowStatus?: string | null;
+  payoutStatus?: string | null;
 }
 
 export interface TaskApplication {
@@ -245,6 +268,7 @@ export interface PaymentOverview {
 }
 
 export interface PaymentTransaction {
+  id: number;
   escrowId: string;
   razorpayOrderId: string;
   razorpayPaymentId: string | null;
@@ -269,6 +293,7 @@ export interface PaymentTransaction {
 }
 
 export interface PaymentPayout {
+  id: number;
   payoutId: string;
   performerUid: string;
   taskId?: string;
@@ -280,9 +305,18 @@ export interface PaymentPayout {
   type?: string;
   createdAt: string;
   teamTest?: boolean;
+  links?: {
+    customerUserId?: string;
+    helperUserId?: string;
+    taskId?: string;
+    customerName?: string;
+    taskTitle?: string;
+    helperName?: string;
+  };
 }
 
 export interface PaymentRefund {
+  id: number;
   refundId: string;
   paymentId: string;
   taskId?: string;
@@ -292,9 +326,18 @@ export interface PaymentRefund {
   status: string;
   createdAt: string;
   teamTest?: boolean;
+  links?: {
+    customerUserId?: string;
+    helperUserId?: string;
+    taskId?: string;
+    customerName?: string;
+    taskTitle?: string;
+    helperName?: string;
+  };
 }
 
 export interface PaymentLedgerEntry {
+  id: number;
   transactionId: string;
   type: string;
   amount: string;
@@ -302,6 +345,14 @@ export interface PaymentLedgerEntry {
   CustomerUid?: string;
   performerUid?: string;
   createdAt: string;
+  links?: {
+    customerUserId?: string;
+    helperUserId?: string;
+    taskId?: string;
+    customerName?: string;
+    taskTitle?: string;
+    helperName?: string;
+  };
 }
 
 // Support Types

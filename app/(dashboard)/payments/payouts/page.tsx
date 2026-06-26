@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,12 +12,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { listPaymentPayouts, updatePaymentPayoutStatus, updatePayoutTeamTest, getUserBankAccounts, deletePaymentPayout } from "@/lib/api/payments";
+import { listPaymentPayouts, updatePaymentPayoutStatus, updatePayoutTeamTest, getUserBankAccounts, deletePaymentPayout, enrichPaymentPayouts } from "@/lib/api/payments";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { formatDateTime } from "@/lib/utils";
 import { toast } from "sonner";
-import { getUser } from "@/lib/api/users";
-import { getTask } from "@/lib/api/tasks";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -27,6 +25,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { TableSkeleton } from "@/components/LoadingSkeleton";
 
 const PAGE_SIZE = 10;
 const PAYOUT_STATUSES = ["pending", "processing", "completed", "failed", "held"] as const;
@@ -37,8 +36,7 @@ export default function PaymentPayoutsPage() {
   const { hasPermission, isSuperAdmin } = usePermissions();
   const [page, setPage] = useState(1);
   const [transactionType, setTransactionType] = useState<'all' | 'real' | 'team'>('all');
-  const [userMap, setUserMap] = useState(new Map<string, string>());
-  const [taskMap, setTaskMap] = useState(new Map<string, string>());
+  const [environment, setEnvironment] = useState<'production' | 'development'>('production');
   const [bankAccountsDialog, setBankAccountsDialog] = useState<{
     open: boolean;
     helperName: string;
@@ -98,8 +96,8 @@ export default function PaymentPayoutsPage() {
   };
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ["payment-payouts", page, transactionType],
-    queryFn: () => listPaymentPayouts({ limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE, transactionType }),
+    queryKey: ["payment-payouts", page, transactionType, environment],
+    queryFn: () => listPaymentPayouts({ limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE, transactionType, environment }),
     enabled: hasPermission("payment.list"),
     retry: false,
   });
@@ -109,53 +107,37 @@ export default function PaymentPayoutsPage() {
   const total = data?.pagination?.total ?? data?.total ?? rows.length;
   const hasMore = (page * PAGE_SIZE) < total;
 
-  useEffect(() => {
-    let mounted = true;
-    async function loadLookups() {
-      const customerIds = new Set<string>();
-      const performerIds = new Set<string>();
-      const taskIds = new Set<string>();
+  // Lazy enrichment — loads after the table renders with fallback IDs
+  const { data: enrichmentMap } = useQuery({
+    queryKey: ["payment-payouts-enrich", rows.map((r: any) => r.id).sort()],
+    queryFn: () =>
+      enrichPaymentPayouts({ ids: rows.map((r: any) => r.id) }).then(
+        (res) => (res?.data || {}) as Record<string, any>
+      ),
+    enabled: rows.length > 0,
+    retry: false,
+    staleTime: 60000,
+  });
 
-      rows.forEach((r: any) => {
-        if (r.CustomerUid) customerIds.add(r.CustomerUid);
-        if (r.performerUid) performerIds.add(r.performerUid);
-        if (r.taskId) taskIds.add(r.taskId);
-      });
+  // Merge enrichment into rows so existing fallback JSX works unchanged
+  const enrichedRows = rows.map((row: any) => {
+    const e = enrichmentMap?.[row.id];
+    if (!e) return row;
+    return {
+      ...row,
+      teamTest: e.teamTest ?? row.teamTest,
+      links: {
+        ...row.links,
+        customerUserId: e.customerUserId || row.links?.customerUserId,
+        helperUserId: e.helperUserId || row.links?.helperUserId,
+        customerName: e.customerName || row.links?.customerName,
+        helperName: e.helperName || row.links?.helperName,
+        taskTitle: e.taskTitle || row.links?.taskTitle,
+      },
+    };
+  });
 
-      const userIds = Array.from(new Set([...customerIds, ...performerIds]));
-      const nextUserMap = new Map<string, string>();
-      await Promise.all(
-        userIds.map(async (uid) => {
-          try {
-            const res = await getUser(uid);
-            if (res?.data?.name) nextUserMap.set(uid, res.data.name);
-          } catch (e) {
-            // ignore
-          }
-        }),
-      );
 
-      const nextTaskMap = new Map<string, string>();
-      await Promise.all(
-        Array.from(taskIds).map(async (tid) => {
-          try {
-            const res = await getTask(tid);
-            if (res?.data?.title) nextTaskMap.set(tid, res.data.title);
-          } catch (e) {
-            // ignore
-          }
-        }),
-      );
-
-      if (mounted) {
-        setUserMap(nextUserMap);
-        setTaskMap(nextTaskMap);
-      }
-    }
-
-    if (rows.length > 0) loadLookups();
-    return () => { mounted = false; };
-  }, [rows]);
 
   const handleStatusChange = async (payoutId: string, nextStatus: string) => {
     try {
@@ -193,6 +175,15 @@ export default function PaymentPayoutsPage() {
             </p>
           </div>
           <div className="flex gap-2 items-center">
+            <Select value={environment} onValueChange={(value: any) => { setEnvironment(value); setPage(1); }}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="Environment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="production">Production</SelectItem>
+                <SelectItem value="development">Development</SelectItem>
+              </SelectContent>
+            </Select>
             <Select value={transactionType} onValueChange={(value: any) => { setTransactionType(value); setPage(1); }}>
               <SelectTrigger className="w-32">
                 <SelectValue />
@@ -203,7 +194,7 @@ export default function PaymentPayoutsPage() {
                 <SelectItem value="team">Team tests</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" onClick={() => { setTransactionType('all'); setPage(1); }}>Reset</Button>
+            <Button variant="outline" onClick={() => { setTransactionType('all'); setEnvironment('production'); setPage(1); }}>Reset</Button>
           </div>
           <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -213,42 +204,39 @@ export default function PaymentPayoutsPage() {
           </span>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto rounded-md border border-gray-200">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-3 py-2 text-left w-36">Date</th>
-                  <th className="px-3 py-2 text-left">Payout ID</th>
-                  <th className="px-3 py-2 text-left">Customer</th>
-                  <th className="px-3 py-2 text-left">Task</th>
-                  <th className="px-3 py-2 text-left">Helper</th>
-                  <th className="px-3 py-2 text-left">Gross</th>
-                  <th className="px-3 py-2 text-left">Net</th>
-                  <th className="px-3 py-2 text-left">Source</th>
-                  <th className="px-3 py-2 text-left">Transaction Type</th>
-                  <th className="px-3 py-2 text-left">Status</th>
-                  <th className="px-3 py-2 text-left">Bank Details</th>
-                  {(isSuperAdmin || hasPermission("payment.delete")) && (
-                    <th className="px-3 py-2 text-left w-24">Actions</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading ? (
+          {isLoading ? (
+            <TableSkeleton rows={5} />
+          ) : (
+            <div className="overflow-x-auto rounded-md border border-gray-200">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
                   <tr>
-                    <td colSpan={(isSuperAdmin || hasPermission("payment.delete")) ? 12 : 11} className="px-3 py-8 text-center text-gray-500">
-                      Loading payouts...
-                    </td>
+                    <th className="px-3 py-2 text-left w-36">Date</th>
+                    <th className="px-3 py-2 text-left">Payout ID</th>
+                    <th className="px-3 py-2 text-left">Customer</th>
+                    <th className="px-3 py-2 text-left">Task</th>
+                    <th className="px-3 py-2 text-left">Helper</th>
+                    <th className="px-3 py-2 text-left">Gross</th>
+                    <th className="px-3 py-2 text-left">Net</th>
+                    <th className="px-3 py-2 text-left">Source</th>
+                    <th className="px-3 py-2 text-left">Transaction Type</th>
+                    <th className="px-3 py-2 text-left">Status</th>
+                    <th className="px-3 py-2 text-left">Bank Details</th>
+                    {(isSuperAdmin || hasPermission("payment.delete")) && (
+                      <th className="px-3 py-2 text-left w-24">Actions</th>
+                    )}
                   </tr>
-                ) : rows.length === 0 ? (
-                  <tr>
-                    <td colSpan={(isSuperAdmin || hasPermission("payment.delete")) ? 12 : 11} className="px-3 py-8 text-center text-gray-500">
-                      No payouts found
-                    </td>
-                  </tr>
-                ) : (
-                  rows.map((row) => (
-                    <tr key={row.payoutId} className="border-t">
+                </thead>
+                <tbody>
+                  {rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={(isSuperAdmin || hasPermission("payment.delete")) ? 12 : 11} className="px-3 py-8 text-center text-gray-500">
+                        No payouts found
+                      </td>
+                    </tr>
+                  ) : (
+                    enrichedRows.map((row: any) => (
+                      <tr key={row.payoutId} className="border-t">
                       <td className="px-3 py-2 text-sm text-gray-700">
                         {row.createdAt ? formatDateTime(row.createdAt) : "—"}
                       </td>
@@ -257,9 +245,9 @@ export default function PaymentPayoutsPage() {
                         {row.CustomerUid ? (
                           <Link
                             className="text-blue-600 hover:underline"
-                            href={`/users/${encodeURIComponent(row.CustomerUid)}`}
+                            href={`/users/${encodeURIComponent(row.links?.customerUserId || row.CustomerUid)}`}
                           >
-                            {userMap.get(row.CustomerUid) || row.CustomerUid}
+                            {row.links?.customerName || row.CustomerUid}
                           </Link>
                         ) : (
                           "—"
@@ -269,9 +257,9 @@ export default function PaymentPayoutsPage() {
                         {row.taskId ? (
                           <Link
                             className="text-blue-600 hover:underline"
-                            href={`/tasks/${encodeURIComponent(row.taskId)}`}
+                            href={`/tasks/${encodeURIComponent(row.links?.taskId || row.taskId)}`}
                           >
-                            {taskMap.get(row.taskId) || row.taskId}
+                            {row.links?.taskTitle || row.taskId}
                           </Link>
                         ) : (
                           "—"
@@ -281,9 +269,9 @@ export default function PaymentPayoutsPage() {
                         {row.performerUid ? (
                           <Link
                             className="text-blue-600 hover:underline"
-                            href={`/users/${encodeURIComponent(row.performerUid)}`}
+                            href={`/users/${encodeURIComponent(row.links?.helperUserId || row.performerUid)}`}
                           >
-                            {userMap.get(row.performerUid) || row.performerUid}
+                            {row.links?.helperName || row.performerUid}
                           </Link>
                         ) : (
                           "—"
@@ -338,7 +326,7 @@ export default function PaymentPayoutsPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleShowBankDetails(row.performerUid, userMap.get(row.performerUid) || row.performerUid)}
+                            onClick={() => handleShowBankDetails(row.performerUid, row.links?.helperName || row.performerUid)}
                           >
                             Show Details
                           </Button>
@@ -364,28 +352,17 @@ export default function PaymentPayoutsPage() {
               </tbody>
             </table>
           </div>
-          <div className="mt-4 flex items-center justify-between">
-            <div className="text-sm text-gray-500">
-              {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                className="btn btn-outline"
-                disabled={page === 1 || isLoading}
-                onClick={() => setPage(Math.max(1, page - 1))}
-              >
-                Previous
-              </button>
-              <button
-                className="btn btn-outline"
-                disabled={page * PAGE_SIZE >= total || isLoading}
-                onClick={() => setPage(page + 1)}
-              >
-                Next
-              </button>
-            </div>
-          </div>
+          )}
         </CardContent>
+        <div className="px-4 py-3 flex items-center justify-between">
+          <div className="text-sm text-gray-500">
+            {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" disabled={page === 1 || isLoading} onClick={() => setPage(Math.max(1, page - 1))}>Previous</Button>
+            <Button variant="outline" disabled={page * PAGE_SIZE >= total || isLoading} onClick={() => setPage(page + 1)}>Next</Button>
+          </div>
+        </div>
       </Card>
       
       <Dialog

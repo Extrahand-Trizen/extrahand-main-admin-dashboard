@@ -18,6 +18,7 @@ export async function listPaymentTransactions(filters?: {
   q?: string;
   transactionType?: 'all' | 'real' | 'team';
   holdStatus?: 'held' | 'cancelled';
+  environment?: 'production' | 'development';
   limit?: number;
   offset?: number;
 }): Promise<PaymentListResponse<PaymentTransaction>> {
@@ -25,6 +26,7 @@ export async function listPaymentTransactions(filters?: {
   if (filters?.q) params.append('q', filters.q);
   if (filters?.transactionType) params.append('transactionType', filters.transactionType);
   if (filters?.holdStatus) params.append('holdStatus', filters.holdStatus);
+  if (filters?.environment) params.append('environment', filters.environment);
   if (filters?.limit) params.append('limit', String(filters.limit));
   if (filters?.offset) params.append('offset', String(filters.offset));
   const query = params.toString();
@@ -62,6 +64,7 @@ export async function listPaymentPayouts(filters?: {
   q?: string;
   status?: string;
   transactionType?: 'all' | 'real' | 'team';
+  environment?: 'production' | 'development';
   limit?: number;
   offset?: number;
 }): Promise<PaymentListResponse<PaymentPayout>> {
@@ -71,6 +74,7 @@ export async function listPaymentPayouts(filters?: {
   if (filters?.transactionType && filters.transactionType !== 'all') {
     params.append('transactionType', filters.transactionType);
   }
+  if (filters?.environment) params.append('environment', filters.environment);
   if (filters?.limit) params.append('limit', String(filters.limit));
   if (filters?.offset) params.append('offset', String(filters.offset));
   const query = params.toString();
@@ -92,6 +96,7 @@ export async function updatePayoutTeamTest(
 export async function listPaymentRefunds(filters?: {
   status?: string;
   transactionType?: 'all' | 'real' | 'team';
+  environment?: 'production' | 'development';
   limit?: number;
   offset?: number;
 }): Promise<PaymentListResponse<PaymentRefund>> {
@@ -100,6 +105,7 @@ export async function listPaymentRefunds(filters?: {
   if (filters?.transactionType && filters.transactionType !== 'all') {
     params.append('transactionType', filters.transactionType);
   }
+  if (filters?.environment) params.append('environment', filters.environment);
   if (filters?.limit) params.append('limit', String(filters.limit));
   if (filters?.offset) params.append('offset', String(filters.offset));
   const query = params.toString();
@@ -120,11 +126,13 @@ export async function updateRefundTeamTest(
 
 export async function listPaymentLedger(filters?: {
   type?: string;
+  environment?: 'production' | 'development';
   limit?: number;
   offset?: number;
 }): Promise<PaymentListResponse<PaymentLedgerEntry>> {
   const params = new URLSearchParams();
   if (filters?.type) params.append('type', filters.type);
+  if (filters?.environment) params.append('environment', filters.environment);
   if (filters?.limit) params.append('limit', String(filters.limit));
   if (filters?.offset) params.append('offset', String(filters.offset));
   const query = params.toString();
@@ -135,6 +143,69 @@ export async function listPaymentLedger(filters?: {
 
 export async function getUserBankAccounts(userId: string): Promise<ApiResponse<{ bankAccounts: any[] }>> {
   return apiRequest<ApiResponse<{ bankAccounts: any[] }>>(`/api/v1/payments/users/${encodeURIComponent(userId)}/bank-accounts`);
+}
+
+export async function enrichPaymentTransactions(body: {
+  ids: string[];
+}): Promise<ApiResponse<Record<string, {
+  customerUserId?: string;
+  helperUserId?: string;
+  customerName?: string | null;
+  helperName?: string | null;
+  taskTitle?: string | null;
+  teamTest?: boolean;
+}>>> {
+  return apiRequest('/api/v1/payments/transactions/enrich', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function enrichPaymentPayouts(body: {
+  ids: string[];
+}): Promise<ApiResponse<Record<string, {
+  customerUserId?: string;
+  helperUserId?: string;
+  customerName?: string | null;
+  helperName?: string | null;
+  taskTitle?: string | null;
+  teamTest?: boolean;
+}>>> {
+  return apiRequest('/api/v1/payments/payouts/enrich', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function enrichPaymentRefunds(body: {
+  ids: string[];
+}): Promise<ApiResponse<Record<string, {
+  customerUserId?: string;
+  helperUserId?: string;
+  customerName?: string | null;
+  helperName?: string | null;
+  taskTitle?: string | null;
+  teamTest?: boolean;
+}>>> {
+  return apiRequest('/api/v1/payments/refunds/enrich', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function enrichPaymentLedger(body: {
+  ids: string[];
+}): Promise<ApiResponse<Record<string, {
+  customerUserId?: string;
+  helperUserId?: string;
+  customerName?: string | null;
+  helperName?: string | null;
+  taskTitle?: string | null;
+}>>> {
+  return apiRequest('/api/v1/payments/ledger/enrich', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 }
 
 export async function deletePaymentTransaction(escrowId: string): Promise<ApiResponse<any>> {

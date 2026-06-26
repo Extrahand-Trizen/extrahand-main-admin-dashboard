@@ -48,7 +48,9 @@ import {
   updateTaskCallStatus,
 } from "@/lib/api/task-calls";
 import { getUser } from "@/lib/api/users";
+import { listPaymentPayouts } from "@/lib/api/payments";
 import AssignHelperModal from "@/components/assign-helper-modal";
+import { TaskProgressCard } from "@/components/task-progress-card";
 import { unassignHelper } from "@/lib/api/tasks";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -205,6 +207,12 @@ export default function TaskDetailsPage() {
     retry: false,
   });
 
+  const { data: payoutsData } = useQuery({
+    queryKey: ["task-payouts", taskId],
+    queryFn: () => listPaymentPayouts({ q: taskId }),
+    enabled: isValidTaskId && hasPermission("payment.view"),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: ({ taskId, reason }: { taskId: string; reason: string }) =>
       deleteTask(taskId, reason),
@@ -355,6 +363,9 @@ export default function TaskDetailsPage() {
   const task = taskData?.data;
   const taskCall = taskCallData?.data;
   const applications = applicationsData?.data || [];
+  const payouts = payoutsData?.data || [];
+  const payoutStatus = payouts.find((p: any) => p.taskId === taskId || p.escrow?.taskId === taskId)?.status || task?.payoutStatus;
+  const taskWithPayoutStatus = task ? { ...task, payoutStatus } : undefined;
   const customerProfileId = extractCustomerProfileId(task);
 
   // Extract the actual helper's assigneeId from raw task data (MongoDB field)
@@ -675,6 +686,11 @@ export default function TaskDetailsPage() {
               </div>
             </CardContent>
           </Card>
+
+          <TaskProgressCard
+            task={taskWithPayoutStatus as any}
+            onAssignHelper={() => setAssignModalOpen(true)}
+          />
 
           {/* Applications / Helper Assignment */}
           {task.bookingSource === "book_now" ? (

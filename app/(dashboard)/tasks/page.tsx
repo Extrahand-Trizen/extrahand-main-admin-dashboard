@@ -536,6 +536,9 @@ export default function TasksPage() {
                       <TableHead className="hidden lg:table-cell">
                         Assigned To
                       </TableHead>
+                      <TableHead className="hidden xl:table-cell">
+                        Assigned Ops Admin
+                      </TableHead>
                       <TableHead className="hidden lg:table-cell">
                         Budget
                       </TableHead>
@@ -649,6 +652,15 @@ export default function TasksPage() {
                             <span className="text-amber-600 font-medium italic hover:underline">
                               Assign Helper
                             </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="hidden xl:table-cell text-sm">
+                          {task.assignedTo?.name ? (
+                            <span className="font-medium text-gray-900 capitalize">
+                              {task.assignedTo.name}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 italic">Unassigned</span>
                           )}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-sm font-medium">
