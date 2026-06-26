@@ -165,7 +165,7 @@ function getLifecycleSteps(task: Task): LifecycleStep[] {
       label: 'Helper assignment',
       state: helperDone ? 'done' : helperActive ? 'active' : 'future',
       timestamp: task.assignedAt,
-      detail: helperDetail,
+      detail: helperDetail ?? undefined,
       badge: helperActive && !task.assignedTo
         ? {
             label: 'Action needed',

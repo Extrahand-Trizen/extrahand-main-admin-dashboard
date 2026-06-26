@@ -71,7 +71,7 @@ export default function PaymentTransactionsPage() {
   const { data: enrichmentMap } = useQuery({
     queryKey: ["payment-transactions-enrich", rows.map((r) => r.id).sort()],
     queryFn: () =>
-      enrichPaymentTransactions({ ids: rows.map((r) => r.id) }).then(
+      enrichPaymentTransactions({ ids: rows.map((r) => String(r.id)) }).then(
         (res) => (res?.data || {}) as Record<string, any>
       ),
     enabled: rows.length > 0,
