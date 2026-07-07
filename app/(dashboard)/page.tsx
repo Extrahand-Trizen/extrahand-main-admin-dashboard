@@ -5,8 +5,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Users, Briefcase, AlertTriangle, TrendingUp, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { listUsers } from '@/lib/api/users';
-import { listTasks } from '@/lib/api/tasks';
 import { getAnalyticsOverview } from '@/lib/api/analytics';
 import { formatDate } from '@/lib/utils';
 import Link from 'next/link';
@@ -38,20 +36,6 @@ export default function DashboardPage() {
     return null;
   }
 
-  // Fetch users data
-  const { data: usersData, isLoading: usersLoading } = useQuery({
-    queryKey: ['users', 'stats'],
-    queryFn: () => listUsers({ limit: 1 }),
-    enabled: hasPermission('user.list'),
-  });
-
-  // Fetch tasks data
-  const { data: tasksData, isLoading: tasksLoading } = useQuery({
-    queryKey: ['tasks', 'stats'],
-    queryFn: () => listTasks({ limit: 1 }),
-    enabled: hasPermission('task.list'),
-  });
-
   const { data: analyticsOverviewData } = useQuery({
     queryKey: ['analytics', 'overview', 'dashboard-card'],
     queryFn: getAnalyticsOverview,
@@ -61,20 +45,16 @@ export default function DashboardPage() {
 
   // Calculate stats
   const stats: DashboardStats = {
-    totalUsers: usersData?.pagination?.total || 0,
-    activeUsers:
-      usersData?.data?.filter((u: any) => u.status === "active").length ||
-      0,
-    totalTasks:
-      analyticsOverviewData?.data?.tasks?.total ??
-      tasksData?.pagination?.total ??
-      0,
-    openTasks:
-      analyticsOverviewData?.data?.tasks?.open ??
-      (tasksData?.data?.filter((t: any) => t.status === "open")?.length ?? 0),
+    totalUsers:
+      analyticsOverviewData?.data?.platform?.totalRegisteredUsers ??
+      ((analyticsOverviewData?.data?.Customers?.totalRegistered || 0) +
+        (analyticsOverviewData?.data?.Helpers?.totalRegistered || 0)),
+    activeUsers: 0, // Computed metric was previously flawed; resetting to 0 to preserve UI
+    totalTasks: analyticsOverviewData?.data?.tasks?.total ?? 0,
+    openTasks: analyticsOverviewData?.data?.tasks?.open ?? 0,
   };
 
-  const isLoading = usersLoading || tasksLoading;
+  const isLoading = !analyticsOverviewData;
 
   const statCards = [
     {

@@ -441,6 +441,9 @@ export interface ApiResponse<T> {
 }
 
 export interface AnalyticsOverview {
+  platform: {
+    totalRegisteredUsers: number;
+  };
   Customers: {
     totalRegistered: number;
   };
@@ -491,6 +494,7 @@ export interface UserFilters {
   createdTo?: string;
   page?: number;
   limit?: number;
+  uids?: string;
 }
 
 export interface TaskFilters {
