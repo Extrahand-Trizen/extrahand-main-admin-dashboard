@@ -18,6 +18,17 @@ import { toast } from "sonner";
 
 const PAGE_SIZE = 10;
 
+import { PaymentRefund } from '@/types';
+
+type EnrichmentEntry = {
+  customerUserId?: string;
+  helperUserId?: string;
+  customerName?: string | null;
+  helperName?: string | null;
+  taskTitle?: string | null;
+  teamTest?: boolean;
+};
+
 export default function PaymentRefundsPage() {
   const { hasPermission, isSuperAdmin } = usePermissions();
   const [page, setPage] = useState(1);
@@ -32,15 +43,15 @@ export default function PaymentRefundsPage() {
   });
 
   const canUpdateRefund = isSuperAdmin || hasPermission("payment.update");
-  const rows = data?.data || [];
+  const rows = (data?.data as PaymentRefund[]) || [];
   const total = data?.pagination?.total ?? data?.total ?? rows.length;
 
   // Lazy enrichment — loads after the table renders with fallback IDs
   const { data: enrichmentMap } = useQuery({
-    queryKey: ["payment-refunds-enrich", rows.map((r: any) => r.id).sort()],
+    queryKey: ["payment-refunds-enrich", rows.map((r) => String(r.id)).sort(), environment],
     queryFn: () =>
-      enrichPaymentRefunds({ ids: rows.map((r: any) => r.id) }).then(
-        (res) => (res?.data || {}) as Record<string, any>
+      enrichPaymentRefunds({ ids: rows.map((r) => String(r.id)), environment }).then(
+        (res) => (res?.data || {}) as Record<string, EnrichmentEntry>
       ),
     enabled: rows.length > 0,
     retry: false,
@@ -48,7 +59,7 @@ export default function PaymentRefundsPage() {
   });
 
   // Merge enrichment into rows so existing fallback JSX works unchanged
-  const enrichedRows = rows.map((row: any) => {
+  const enrichedRows = rows.map((row) => {
     const e = enrichmentMap?.[row.id];
     if (!e) return row;
     return {
@@ -129,12 +140,12 @@ export default function PaymentRefundsPage() {
               <tbody>
                 {rows.length === 0 ? (
                   <tr><td colSpan={7} className="px-3 py-8 text-center text-gray-500">No refunds found</td></tr>
-                ) : enrichedRows.map((row: any) => (
+                ) : enrichedRows.map((row) => (
                   <tr key={row.refundId} className="border-t">
                     <td className="px-3 py-2 font-mono text-xs">{row.refundId}</td>
-                    <td className="px-3 py-2">{row.CustomerUid ? <Link className="text-blue-600 hover:underline" href={`/users/${encodeURIComponent(row.links?.customerUserId || row.CustomerUid)}`}>{row.links?.customerName || row.CustomerUid}</Link> : "—"}</td>
-                    <td className="px-3 py-2">{row.taskId ? <Link className="text-blue-600 hover:underline" href={`/tasks/${encodeURIComponent(row.links?.taskId || row.taskId)}`}>{row.links?.taskTitle || row.taskId}</Link> : "—"}</td>
-                    <td className="px-3 py-2">{row.performerUid ? <Link className="text-blue-600 hover:underline" href={`/users/${encodeURIComponent(row.links?.helperUserId || row.performerUid)}`}>{row.links?.helperName || row.performerUid}</Link> : "—"}</td>
+                    <td className="px-3 py-2">{row.CustomerUid ? <Link className="text-blue-600 hover:underline" href={`/users/${encodeURIComponent(row.links?.customerUserId || row.CustomerUid)}`}>{enrichmentMap?.[row.id] !== undefined ? (enrichmentMap[row.id]?.customerName ?? "Account Deleted") : row.CustomerUid}</Link> : "—"}</td>
+                    <td className="px-3 py-2">{row.taskId ? <Link className="text-blue-600 hover:underline" href={`/tasks/${encodeURIComponent(row.links?.taskId || row.taskId)}`}>{enrichmentMap?.[row.id] !== undefined ? (enrichmentMap[row.id]?.taskTitle ?? "Task Deleted") : row.taskId}</Link> : "—"}</td>
+                    <td className="px-3 py-2">{row.performerUid ? <Link className="text-blue-600 hover:underline" href={`/users/${encodeURIComponent(row.links?.helperUserId || row.performerUid)}`}>{enrichmentMap?.[row.id] !== undefined ? (enrichmentMap[row.id]?.helperName ?? "Account Deleted") : row.performerUid}</Link> : "—"}</td>
                     <td className="px-3 py-2">₹{row.refundAmount}</td>
                     <td className="px-3 py-2">
                       {canUpdateRefund ? (

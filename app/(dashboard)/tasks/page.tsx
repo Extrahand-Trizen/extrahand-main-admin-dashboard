@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -51,7 +51,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { listTasks, deleteTask, requestTaskDelete } from "@/lib/api/tasks";
-import { getUser, listUsers } from "@/lib/api/users";
+import { listUsers } from "@/lib/api/users";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { CATEGORY_OPTIONS } from "@/lib/category-options";
@@ -287,10 +287,11 @@ export default function TasksPage() {
     ) as string[];
   }, [tasks]);
 
-  const { data: batchUsersData } = useQuery({
+  const { data: batchUsersData, isLoading: isBatchLoading } = useQuery({
     queryKey: ["users-batch", uniqueHelperProfileIds.join(',')],
     queryFn: () => listUsers({ uids: uniqueHelperProfileIds.join(','), limit: uniqueHelperProfileIds.length || 1 }),
     enabled: uniqueHelperProfileIds.length > 0,
+    retry: false,
   });
 
   const helperDetailsByProfileId = useMemo(() => {
@@ -298,7 +299,6 @@ export default function TasksPage() {
     if (batchUsersData?.data && Array.isArray(batchUsersData.data)) {
       batchUsersData.data.forEach((user: any) => {
         if (user.uid) map.set(user.uid, user);
-        // Also map by _id or profileId in case assigneeId matches those
         if (user._id) map.set(user._id, user);
         if (user.profileId) map.set(user.profileId, user);
         if (user.userId) map.set(user.userId, user);
@@ -647,9 +647,15 @@ export default function TasksPage() {
                               className="font-medium text-blue-600 hover:text-blue-800 hover:underline capitalize"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              {helperDetailsByProfileId.get(task.assigneeId)?.name ||
+                              {isBatchLoading ? (
+                                task.assigneeName || "Loading..."
+                              ) : helperDetailsByProfileId.has(task.assigneeId) ? (
+                                helperDetailsByProfileId.get(task.assigneeId)?.name ||
                                 helperDetailsByProfileId.get(task.assigneeId)?.fullName ||
-                                "Loading..."}
+                                "Account Deleted"
+                              ) : (
+                                "Account Deleted"
+                              )}
                             </Link>
                           ) : (
                             <span className="text-amber-600 font-medium italic hover:underline">

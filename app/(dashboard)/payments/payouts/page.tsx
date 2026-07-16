@@ -109,9 +109,9 @@ export default function PaymentPayoutsPage() {
 
   // Lazy enrichment — loads after the table renders with fallback IDs
   const { data: enrichmentMap } = useQuery({
-    queryKey: ["payment-payouts-enrich", rows.map((r: any) => r.id).sort()],
+    queryKey: ["payment-payouts-enrich", rows.map((r: any) => r.id).sort(), environment],
     queryFn: () =>
-      enrichPaymentPayouts({ ids: rows.map((r: any) => r.id) }).then(
+      enrichPaymentPayouts({ ids: rows.map((r: any) => r.id), environment }).then(
         (res) => (res?.data || {}) as Record<string, any>
       ),
     enabled: rows.length > 0,
@@ -141,7 +141,7 @@ export default function PaymentPayoutsPage() {
 
   const handleStatusChange = async (payoutId: string, nextStatus: string) => {
     try {
-      await updatePaymentPayoutStatus(payoutId, nextStatus);
+      await updatePaymentPayoutStatus(payoutId, nextStatus, environment);
       toast.success("Payout status updated");
       await refetch();
     } catch (error: any) {
@@ -247,7 +247,7 @@ export default function PaymentPayoutsPage() {
                             className="text-blue-600 hover:underline"
                             href={`/users/${encodeURIComponent(row.links?.customerUserId || row.CustomerUid)}`}
                           >
-                            {row.links?.customerName || row.CustomerUid}
+                            {enrichmentMap?.[row.id] !== undefined ? (enrichmentMap[row.id]?.customerName ?? "Account Deleted") : row.CustomerUid}
                           </Link>
                         ) : (
                           "—"
@@ -259,7 +259,7 @@ export default function PaymentPayoutsPage() {
                             className="text-blue-600 hover:underline"
                             href={`/tasks/${encodeURIComponent(row.links?.taskId || row.taskId)}`}
                           >
-                            {row.links?.taskTitle || row.taskId}
+                            {enrichmentMap?.[row.id] !== undefined ? (enrichmentMap[row.id]?.taskTitle ?? "Task Deleted") : row.taskId}
                           </Link>
                         ) : (
                           "—"
@@ -271,7 +271,7 @@ export default function PaymentPayoutsPage() {
                             className="text-blue-600 hover:underline"
                             href={`/users/${encodeURIComponent(row.links?.helperUserId || row.performerUid)}`}
                           >
-                            {row.links?.helperName || row.performerUid}
+                            {enrichmentMap?.[row.id] !== undefined ? (enrichmentMap[row.id]?.helperName ?? "Account Deleted") : row.performerUid}
                           </Link>
                         ) : (
                           "—"

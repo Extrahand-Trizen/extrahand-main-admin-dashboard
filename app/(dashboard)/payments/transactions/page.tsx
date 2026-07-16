@@ -69,9 +69,9 @@ export default function PaymentTransactionsPage() {
 
   // Lazy enrichment — loads after the table renders with fallback IDs
   const { data: enrichmentMap } = useQuery({
-    queryKey: ["payment-transactions-enrich", rows.map((r) => r.id).sort()],
+    queryKey: ["payment-transactions-enrich", rows.map((r) => r.id).sort(), environment],
     queryFn: () =>
-      enrichPaymentTransactions({ ids: rows.map((r) => String(r.id)) }).then(
+      enrichPaymentTransactions({ ids: rows.map((r) => String(r.id)), environment }).then(
         (res) => (res?.data || {}) as Record<string, any>
       ),
     enabled: rows.length > 0,
@@ -235,12 +235,12 @@ export default function PaymentTransactionsPage() {
                         </td>
                         <td className="px-3 py-2">
                           <Link href={`/tasks/${encodeURIComponent(row.links?.taskId || row.taskId)}`} className="text-blue-600 hover:underline">
-                            {row.links?.taskTitle || row.taskId}
+                            {enrichmentMap?.[row.id] !== undefined ? (enrichmentMap[row.id]?.taskTitle ?? "Task Deleted") : row.taskId}
                           </Link>
                         </td>
                         <td className="px-3 py-2">
                           <Link href={`/users/${encodeURIComponent(row.links?.customerUserId || row.posterUid)}`} className="text-blue-600 hover:underline">
-                            {row.links?.customerName || row.posterUid}
+                            {enrichmentMap?.[row.id] !== undefined ? (enrichmentMap[row.id]?.customerName ?? "Account Deleted") : row.posterUid}
                           </Link>
                         </td>
                         <td className="px-3 py-2">
@@ -248,7 +248,7 @@ export default function PaymentTransactionsPage() {
                             <span className="text-gray-400 italic text-xs">Pending Assignment</span>
                           ) : (
                             <Link href={`/users/${encodeURIComponent(row.links.helperUserId)}`} className="text-blue-600 hover:underline">
-                              {row.links.helperName || row.links.helperUserId}
+                              {enrichmentMap?.[row.id] !== undefined ? (enrichmentMap[row.id]?.helperName ?? "Account Deleted") : row.links.helperUserId}
                             </Link>
                           )}
                         </td>

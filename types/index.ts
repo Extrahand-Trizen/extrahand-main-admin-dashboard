@@ -35,6 +35,20 @@ export interface User {
     };
     isPublic?: boolean;
   };
+  homeLocation?: {
+    type: 'Point';
+    coordinates: [number, number];
+    address?: string;
+    addressDetails?: {
+      doorNo?: string;
+      area?: string;
+      city?: string;
+      state?: string;
+      pinCode?: string;
+      country?: string;
+    };
+    isPublic?: boolean;
+  };
   savedAddresses?: Array<{
     _id?: string;
     label: 'Home' | 'Work' | 'Other';

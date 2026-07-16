@@ -393,7 +393,7 @@ export default function TaskDetailsPage() {
   });
 
   // Fetch the actual assigned helper details using assigneeId
-  const { data: assignedHelperData } = useQuery({
+  const { data: assignedHelperData, isError: assignedHelperError } = useQuery({
     queryKey: ["user-from-task-assignee", assigneeProfileId],
     queryFn: () => getUser(assigneeProfileId),
     enabled:
@@ -720,21 +720,33 @@ export default function TaskDetailsPage() {
                       <div className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors cursor-pointer">
                         <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 text-gray-700 font-medium text-sm">
                           {(
-                            assignedHelper?.name ||
-                            assignedHelper?.fullName ||
-                            "H"
+                            assignedHelperError
+                              ? "Account Deleted"
+                              : assignedHelper?.name ||
+                                assignedHelper?.fullName ||
+                                "H"
                           )
                             .charAt(0)
                             .toUpperCase()}
                         </div>
                         <div>
                           <p className="text-sm font-medium text-gray-900">
-                            {assignedHelper?.name ||
-                              assignedHelper?.fullName ||
-                              "Loading..."}
+                            {assignedHelperError ? (
+                              "Account Deleted"
+                            ) : assignedHelper ? (
+                              assignedHelper.name ||
+                              assignedHelper.fullName ||
+                              "Account Deleted"
+                            ) : (
+                              "Loading..."
+                            )}
                           </p>
                           <p className="text-xs text-gray-500">
-                            {assignedHelper?.email || "Assigned helper"}
+                            {assignedHelperError ? (
+                              "User not found"
+                            ) : (
+                              assignedHelper?.email || "Assigned helper"
+                            )}
                           </p>
                         </div>
                         <CheckCircle className="ml-auto h-5 w-5 text-emerald-600" />

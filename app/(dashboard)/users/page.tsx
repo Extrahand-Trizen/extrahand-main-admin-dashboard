@@ -109,6 +109,67 @@ const getRoleLabel = (user: Pick<User, "role" | "roles">) => {
   return "N/A";
 };
 
+const deriveAreaFromAddress = (address?: string, city?: string) => {
+  if (!address) return null;
+  const cityLower = city?.trim().toLowerCase();
+  const parts = address
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length === 0) return null;
+
+  if (cityLower) {
+    for (let i = parts.length - 1; i >= 0; i -= 1) {
+      const part = parts[i].toLowerCase();
+      if (part.includes(cityLower)) {
+        for (let j = i - 1; j >= 0; j -= 1) {
+          const candidate = parts[j];
+          if (candidate && !candidate.toLowerCase().includes(cityLower)) {
+            return candidate;
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  for (let i = parts.length - 1; i >= 0; i -= 1) {
+    const candidate = parts[i];
+    if (!candidate.toLowerCase().includes('hyderabad')) {
+      return candidate;
+    }
+  }
+
+  return parts[parts.length - 1];
+};
+
+const getUserAreaLabel = (user: User) => {
+  const locationAddressDetails = user.location?.addressDetails;
+  const homeLocationAddressDetails = (user as any).homeLocation?.addressDetails;
+  const address =
+    user.location?.address || (user as any).homeLocation?.address || undefined;
+
+  const areaFromDetails =
+    locationAddressDetails?.area?.trim() ||
+    homeLocationAddressDetails?.area?.trim();
+  const city =
+    locationAddressDetails?.city?.trim() ||
+    homeLocationAddressDetails?.city?.trim();
+  const areaFromAddress = deriveAreaFromAddress(address, city);
+
+  const normalizedCity = city?.toLowerCase();
+  const isGenericArea =
+    !!areaFromDetails && normalizedCity && areaFromDetails.toLowerCase() === normalizedCity;
+
+  const area = isGenericArea ? areaFromAddress || areaFromDetails : areaFromDetails || areaFromAddress;
+
+  if (area && city) return `${area}, ${city}`;
+  if (area) return area;
+  if (city) return city;
+  return '—';
+};
+
 export default function UsersPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -636,6 +697,9 @@ export default function UsersPage() {
                       <TableHead className="hidden md:table-cell">
                         Primary Skill
                       </TableHead>
+                      <TableHead className="hidden md:table-cell">
+                        Area
+                      </TableHead>
                       <TableHead className="hidden lg:table-cell">
                         Status
                       </TableHead>
@@ -695,6 +759,9 @@ export default function UsersPage() {
                           ) : (
                             "—"
                           )}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell text-sm text-gray-500">
+                          {getUserAreaLabel(user)}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
                           <Badge variant={statusColors[user.status] as any}>

@@ -52,9 +52,11 @@ export async function updateTransactionTeamTest(
 
 export async function updatePaymentPayoutStatus(
   payoutId: string,
-  status: string
+  status: string,
+  environment?: 'production' | 'development'
 ): Promise<ApiResponse<any>> {
-  return apiRequest<ApiResponse<any>>(`/api/v1/payments/payouts/${payoutId}/status`, {
+  const qs = environment ? `?environment=${environment}` : '';
+  return apiRequest<ApiResponse<any>>(`/api/v1/payments/payouts/${payoutId}/status${qs}`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
   });
@@ -147,6 +149,7 @@ export async function getUserBankAccounts(userId: string): Promise<ApiResponse<{
 
 export async function enrichPaymentTransactions(body: {
   ids: string[];
+  environment?: 'production' | 'development';
 }): Promise<ApiResponse<Record<string, {
   customerUserId?: string;
   helperUserId?: string;
@@ -155,14 +158,18 @@ export async function enrichPaymentTransactions(body: {
   taskTitle?: string | null;
   teamTest?: boolean;
 }>>> {
-  return apiRequest('/api/v1/payments/transactions/enrich', {
+  const params = new URLSearchParams();
+  if (body.environment) params.append('environment', body.environment);
+  const query = params.toString();
+  return apiRequest(`/api/v1/payments/transactions/enrich${query ? `?${query}` : ''}`, {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ids: body.ids }),
   });
 }
 
 export async function enrichPaymentPayouts(body: {
   ids: string[];
+  environment?: 'production' | 'development';
 }): Promise<ApiResponse<Record<string, {
   customerUserId?: string;
   helperUserId?: string;
@@ -171,14 +178,18 @@ export async function enrichPaymentPayouts(body: {
   taskTitle?: string | null;
   teamTest?: boolean;
 }>>> {
-  return apiRequest('/api/v1/payments/payouts/enrich', {
+  const params = new URLSearchParams();
+  if (body.environment) params.append('environment', body.environment);
+  const query = params.toString();
+  return apiRequest(`/api/v1/payments/payouts/enrich${query ? `?${query}` : ''}`, {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ids: body.ids }),
   });
 }
 
 export async function enrichPaymentRefunds(body: {
   ids: string[];
+  environment?: 'production' | 'development';
 }): Promise<ApiResponse<Record<string, {
   customerUserId?: string;
   helperUserId?: string;
@@ -187,14 +198,18 @@ export async function enrichPaymentRefunds(body: {
   taskTitle?: string | null;
   teamTest?: boolean;
 }>>> {
-  return apiRequest('/api/v1/payments/refunds/enrich', {
+  const params = new URLSearchParams();
+  if (body.environment) params.append('environment', body.environment);
+  const query = params.toString();
+  return apiRequest(`/api/v1/payments/refunds/enrich${query ? `?${query}` : ''}`, {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ids: body.ids }),
   });
 }
 
 export async function enrichPaymentLedger(body: {
   ids: string[];
+  environment?: 'production' | 'development';
 }): Promise<ApiResponse<Record<string, {
   customerUserId?: string;
   helperUserId?: string;
@@ -202,9 +217,12 @@ export async function enrichPaymentLedger(body: {
   helperName?: string | null;
   taskTitle?: string | null;
 }>>> {
-  return apiRequest('/api/v1/payments/ledger/enrich', {
+  const params = new URLSearchParams();
+  if (body.environment) params.append('environment', body.environment);
+  const query = params.toString();
+  return apiRequest(`/api/v1/payments/ledger/enrich${query ? `?${query}` : ''}`, {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ids: body.ids }),
   });
 }
 
