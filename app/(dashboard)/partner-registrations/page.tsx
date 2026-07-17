@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -63,21 +64,19 @@ const PARTNER_CATEGORY_OPTIONS = [
   "Care Services",
 ];
 
-const CITY_OPTIONS = [
-  { value: "all", label: "All Cities" },
-  { value: "Hyderabad", label: "Hyderabad" },
+const TELANGANA_CITIES = [
+  "Hyderabad"
 ];
 
-const WORK_AREA_OPTIONS = [
-  { value: "all", label: "All Work Areas" },
-  { value: "Uppal", label: "Uppal" },
-  { value: "LB Nagar", label: "LB Nagar" },
-  { value: "Secunderabad", label: "Secunderabad" },
-  { value: "Ameerpet", label: "Ameerpet" },
-  { value: "Kukatpally", label: "Kukatpally" },
-  { value: "Madhapur", label: "Madhapur" },
-  { value: "Moti Nagar", label: "Moti Nagar" },
-  { value: "Gachibowli", label: "Gachibowli" },
+const PARTNER_WORK_AREAS = [
+  "Uppal",
+  "LB Nagar",
+  "Secunderabad",
+  "Ameerpet",
+  "Kukatpally",
+  "Madhapur",
+  "Moti Nagar",
+  "Gachibowli"
 ];
 
 const getStatusLabel = (status?: string) => {
@@ -101,7 +100,7 @@ const getUserAreaLabel = (user: User) => {
     ? address
         .split(',')
         .map((part: string) => part.trim())
-        .filter((part: string) => Boolean(part))
+        .filter(Boolean)
         .reverse()
         .find((part: string) => city ? !part.toLowerCase().includes(city.toLowerCase()) : true)
     : null;
@@ -173,6 +172,8 @@ export default function PartnerRegistrationsPage() {
     },
   });
 
+  // Pre-defined work areas are used instead of fetching all Hyderabad sub-areas
+
   const { data, isLoading, error } = useQuery({
     queryKey: [
       "partner-registrations",
@@ -192,8 +193,8 @@ export default function PartnerRegistrationsPage() {
         role: "partner",
         status: statusFilter !== "all" ? statusFilter : undefined,
         category: categoryFilter !== "all" ? categoryFilter : undefined,
-        city: cityFilter !== "all" ? cityFilter : undefined,
-        workArea: workAreaFilter !== "all" ? workAreaFilter : undefined,
+        city: cityFilter !== "all" ? (cityFilter || undefined) : undefined,
+        workArea: workAreaFilter !== "all" ? (workAreaFilter || undefined) : undefined,
         createdFrom: submittedFrom || undefined,
         createdTo: submittedTo || undefined,
         page,
@@ -245,8 +246,8 @@ export default function PartnerRegistrationsPage() {
           <CardTitle className="text-lg">Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-5 xl:grid-cols-5">
-            <div className="space-y-2 sm:col-span-2 md:col-span-2 xl:col-span-2">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-4">
+            <div className="space-y-2">
               <Label htmlFor="search">Search</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -258,7 +259,7 @@ export default function PartnerRegistrationsPage() {
                     setSearch(e.target.value);
                     setPage(1);
                   }}
-                  className="pl-10 w-full"
+                  className="pl-10"
                 />
               </div>
             </div>
@@ -321,16 +322,17 @@ export default function PartnerRegistrationsPage() {
                   <SelectValue placeholder="All Cities" />
                 </SelectTrigger>
                 <SelectContent>
-                  {CITY_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
+                  <SelectItem value="all">All Cities</SelectItem>
+                  {TELANGANA_CITIES.map((city) => (
+                    <SelectItem key={city} value={city}>
+                      {city}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-2 md:col-span-1">
+            <div className="space-y-2">
               <Label htmlFor="workArea">Work area</Label>
               <Select
                 value={workAreaFilter}
@@ -343,16 +345,17 @@ export default function PartnerRegistrationsPage() {
                   <SelectValue placeholder="All Work Areas" />
                 </SelectTrigger>
                 <SelectContent>
-                  {WORK_AREA_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
+                  <SelectItem value="all">All Work Areas</SelectItem>
+                  {PARTNER_WORK_AREAS.map((area) => (
+                    <SelectItem key={area} value={area}>
+                      {area}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-2 md:col-span-1">
+            <div className="space-y-2">
               <Label htmlFor="submittedFrom">Submitted From</Label>
               <Input
                 id="submittedFrom"
@@ -365,7 +368,7 @@ export default function PartnerRegistrationsPage() {
               />
             </div>
 
-            <div className="space-y-2 md:col-span-1">
+            <div className="space-y-2">
               <Label htmlFor="submittedTo">Submitted To</Label>
               <Input
                 id="submittedTo"
@@ -378,7 +381,7 @@ export default function PartnerRegistrationsPage() {
               />
             </div>
 
-            <div className="space-y-2 md:col-span-1">
+            <div className="space-y-2">
               <Label>&nbsp;</Label>
               <Button
                 variant="outline"
@@ -552,6 +555,9 @@ export default function PartnerRegistrationsPage() {
       <Dialog open={reviewModalOpen} onOpenChange={setReviewModalOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
+            <DialogDescription className="sr-only">
+              Review partner registration details, uploaded documents, location, and approval actions.
+            </DialogDescription>
             <div className="flex items-start justify-between mb-6">
               <div className="flex-1">
                 <DialogTitle className="text-2xl mb-2">
@@ -771,25 +777,16 @@ export default function PartnerRegistrationsPage() {
                             <p className="font-medium text-sm mb-2">
                               {category.replace(/_/g, " ")} - Experience Proof
                             </p>
-                            <div className="flex flex-wrap gap-3">
+                            <div className="flex flex-wrap gap-2">
                               {proofs.map((proof: string, idx: number) => (
                                 <a
                                   key={idx}
                                   href={proof}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="group block w-32 rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden"
+                                  className="text-xs text-blue-600 hover:underline bg-blue-50 px-2 py-1 rounded"
                                 >
-                                  <div className="h-20 w-full bg-gray-100 overflow-hidden">
-                                    <img
-                                      src={proof}
-                                      alt={`Proof ${idx + 1}`}
-                                      className="h-full w-full object-cover transition duration-200 group-hover:scale-105"
-                                    />
-                                  </div>
-                                  <div className="px-2 py-2 text-center text-xs text-gray-700">
-                                    View Proof {idx + 1}
-                                  </div>
+                                  View Proof {idx + 1}
                                 </a>
                               ))}
                             </div>
@@ -884,14 +881,15 @@ export default function PartnerRegistrationsPage() {
                   disabled={!selectedPartner || rejectMutation.isPending}
                   onClick={() => rejectMutation.mutate()}
                 >
-                  Reject
+                  {rejectMutation.isPending ? 'Rejecting...' : 'Reject'}
                 </Button>
                 <Button
-                  variant="secondary"
+                  variant="default"
                   disabled={!selectedPartner || approveMutation.isPending}
                   onClick={() => approveMutation.mutate()}
+                  className="bg-green-600 hover:bg-green-700"
                 >
-                  Approve
+                  {approveMutation.isPending ? 'Approving...' : 'Approve'}
                 </Button>
                 <Button
                   onClick={() => {
