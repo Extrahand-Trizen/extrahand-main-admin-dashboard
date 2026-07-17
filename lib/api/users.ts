@@ -12,7 +12,12 @@ export async function listUsers(filters?: UserFilters): Promise<ApiResponse<User
   if (filters?.status) params.append('status', filters.status);
   if (filters?.role) params.append('role', filters.role);
   if (filters?.category) params.append('category', filters.category);
+  if (filters?.city) params.append('city', filters.city);
+  if (filters?.workArea) params.append('workArea', filters.workArea);
   if (filters?.area && filters.area !== 'all') params.append('area', filters.area);
+  if (typeof filters?.includeSummary === 'boolean') {
+    params.append('includeSummary', String(filters.includeSummary));
+  }
   if (typeof filters?.isAadhaarVerified === 'boolean') {
     params.append('isAadhaarVerified', String(filters.isAadhaarVerified));
   }

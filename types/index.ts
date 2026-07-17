@@ -8,8 +8,8 @@ export interface User {
   name: string;
   fullName?: string;
   phone?: string;
-  role: 'Helper' | 'Customer' | 'unknown';
-  roles?: ('Helper' | 'Customer')[];
+  role: 'Helper' | 'Customer' | 'Partner' | 'unknown';
+  roles?: ('Helper' | 'Customer' | 'Partner')[];
   userType?: 'individual' | 'business';
   status: 'active' | 'suspended' | 'banned' | 'inactive';
   isVerified: boolean;
@@ -124,6 +124,12 @@ export interface User {
     accountHolderName?: string;
     bankName?: string;
     ifsc?: string;
+  };
+  partnerProfile?: {
+    status?: string;
+    categories?: string[];
+    workAreas?: string[];
+    businessName?: string;
   };
   isFaceVerified?: boolean;
   phoneVerified?: boolean;
@@ -452,6 +458,7 @@ export interface ApiResponse<T> {
     total: number;
     pages: number;
   };
+  summary?: Record<string, number>;
 }
 
 export interface AnalyticsOverview {
@@ -501,7 +508,10 @@ export interface UserFilters {
   status?: string;
   role?: string;
   category?: string;
+  city?: string;
+  workArea?: string;
   area?: string;
+  includeSummary?: boolean;
   isAadhaarVerified?: boolean;
   isCertified?: boolean;
   createdFrom?: string;

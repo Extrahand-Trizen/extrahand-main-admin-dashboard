@@ -36,6 +36,12 @@ const navigation: Array<{
     permission: 'user.list',
   },
   {
+    name: 'Partner Registrations',
+    href: '/partner-registrations',
+    icon: Briefcase,
+    permission: 'user.list',
+  },
+  {
     name: 'Works',
     href: '/tasks',
     icon: Briefcase,

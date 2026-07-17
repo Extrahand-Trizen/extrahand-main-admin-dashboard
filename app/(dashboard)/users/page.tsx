@@ -86,6 +86,7 @@ const getNormalizedRoleLabel = (role?: string) => {
   ) {
     return "Customer";
   }
+  if (normalizedRole === "partner") return "Partner";
   if (normalizedRole === "both") return "Customer & Helper";
 
   return null;
@@ -508,6 +509,7 @@ export default function UsersPage() {
                   <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="helper">Helper</SelectItem>
                   <SelectItem value="customer">Customer</SelectItem>
+                  <SelectItem value="partner">Partner</SelectItem>
                 </SelectContent>
               </Select>
             </div>
