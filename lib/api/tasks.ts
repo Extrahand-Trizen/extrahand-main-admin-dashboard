@@ -236,23 +236,12 @@ export async function assignHelper(
   taskId: string,
   helperUid: string,
   helperProfileId: string,
-  helperName?: string
+  helperName?: string,
+  assignmentRole: 'helper' | 'partner' = 'helper'
 ): Promise<ApiResponse<any>> {
   return apiRequest<ApiResponse<any>>(`/api/v1/tasks/${taskId}/assign`, {
     method: 'POST',
-    body: JSON.stringify({ helperUid, helperProfileId, helperName }),
-  });
-}
-
-export async function assignPartner(
-  taskId: string,
-  partnerUid: string,
-  partnerProfileId: string,
-  partnerName?: string
-): Promise<ApiResponse<any>> {
-  return apiRequest<ApiResponse<any>>(`/api/v1/tasks/${taskId}/assign-partner`, {
-    method: 'POST',
-    body: JSON.stringify({ partnerUid, partnerProfileId, partnerName }),
+    body: JSON.stringify({ helperUid, helperProfileId, helperName, assignmentRole }),
   });
 }
 
