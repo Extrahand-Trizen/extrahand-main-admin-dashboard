@@ -12,7 +12,6 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -64,21 +63,6 @@ const PARTNER_CATEGORY_OPTIONS = [
   "Care Services",
 ];
 
-const TELANGANA_CITIES = [
-  "Hyderabad"
-];
-
-const PARTNER_WORK_AREAS = [
-  "Uppal",
-  "LB Nagar",
-  "Secunderabad",
-  "Ameerpet",
-  "Kukatpally",
-  "Madhapur",
-  "Moti Nagar",
-  "Gachibowli"
-];
-
 const getStatusLabel = (status?: string) => {
   return (
     PARTNER_STATUS_OPTIONS.find((option) => option.value === status)?.label ||
@@ -121,10 +105,8 @@ export default function PartnerRegistrationsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [cityFilter, setCityFilter] = useState("all");
-  const [workAreaFilter, setWorkAreaFilter] = useState("all");
-  const [submittedFrom, setSubmittedFrom] = useState("");
-  const [submittedTo, setSubmittedTo] = useState("");
+  const [cityFilter, setCityFilter] = useState("");
+  const [workAreaFilter, setWorkAreaFilter] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -172,8 +154,6 @@ export default function PartnerRegistrationsPage() {
     },
   });
 
-  // Pre-defined work areas are used instead of fetching all Hyderabad sub-areas
-
   const { data, isLoading, error } = useQuery({
     queryKey: [
       "partner-registrations",
@@ -182,8 +162,6 @@ export default function PartnerRegistrationsPage() {
       categoryFilter,
       cityFilter,
       workAreaFilter,
-      submittedFrom,
-      submittedTo,
       page,
       limit,
     ],
@@ -193,10 +171,8 @@ export default function PartnerRegistrationsPage() {
         role: "partner",
         status: statusFilter !== "all" ? statusFilter : undefined,
         category: categoryFilter !== "all" ? categoryFilter : undefined,
-        city: cityFilter !== "all" ? (cityFilter || undefined) : undefined,
-        workArea: workAreaFilter !== "all" ? (workAreaFilter || undefined) : undefined,
-        createdFrom: submittedFrom || undefined,
-        createdTo: submittedTo || undefined,
+        city: cityFilter || undefined,
+        workArea: workAreaFilter || undefined,
         page,
         limit,
         includeSummary: true,
@@ -246,7 +222,7 @@ export default function PartnerRegistrationsPage() {
           <CardTitle className="text-lg">Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
             <div className="space-y-2">
               <Label htmlFor="search">Search</Label>
               <div className="relative">
@@ -311,71 +287,25 @@ export default function PartnerRegistrationsPage() {
 
             <div className="space-y-2">
               <Label htmlFor="city">City</Label>
-              <Select
-                value={cityFilter}
-                onValueChange={(value) => {
-                  setCityFilter(value);
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger id="city">
-                  <SelectValue placeholder="All Cities" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Cities</SelectItem>
-                  {TELANGANA_CITIES.map((city) => (
-                    <SelectItem key={city} value={city}>
-                      {city}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="workArea">Work area</Label>
-              <Select
-                value={workAreaFilter}
-                onValueChange={(value) => {
-                  setWorkAreaFilter(value);
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger id="workArea">
-                  <SelectValue placeholder="All Work Areas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Work Areas</SelectItem>
-                  {PARTNER_WORK_AREAS.map((area) => (
-                    <SelectItem key={area} value={area}>
-                      {area}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="submittedFrom">Submitted From</Label>
               <Input
-                id="submittedFrom"
-                type="date"
-                value={submittedFrom}
+                id="city"
+                placeholder="City"
+                value={cityFilter}
                 onChange={(e) => {
-                  setSubmittedFrom(e.target.value);
+                  setCityFilter(e.target.value);
                   setPage(1);
                 }}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="submittedTo">Submitted To</Label>
+              <Label htmlFor="workArea">Work area</Label>
               <Input
-                id="submittedTo"
-                type="date"
-                value={submittedTo}
+                id="workArea"
+                placeholder="Work area"
+                value={workAreaFilter}
                 onChange={(e) => {
-                  setSubmittedTo(e.target.value);
+                  setWorkAreaFilter(e.target.value);
                   setPage(1);
                 }}
               />
@@ -390,10 +320,8 @@ export default function PartnerRegistrationsPage() {
                   setSearch("");
                   setStatusFilter("all");
                   setCategoryFilter("all");
-                  setCityFilter("all");
-                  setWorkAreaFilter("all");
-                  setSubmittedFrom("");
-                  setSubmittedTo("");
+                  setCityFilter("");
+                  setWorkAreaFilter("");
                   setPage(1);
                 }}
               >
@@ -555,9 +483,6 @@ export default function PartnerRegistrationsPage() {
       <Dialog open={reviewModalOpen} onOpenChange={setReviewModalOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogDescription className="sr-only">
-              Review partner registration details, uploaded documents, location, and approval actions.
-            </DialogDescription>
             <div className="flex items-start justify-between mb-6">
               <div className="flex-1">
                 <DialogTitle className="text-2xl mb-2">

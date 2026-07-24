@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   // Enable standalone output for Docker
@@ -10,6 +11,10 @@ const nextConfig: NextConfig = {
         hostname: 'extrahandimages-api.apps.extrahand.in',
       },
     ],
+  },
+  // Set Turbopack root to this directory to resolve RSC manifest lookup issues
+  turbopack: {
+    root: path.resolve(__dirname),
   },
 };
 

@@ -244,6 +244,18 @@ export async function assignHelper(
   });
 }
 
+export async function assignPartner(
+  taskId: string,
+  partnerUid: string,
+  partnerProfileId: string,
+  partnerName?: string
+): Promise<ApiResponse<any>> {
+  return apiRequest<ApiResponse<any>>(`/api/v1/tasks/${taskId}/assign-partner`, {
+    method: 'POST',
+    body: JSON.stringify({ partnerUid, partnerProfileId, partnerName }),
+  });
+}
+
 export async function unassignHelper(
   taskId: string,
   escrowId?: string
