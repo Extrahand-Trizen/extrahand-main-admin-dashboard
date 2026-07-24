@@ -409,7 +409,7 @@ export default function PaymentPayoutsPage() {
                       <span className="text-gray-900 font-medium">{acc.accountHolderName || "—"}</span>
                       <span className="text-gray-500">Account Number:</span>
                       <span className="text-gray-900 font-mono font-medium">
-                        {acc.accountNumber || "—"}
+                        {acc.accountNumber || acc.accountNumberMasked || "—"}
                         {!acc.isDecrypted && acc.hasEncryptedAccountNumber && (
                           <span className="ml-1 text-xs text-yellow-600">(masked)</span>
                         )}

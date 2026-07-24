@@ -18,6 +18,7 @@ import {
   updateTransactionTeamTest,
   deletePaymentTransaction,
   enrichPaymentTransactions,
+  getUserBankAccounts,
 } from "@/lib/api/payments";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { toast } from "sonner";
@@ -49,6 +50,41 @@ export default function PaymentTransactionsPage() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string } | null>(null);
   const [confirmDeleteText, setConfirmDeleteText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [bankAccountsDialog, setBankAccountsDialog] = useState<{
+    open: boolean;
+    helperName: string;
+    helperUid: string;
+    loading: boolean;
+    accounts: any[];
+  }>({
+    open: false,
+    helperName: "",
+    helperUid: "",
+    loading: false,
+    accounts: [],
+  });
+
+  const handleShowBankDetails = async (helperUid: string, helperName: string) => {
+    setBankAccountsDialog({
+      open: true,
+      helperName,
+      helperUid,
+      loading: true,
+      accounts: [],
+    });
+
+    try {
+      const res = await getUserBankAccounts(helperUid);
+      setBankAccountsDialog((prev) => ({
+        ...prev,
+        loading: false,
+        accounts: res?.data?.bankAccounts ?? [],
+      }));
+    } catch (error: any) {
+      toast.error("Failed to load bank details");
+      setBankAccountsDialog((prev) => ({ ...prev, loading: false }));
+    }
+  };
 
   const { data, refetch, isLoading, isFetching } = useQuery({
     queryKey: ["payment-transactions", q, transactionType, holdStatus, environment, page],
@@ -215,6 +251,7 @@ export default function PaymentTransactionsPage() {
                     <th className="px-3 py-2 text-left">Hold Status</th>
                     <th className="px-3 py-2 text-left">Transaction ID</th>
                     <th className="px-3 py-2 text-left">Transaction Type</th>
+                    <th className="px-3 py-2 text-left">Bank Details</th>
                     {(isSuperAdmin || hasPermission("payment.delete")) && (
                       <th className="px-3 py-2 text-left w-24">Actions</th>
                     )}
@@ -223,7 +260,7 @@ export default function PaymentTransactionsPage() {
                 <tbody>
                   {rows.length === 0 ? (
                     <tr>
-                      <td colSpan={(isSuperAdmin || hasPermission("payment.delete")) ? 11 : 10} className="px-3 py-8 text-center text-gray-500">
+                      <td colSpan={(isSuperAdmin || hasPermission("payment.delete")) ? 12 : 11} className="px-3 py-8 text-center text-gray-500">
                         No transactions found
                       </td>
                     </tr>
@@ -279,6 +316,19 @@ export default function PaymentTransactionsPage() {
                             <span className="text-gray-500">{row.teamTest ? "Team test" : "Real"}</span>
                           )}
                         </td>
+                        <td className="px-3 py-2">
+                          {row.performerUid && row.performerUid !== 'pending_assignment' ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleShowBankDetails(row.performerUid, row.links?.helperName || row.performerUid)}
+                            >
+                              Show Details
+                            </Button>
+                          ) : (
+                            <span className="text-gray-400 italic text-xs">No helper details</span>
+                          )}
+                        </td>
                         {(isSuperAdmin || hasPermission("payment.delete")) && (
                           <td className="px-3 py-2">
                             <Button
@@ -309,6 +359,70 @@ export default function PaymentTransactionsPage() {
           </div>
         </div>
       </Card>
+
+      <Dialog
+        open={bankAccountsDialog.open}
+        onOpenChange={(open) => setBankAccountsDialog((prev) => ({ ...prev, open }))}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Bank Details</DialogTitle>
+            <DialogDescription>
+              Registered bank account details for helper <strong>{bankAccountsDialog.helperName}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {bankAccountsDialog.loading ? (
+              <div className="text-center py-4 text-gray-500">Loading bank details...</div>
+            ) : bankAccountsDialog.accounts.length === 0 ? (
+              <div className="text-center py-4 text-gray-500">No bank accounts registered.</div>
+            ) : (
+              <div className="space-y-3">
+                {bankAccountsDialog.accounts.map((acc: any, index: number) => (
+                  <div key={acc.id || index} className="p-3 border rounded-lg bg-gray-50 space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-gray-900">{acc.bankName || "Unknown Bank"}</span>
+                      <div className="flex gap-1.5">
+                        {acc.isDefault && (
+                          <span className="text-xs px-2 py-0.5 bg-green-100 text-green-800 rounded-full font-medium">
+                            Default
+                          </span>
+                        )}
+                        {acc.isDecrypted ? (
+                          <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full font-medium">
+                            ✓ Decrypted
+                          </span>
+                        ) : acc.hasEncryptedAccountNumber ? (
+                          <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full font-medium" title="Encryption key not configured in this environment">
+                            ⚠ Masked
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-sm pt-2">
+                      <span className="text-gray-500">Account Holder:</span>
+                      <span className="text-gray-900 font-medium">{acc.accountHolderName || "—"}</span>
+                      <span className="text-gray-500">Account Number:</span>
+                      <span className="text-gray-900 font-mono font-medium">
+                        {acc.accountNumber || acc.accountNumberMasked || "—"}
+                        {!acc.isDecrypted && acc.hasEncryptedAccountNumber && (
+                          <span className="ml-1 text-xs text-yellow-600">(masked)</span>
+                        )}
+                      </span>
+                      <span className="text-gray-500">IFSC Code:</span>
+                      <span className="text-gray-900 font-mono font-medium">{acc.ifscCode || "—"}</span>
+                      <span className="text-gray-500">Verified:</span>
+                      <span className={`font-medium ${acc.isVerified ? 'text-green-700' : 'text-gray-500'}`}>
+                        {acc.isVerified ? 'Yes' : 'No'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={!!deleteTarget}
