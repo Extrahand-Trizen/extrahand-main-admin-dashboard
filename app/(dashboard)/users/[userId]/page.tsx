@@ -44,6 +44,7 @@ import {
   unsuspendUser,
   getUserRegistrationSource,
 } from "@/lib/api/users";
+import { getUserBankAccounts } from "@/lib/api/payments";
 import { listTasks, listApplications } from "@/lib/api/tasks";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -111,6 +112,7 @@ export default function UserDetailsPage() {
   const [activeTasksPage, setActiveTasksPage] = useState(1);
   const [offersPage, setOffersPage] = useState(1);
   const [aadhaarUploadOpen, setAadhaarUploadOpen] = useState(false);
+  const [bankDetailsDialogOpen, setBankDetailsDialogOpen] = useState(false);
 
   // ── Aadhaar upload status — drives button label and "Re-upload" mode ────────
   const { data: uploadStatusRes, isLoading: uploadStatusLoading } = useQuery({
@@ -134,6 +136,8 @@ export default function UserDetailsPage() {
     retry: false,
   });
 
+  const user = data?.data;
+
   const { data: registrationSourceResponse, isLoading: registrationSourceLoading } = useQuery({
     queryKey: ["user-registration-source", userId],
     queryFn: () => getUserRegistrationSource(userId),
@@ -141,8 +145,21 @@ export default function UserDetailsPage() {
     retry: false,
   });
 
+  const canViewPaymentStatus = isSuperAdmin || hasPermission("payment.view");
+  const { data: bankAccountsResponse, isLoading: bankAccountsLoading, refetch: refetchBankAccounts } = useQuery({
+    queryKey: ["user-bank-accounts-postgres", userId],
+    queryFn: () => getUserBankAccounts(userId),
+    enabled: !!userId && canViewPaymentStatus,
+    retry: false,
+    staleTime: 30_000,
+  });
+
   const registrationSource = registrationSourceResponse?.data;
 
+  const postgresBankAccounts = bankAccountsResponse?.data?.bankAccounts ?? [];
+  const combinedBankVerified = Boolean(user?.isBankVerified) || postgresBankAccounts.some(
+    (account: any) => account?.isVerified || account?.isBankVerified,
+  );
   const banMutation = useMutation({
     mutationFn: ({ userId, reason }: { userId: string; reason: string }) =>
       banUser(userId, reason),
@@ -227,7 +244,6 @@ export default function UserDetailsPage() {
     }
   };
 
-  const user = data?.data;
   const profileId = String((user as any)?._id || (user as any)?.profileId || "");
   const ratingValue = Number(user?.rating ?? 0);
   const totalReviewsValue = Number(user?.totalReviews ?? 0);
@@ -1004,7 +1020,7 @@ export default function UserDetailsPage() {
                             {aadhaarStatus}
                           </p>
                           {isAadhaarFailed && aadhaarKyc.failureReason && (
-                            <p className="text-red-700 break-words">
+                            <p className="text-red-700 wrap-break-word">
                               <span className="font-medium">
                                 Failure reason:
                               </span>{" "}
@@ -1138,7 +1154,7 @@ export default function UserDetailsPage() {
                       <CreditCard className="h-5 w-5 text-gray-400" />
                       <span className="font-medium text-sm">Bank Account</span>
                     </div>
-                    {user.isBankVerified ? (
+                    {combinedBankVerified ? (
                       <Badge variant="success">Verified</Badge>
                     ) : (
                       <Badge variant="secondary">Not Verified</Badge>
@@ -1180,6 +1196,20 @@ export default function UserDetailsPage() {
                           {formatDateTime(user.bankVerifiedAt)}
                         </p>
                       )}
+                    </div>
+                  )}
+                  {isSuperAdmin && (
+                    <div className="mt-4">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={async () => {
+                          setBankDetailsDialogOpen(true);
+                          await refetchBankAccounts();
+                        }}
+                      >
+                        View Details
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -1917,6 +1947,80 @@ export default function UserDetailsPage() {
           </TabsContent>
         )}
       </Tabs>
+
+      <Dialog
+        open={bankDetailsDialogOpen}
+        onOpenChange={(open) => setBankDetailsDialogOpen(open)}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Bank Account Details</DialogTitle>
+            <DialogDescription>
+              Full bank account details from the payment database for this user.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {bankAccountsLoading ? (
+              <div className="text-center py-4 text-gray-500">Loading bank details...</div>
+            ) : postgresBankAccounts.length === 0 ? (
+              <div className="text-center py-4 text-gray-500">No bank accounts registered.</div>
+            ) : (
+              <div className="space-y-3">
+                {postgresBankAccounts.map((acc: any, index: number) => (
+                  <div key={acc.id || index} className="p-3 border rounded-lg bg-gray-50 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-gray-900">{acc.bankName || "Unknown Bank"}</span>
+                      <div className="flex gap-2">
+                        {acc.isDefault && (
+                          <span className="text-xs px-2 py-0.5 bg-green-100 text-green-800 rounded-full font-medium">
+                            Default
+                          </span>
+                        )}
+                        {(acc.isVerified || acc.isBankVerified) && (
+                          <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full font-medium">
+                            Verified
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-y-2 text-sm text-gray-700">
+                      <div className="flex justify-between gap-2">
+                        <span className="text-gray-500">Account Holder</span>
+                        <span className="font-medium">{acc.accountHolderName || '—'}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-gray-500">Account Number</span>
+                        <span className="font-mono font-medium">{acc.accountNumber || acc.accountNumberMasked || '—'}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-gray-500">IFSC Code</span>
+                        <span className="font-mono font-medium">{acc.ifscCode || '—'}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-gray-500">Verified</span>
+                        <span className={`font-medium ${acc.isVerified || acc.isBankVerified ? 'text-green-700' : 'text-gray-500'}`}>
+                          {acc.isVerified || acc.isBankVerified ? 'Yes' : 'No'}
+                        </span>
+                      </div>
+                      {acc.verifiedAt && (
+                        <div className="flex justify-between gap-2">
+                          <span className="text-gray-500">Verified At</span>
+                          <span className="font-medium">{formatDateTime(acc.verifiedAt)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBankDetailsDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Action Confirmation Dialog */}
       <Dialog
