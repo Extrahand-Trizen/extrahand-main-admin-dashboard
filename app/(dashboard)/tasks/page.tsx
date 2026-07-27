@@ -474,7 +474,6 @@ export default function TasksPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="santhosh reddy">santhosh reddy</SelectItem>
                   <SelectItem value="durgamshiva">durgamshiva</SelectItem>
                   <SelectItem value="tadembharath">tadembharath</SelectItem>
                 </SelectContent>

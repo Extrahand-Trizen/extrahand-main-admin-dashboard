@@ -182,3 +182,49 @@ export const deleteUser = async (userId: string) => {
 
   return res;
 };
+
+export interface AssignmentsSummary {
+  taskAssignmentCount: number;
+  aadhaarAssignmentCount: number;
+  totalAssignments: number;
+  hasAssignments: boolean;
+  remainingActiveOpsAdmins: Array<{ userId: string; name: string; email: string }>;
+  canDelete: boolean;
+}
+
+export interface TransferAndDeleteResult {
+  transferredTasks: number;
+  transferredAadhaar: number;
+  redistributedTo: Array<{ userId: string; name: string; email: string }>;
+}
+
+export const getAdminUserAssignmentsSummary = async (
+  userId: string,
+): Promise<AssignmentsSummary> => {
+  const res = await apiRequest<{
+    success: boolean;
+    data: AssignmentsSummary;
+  }>(`/api/v1/admin/users/${userId}/assignments-summary`);
+
+  if (!res?.data) {
+    throw new Error("Failed to fetch assignment summary");
+  }
+  return res.data;
+};
+
+export const transferAndDeleteAdminUser = async (
+  userId: string,
+): Promise<{ message: string; data: TransferAndDeleteResult }> => {
+  const res = await apiRequest<{
+    success: boolean;
+    message: string;
+    data: TransferAndDeleteResult;
+  }>(`/api/v1/admin/users/${userId}/transfer-and-delete`, {
+    method: "POST",
+  });
+
+  if (!res?.success) {
+    throw new Error((res as any)?.error || "Failed to transfer and delete admin user");
+  }
+  return { message: res.message, data: res.data };
+};

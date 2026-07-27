@@ -46,36 +46,74 @@ import {
   ShieldCheck,
   UserCog,
   Trash2,
+  ArrowRightLeft,
+  CheckCircle2,
+  AlertTriangle,
+  Users,
+  FileText,
+  CreditCard,
 } from "lucide-react";
 import { toast } from "sonner";
-import { listUsers, updateUser, deleteUser, AdminUser } from "@/lib/api/admin";
+import {
+  listUsers,
+  updateUser,
+  deleteUser,
+  AdminUser,
+  getAdminUserAssignmentsSummary,
+  transferAndDeleteAdminUser,
+  AssignmentsSummary,
+  TransferAndDeleteResult,
+} from "@/lib/api/admin";
 import { formatDate } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 
+// ─── Delete Flow Step Type ──────────────────────────────────────────────────
+type DeleteStep =
+  | "idle"
+  | "checking"          // Step 1: loading spinner while fetching summary
+  | "transfer_needed"   // Step 2: show transfer dialog (has assignments)
+  | "transferring"      // Step 2b: transfer in progress
+  | "transfer_done"     // Step 3: transfer complete, show final delete confirm
+  | "no_transfer"       // Step 3 (direct): no assignments, show simple delete confirm
+  | "deleting";         // Final deletion in progress
+
+interface DeleteFlowState {
+  user: AdminUser | null;
+  step: DeleteStep;
+  summary: AssignmentsSummary | null;
+  transferResult: TransferAndDeleteResult | null;
+}
+
+// ─── Component ──────────────────────────────────────────────────────────────
 export default function AdminUsersPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
   const { isSuperAdmin } = usePermissions();
+
   const [shiftRoleDialog, setShiftRoleDialog] = useState<{
     open: boolean;
     user: AdminUser | null;
     role: string;
   }>({ open: false, user: null, role: "" });
-  const [deleteDialog, setDeleteDialog] = useState<{
-    open: boolean;
-    user: AdminUser | null;
-  }>({ open: false, user: null });
 
-  // Fetch Users
+  // Delete flow state
+  const [deleteFlow, setDeleteFlow] = useState<DeleteFlowState>({
+    user: null,
+    step: "idle",
+    summary: null,
+    transferResult: null,
+  });
+
+  // ── Fetch Users ─────────────────────────────────────────────────────────
   const { data, isLoading } = useQuery({
     queryKey: ["admin-users", page, search],
     queryFn: () => listUsers({ page, limit: 10, search }),
     placeholderData: (previousData) => previousData,
   });
 
-  // Update Status Mutation
+  // ── Update Status Mutation ───────────────────────────────────────────────
   const updateStatusMutation = useMutation({
     mutationFn: ({
       userId,
@@ -98,6 +136,7 @@ export default function AdminUsersPage() {
     updateStatusMutation.mutate({ userId, status: newStatus });
   };
 
+  // ── Shift Role Mutation ──────────────────────────────────────────────────
   const updateRoleMutation = useMutation({
     mutationFn: ({ userId, role }: { userId: string; role: string }) =>
       updateUser(userId, { role } as any),
@@ -111,24 +150,78 @@ export default function AdminUsersPage() {
     },
   });
 
+  // ── Simple Delete Mutation (no assignments case) ─────────────────────────
   const deleteMutation = useMutation({
     mutationFn: (userId: string) => deleteUser(userId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-      toast.success("Admin user removed successfully");
-      setDeleteDialog({ open: false, user: null });
+      toast.success("Admin user deleted successfully");
+      setDeleteFlow({ user: null, step: "idle", summary: null, transferResult: null });
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error || "Failed to remove admin user");
+      toast.error(error.response?.data?.error || "Failed to delete admin user");
+      setDeleteFlow((d) => ({ ...d, step: d.summary?.hasAssignments ? "transfer_done" : "no_transfer" }));
     },
   });
 
+
+  // ── Delete Flow Handlers ─────────────────────────────────────────────────
+
+  /** Step 1: Triggered when "Delete User" is clicked from dropdown */
+  const handleDeleteClick = async (user: AdminUser) => {
+    setDeleteFlow({ user, step: "checking", summary: null, transferResult: null });
+    try {
+      const summary = await getAdminUserAssignmentsSummary(user.userId);
+      if (summary.hasAssignments) {
+        setDeleteFlow({ user, step: "transfer_needed", summary, transferResult: null });
+      } else {
+        setDeleteFlow({ user, step: "no_transfer", summary, transferResult: null });
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to check assignments");
+      setDeleteFlow({ user: null, step: "idle", summary: null, transferResult: null });
+    }
+  };
+
+  /** Step 2: User clicks "Transfer & Proceed" */
+  const handleTransferAndProceed = async () => {
+    if (!deleteFlow.user) return;
+    setDeleteFlow((d) => ({ ...d, step: "transferring" }));
+    try {
+      const result = await transferAndDeleteAdminUser(deleteFlow.user.userId);
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      toast.success("Admin user deleted and assignments redistributed successfully");
+      setDeleteFlow({ user: null, step: "idle", summary: null, transferResult: null });
+    } catch (err: any) {
+      const msg = err?.message || "Failed to transfer and delete";
+      toast.error(msg);
+      setDeleteFlow((d) => ({ ...d, step: "transfer_needed" }));
+    }
+  };
+
+  /** Step 3: Final delete (no-transfer path only) */
+  const handleFinalDelete = () => {
+    if (!deleteFlow.user) return;
+    setDeleteFlow((d) => ({ ...d, step: "deleting" }));
+    deleteMutation.mutate(deleteFlow.user.userId);
+  };
+
+  const closeDeleteFlow = () => {
+    if (deleteFlow.step === "transferring" || deleteFlow.step === "deleting") return;
+    setDeleteFlow({ user: null, step: "idle", summary: null, transferResult: null });
+  };
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
   const primaryRoleLabel = (user: AdminUser) => {
     if (user.isSuperAdmin) return "Super Admin";
     const role = user.dashboardAccess?.[0]?.role;
     return role ? role.replace(/_/g, " ") : "Admin";
   };
 
+  const isDeleteFlowOpen = deleteFlow.step !== "idle";
+  const isDeleteFlowBusy = deleteFlow.step === "checking" || deleteFlow.step === "transferring" || deleteFlow.step === "deleting";
+
+  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -247,11 +340,11 @@ export default function AdminUsersPage() {
                             <DropdownMenuSeparator />
                             {user.status === "active" ? (
                               <DropdownMenuItem
-                                className="text-red-600 focus:text-red-600"
+                                className="text-amber-600 focus:text-amber-600"
                                 onClick={() =>
                                   handleStatusChange(user.userId, user.status)
                                 }
-                                disabled={user.isSuperAdmin} // Prevent suspending super admins easily
+                                disabled={user.isSuperAdmin}
                               >
                                 <ShieldAlert className="mr-2 h-4 w-4" /> Suspend
                                 User
@@ -272,10 +365,10 @@ export default function AdminUsersPage() {
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   className="text-red-600 focus:text-red-600"
-                                  onClick={() => setDeleteDialog({ open: true, user })}
+                                  onClick={() => handleDeleteClick(user)}
                                   disabled={user.isSuperAdmin}
                                 >
-                                  <Trash2 className="mr-2 h-4 w-4" /> Remove Role
+                                  <Trash2 className="mr-2 h-4 w-4" /> Delete User
                                 </DropdownMenuItem>
                               </>
                             )}
@@ -291,6 +384,7 @@ export default function AdminUsersPage() {
         </CardContent>
       </Card>
 
+      {/* ─── Shift Role Dialog ──────────────────────────────────────────── */}
       <Dialog
         open={shiftRoleDialog.open}
         onOpenChange={(open) =>
@@ -349,48 +443,180 @@ export default function AdminUsersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteDialog.open}
-        onOpenChange={(open) =>
-          setDeleteDialog((d) => ({ ...d, open, user: open ? d.user : null }))
-        }
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Remove Admin Role</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to remove the administrative role for{" "}
-              <span className="font-semibold text-gray-900">
-                {deleteDialog.user?.name}
-              </span>
-              ? This will revoke their access to the administration portal.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteDialog({ open: false, user: null })}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (deleteDialog.user?.userId) {
-                  deleteMutation.mutate(deleteDialog.user.userId);
-                }
-              }}
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="mr-2 h-4 w-4" />
-              )}
-              Remove Role
-            </Button>
-          </DialogFooter>
+      {/* ─── Delete Flow Dialog ─────────────────────────────────────────── */}
+      <Dialog open={isDeleteFlowOpen} onOpenChange={(open) => { if (!open) closeDeleteFlow(); }}>
+        <DialogContent className="max-w-lg">
+
+          {/* ── Step 1: Checking assignments ── */}
+          {deleteFlow.step === "checking" && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  Checking Assignments...
+                </DialogTitle>
+                <DialogDescription>
+                  Checking if <span className="font-semibold text-foreground">{deleteFlow.user?.name}</span> has any assigned works or Aadhaar follow-ups before deletion.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+              </div>
+            </>
+          )}
+
+          {/* ── Step 2: Transfer Needed ── */}
+          {(deleteFlow.step === "transfer_needed" || deleteFlow.step === "transferring") && deleteFlow.summary && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-amber-600">
+                  <ArrowRightLeft className="h-5 w-5" />
+                  Transfer Assignments Before Deletion
+                </DialogTitle>
+                <DialogDescription>
+                  <span className="font-semibold text-foreground">{deleteFlow.user?.name}</span> currently has active assignments that must be transferred to other operations admins before this account can be deleted.
+                </DialogDescription>
+              </DialogHeader>
+
+              {/* Assignment counts */}
+              <div className="space-y-3 my-2">
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                  <p className="text-sm font-semibold text-foreground">Current Assignments of {deleteFlow.user?.name}:</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2">
+                      <FileText className="h-4 w-4 text-blue-500 shrink-0" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Task Assignments</p>
+                        <p className="text-lg font-bold text-foreground">{deleteFlow.summary.taskAssignmentCount}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2">
+                      <CreditCard className="h-4 w-4 text-purple-500 shrink-0" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Aadhaar Follow-ups</p>
+                        <p className="text-lg font-bold text-foreground">{deleteFlow.summary.aadhaarAssignmentCount}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Recipients */}
+                {deleteFlow.summary.remainingActiveOpsAdmins.length > 0 ? (
+                  <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+                    <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                      <Users className="h-4 w-4" /> Will be redistributed equally to:
+                    </p>
+                    <div className="space-y-1.5">
+                      {deleteFlow.summary.remainingActiveOpsAdmins.map((admin) => (
+                        <div key={admin.userId} className="flex items-center gap-2 text-sm">
+                          <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
+                            {admin.name.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="font-medium">{admin.name}</span>
+                          <span className="text-muted-foreground text-xs">({admin.email})</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground pt-1">
+                      {deleteFlow.summary.totalAssignments} total assignments will be split equally (round-robin) among {deleteFlow.summary.remainingActiveOpsAdmins.length} active admin{deleteFlow.summary.remainingActiveOpsAdmins.length > 1 ? "s" : ""}.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-4 flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                    <p className="text-sm text-red-700">
+                      <strong>Cannot delete:</strong> There are no other active operations admins to transfer this user's assignments to. Please add another operations admin first.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={closeDeleteFlow}
+                  disabled={deleteFlow.step === "transferring"}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleTransferAndProceed}
+                  disabled={
+                    deleteFlow.step === "transferring" ||
+                    deleteFlow.summary.remainingActiveOpsAdmins.length === 0
+                  }
+                >
+                  {deleteFlow.step === "transferring" ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Transferring & Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <ArrowRightLeft className="mr-2 h-4 w-4" />
+                      Transfer & Delete Account
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {/* ── Step 3 (no-transfer path): Simple final confirm ── */}
+          {(deleteFlow.step === "no_transfer" || deleteFlow.step === "deleting") && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-red-600">
+                  <Trash2 className="h-5 w-5" />
+                  Delete Admin Account
+                </DialogTitle>
+                <DialogDescription>
+                  This action cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="rounded-lg border border-red-200 bg-red-50 p-4 space-y-2 my-2">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                  <div className="text-sm text-red-700">
+                    <p>You are about to permanently delete the account for:</p>
+                    <p className="font-bold mt-1">{deleteFlow.user?.name}</p>
+                    <p className="text-xs text-red-600">{deleteFlow.user?.email}</p>
+                    <p className="mt-2">This user has no assigned works or Aadhaar follow-ups. The account will be deleted immediately and cannot be recovered.</p>
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={closeDeleteFlow}
+                  disabled={deleteFlow.step === "deleting"}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleFinalDelete}
+                  disabled={deleteFlow.step === "deleting"}
+                >
+                  {deleteFlow.step === "deleting" ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Account
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
         </DialogContent>
       </Dialog>
     </div>
