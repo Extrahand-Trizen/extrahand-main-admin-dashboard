@@ -157,9 +157,10 @@ export default function UserDetailsPage() {
   const registrationSource = registrationSourceResponse?.data;
 
   const postgresBankAccounts = bankAccountsResponse?.data?.bankAccounts ?? [];
-  const combinedBankVerified = Boolean(user?.isBankVerified) || postgresBankAccounts.some(
-    (account: any) => account?.isVerified || account?.isBankVerified,
-  );
+  const firstVerifiedBank = postgresBankAccounts.find(
+    (a: any) => a?.isVerified || a?.isBankVerified
+  ) || postgresBankAccounts[0];
+  const combinedBankVerified = Boolean(user?.isBankVerified) || !!firstVerifiedBank;
   const banMutation = useMutation({
     mutationFn: ({ userId, reason }: { userId: string; reason: string }) =>
       banUser(userId, reason),
@@ -252,10 +253,7 @@ export default function UserDetailsPage() {
   const postedTasksValue = Number(user?.postedTasks ?? 0);
   const earnedAmountValue = Number(user?.earnedAmount ?? 0);
   const isEmailVerified = Boolean(user?.isEmailVerified ?? user?.isVerified);
-  const isPhoneVerified =
-    typeof user?.phoneVerified === "boolean"
-      ? user.phoneVerified
-      : Boolean(user?.phone);
+  const isPhoneVerified = true;
   const aadhaarKyc = user?.aadhaarKyc;
   const aadhaarRawStatus =
     user?.isAadhaarVerified
@@ -1160,44 +1158,7 @@ export default function UserDetailsPage() {
                       <Badge variant="secondary">Not Verified</Badge>
                     )}
                   </div>
-                  {user.isBankVerified && (
-                    <div className="mt-2 space-y-1 text-sm">
-                      {user.maskedBankAccount && (
-                        <p className="text-gray-600">
-                          <span className="font-medium">Account:</span>{" "}
-                          {user.maskedBankAccount}
-                        </p>
-                      )}
-                      {user.bankAccount && (
-                        <div className="space-y-1">
-                          {user.bankAccount.accountHolderName && (
-                            <p className="text-gray-600">
-                              <span className="font-medium">Holder:</span>{" "}
-                              {user.bankAccount.accountHolderName}
-                            </p>
-                          )}
-                          {user.bankAccount.bankName && (
-                            <p className="text-gray-600">
-                              <span className="font-medium">Bank:</span>{" "}
-                              {user.bankAccount.bankName}
-                            </p>
-                          )}
-                          {user.bankAccount.ifsc && (
-                            <p className="text-gray-600">
-                              <span className="font-medium">IFSC:</span>{" "}
-                              {user.bankAccount.ifsc}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                      {user.bankVerifiedAt && (
-                        <p className="text-gray-600">
-                          <span className="font-medium">Verified:</span>{" "}
-                          {formatDateTime(user.bankVerifiedAt)}
-                        </p>
-                      )}
-                    </div>
-                  )}
+
                   {isSuperAdmin && (
                     <div className="mt-4">
                       <Button

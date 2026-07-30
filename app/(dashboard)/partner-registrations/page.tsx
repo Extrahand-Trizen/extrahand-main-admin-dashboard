@@ -30,7 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { listUsers, updateUser } from "@/lib/api/users";
+import { getUser, listUsers, updateUser } from "@/lib/api/users";
 import { formatDate } from "@/lib/utils";
 import { User } from "@/types";
 import Link from "next/link";
@@ -193,8 +193,18 @@ export default function PartnerRegistrationsPage() {
     ),
   );
 
-  const handleReviewClick = (user: User) => {
-    setSelectedPartner(user);
+  const handleReviewClick = async (user: User) => {
+    try {
+      const response = await getUser(user.userId);
+      if (response && response.data) {
+        setSelectedPartner(response.data);
+      } else {
+        setSelectedPartner(user);
+      }
+    } catch (error) {
+      console.error('Failed to fetch full user details for review:', error);
+      setSelectedPartner(user);
+    }
     setReviewModalOpen(true);
   };
 
@@ -562,8 +572,12 @@ export default function PartnerRegistrationsPage() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={selectedPartner.isVerified ? "text-green-600" : "text-gray-400"}>
-                      {selectedPartner.isVerified ? "✓" : "✗"}
+                    <span className={
+                      selectedPartner.isEmailVerified || selectedPartner.isVerified
+                        ? "text-green-600"
+                        : "text-gray-400"
+                    }>
+                      {selectedPartner.isEmailVerified || selectedPartner.isVerified ? "✓" : "✗"}
                     </span>
                     <span className="text-sm">
                       Email Verified

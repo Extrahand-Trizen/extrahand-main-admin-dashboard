@@ -59,7 +59,7 @@ function getCancellationStepIndex(task: Task): number {
 }
 
 function getSlotHoursLabel(task: Task): string | null {
-  if (!task.scheduledDate) return null
+  if (!task.scheduledDate || task.bookingSource !== 'book_now') return null
 
   const scheduled = new Date(task.scheduledDate)
   if (task.scheduledTimeStart) {
@@ -77,9 +77,44 @@ function getSlotHoursLabel(task: Task): string | null {
   return `slot in ${hours} hrs`
 }
 
+function getPaymentState(task: Task): { captured: boolean; failed: boolean; initiated: boolean } {
+  if (task.bookingSource === 'book_now') {
+    return { captured: true, failed: false, initiated: true }
+  }
+  const ps = task.paymentStatus?.toLowerCase()
+  const es = task.escrowStatus?.toLowerCase()
+  const captured = ps === 'captured' || es === 'held' || es === 'released'
+  const failed = ps === 'failed' || es === 'cancelled' || es === 'refunded'
+  const initiated = !!(ps && ps !== 'failed') || !!(es)
+  return { captured, failed, initiated }
+}
+
+function getPaymentBadge(task: Task, budget: number): { label: string; className: string } {
+  const { captured, failed } = getPaymentState(task)
+  const es = task.escrowStatus?.toLowerCase()
+  if (captured) {
+    const label = es === 'released' ? 'Released' : es === 'held' ? 'Escrow held' : 'Captured'
+    return {
+      label: `${formatCurrency(budget)} · ${label}`,
+      className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    }
+  }
+  if (failed) {
+    return {
+      label: `${formatCurrency(budget)} · ${task.paymentStatus === 'failed' ? 'Failed' : task.escrowStatus === 'refunded' ? 'Refunded' : 'Cancelled'}`,
+      className: 'bg-red-50 text-red-700 border-red-200',
+    }
+  }
+  return {
+    label: `${formatCurrency(budget)} · Awaiting payment`,
+    className: 'bg-amber-50 text-amber-700 border-amber-200',
+  }
+}
+
 function getLifecycleSteps(task: Task): LifecycleStep[] {
   const status = normalizeStatus(task.status)
   const slotLabel = getSlotHoursLabel(task)
+  const { captured: paymentCaptured, failed: paymentFailed } = getPaymentState(task)
 
   if (status === 'cancelled') {
     const cancelIndex = getCancellationStepIndex(task)
@@ -88,12 +123,9 @@ function getLifecycleSteps(task: Task): LifecycleStep[] {
       {
         id: 'payment',
         label: 'Payment captured',
-        state: cancelIndex > 0 ? 'done' : 'cancelled',
+        state: paymentCaptured ? 'done' : cancelIndex > 0 ? 'cancelled' : 'future',
         timestamp: task.createdAt,
-        badge: {
-          label: `${formatCurrency(task.budget)} · Escrow held`,
-          className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-        },
+        badge: getPaymentBadge(task, task.budget),
       },
       {
         id: 'helper',
@@ -131,15 +163,19 @@ function getLifecycleSteps(task: Task): LifecycleStep[] {
     return steps
   }
 
-  const helperDone = Boolean(task.assignedAt) || status !== 'open'
+  const helperDone = Boolean(task.startedAt) || status === 'started' || status === 'in_progress' || status === 'review' || status === 'completed'
   const otpDone = Boolean(task.startedAt)
   const inProgressDone = Boolean(task.inProgressAt)
   const proofDone = status === 'completed'
 
-  const helperActive = status === 'open'
-  const otpActive = status === 'assigned'
-  const inProgressActive = status === 'started'
-  const proofActive = status === 'in_progress' || status === 'review'
+  const helperActive = status === 'assigned' && !helperDone
+  const otpActive = status === 'started' && !otpDone
+  const inProgressActive = (status === 'in_progress' || status === 'review') && !inProgressDone
+  const proofActive = status === 'review' && !proofDone
+
+  const paymentDone = paymentCaptured
+  const paymentActive = !paymentCaptured && !paymentFailed && status !== 'open'
+  const paymentFuture = !paymentCaptured && !paymentFailed && status === 'open'
 
   const helperDetail = helperActive
     ? task.assigneeName
@@ -152,13 +188,10 @@ function getLifecycleSteps(task: Task): LifecycleStep[] {
   return [
     {
       id: 'payment',
-      label: 'Payment captured',
-      state: 'done',
-      timestamp: task.createdAt,
-      badge: {
-        label: `${formatCurrency(task.budget)} · Escrow held`,
-        className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      },
+      label: paymentFailed ? 'Payment failed' : 'Payment captured',
+      state: paymentDone ? 'done' : paymentActive ? 'active' : 'future',
+      timestamp: paymentDone ? task.createdAt : undefined,
+      badge: getPaymentBadge(task, task.budget),
     },
     {
       id: 'helper',
@@ -259,7 +292,12 @@ export function TaskProgressCard({ task, onAssignHelper }: TaskProgressCardProps
   const steps = getLifecycleSteps(task)
   const status = normalizeStatus(task.status)
 
-  const escrowStatus = task.escrowStatus ?? 'Held'
+  const { captured: paymentCaptured, failed: paymentFailed } = getPaymentState(task)
+  const escrowStatus = task.escrowStatus
+    ? task.escrowStatus.charAt(0).toUpperCase() + task.escrowStatus.slice(1)
+    : paymentFailed
+      ? 'Failed'
+      : 'Awaiting payment'
   const payoutStatus = task.payoutStatus ?? 'Pending completion'
 
   const scrollToProof = () => {
@@ -363,8 +401,8 @@ export function TaskProgressCard({ task, onAssignHelper }: TaskProgressCardProps
           <div className="space-y-2 text-sm">
             <div className="flex items-center justify-between gap-4">
               <span className="text-gray-600">Customer paid</span>
-              <span className="text-emerald-600 font-medium">
-                {formatCurrency(task.budget)} captured
+              <span className={cn('font-medium', paymentCaptured ? 'text-emerald-600' : 'text-amber-600')}>
+                {paymentCaptured ? `${formatCurrency(task.budget)} captured` : 'Not yet captured'}
               </span>
             </div>
             <div className="flex items-center justify-between gap-4">

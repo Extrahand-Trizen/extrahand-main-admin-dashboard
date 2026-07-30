@@ -48,7 +48,8 @@ import {
   updateTaskCallStatus,
 } from "@/lib/api/task-calls";
 import { getUser } from "@/lib/api/users";
-import { listPaymentPayouts } from "@/lib/api/payments";
+import { listPaymentPayouts, listPaymentTransactions } from "@/lib/api/payments";
+import { PaymentTransaction } from "@/types";
 import AssignHelperModal from "@/components/assign-helper-modal";
 import { TaskProgressCard } from "@/components/task-progress-card";
 import { unassignHelper } from "@/lib/api/tasks";
@@ -188,6 +189,8 @@ export default function TaskDetailsPage() {
     queryKey: ["task", taskId],
     queryFn: () => getTask(taskId),
     enabled: isValidTaskId && hasPermission("task.view"),
+    refetchOnMount: true,
+    staleTime: 0,
   });
 
   const { data: applicationsData, isLoading: applicationsLoading } = useQuery({
@@ -210,6 +213,12 @@ export default function TaskDetailsPage() {
   const { data: payoutsData } = useQuery({
     queryKey: ["task-payouts", taskId],
     queryFn: () => listPaymentPayouts({ q: taskId }),
+    enabled: isValidTaskId && hasPermission("payment.view"),
+  });
+
+  const { data: transactionData } = useQuery({
+    queryKey: ["task-transactions", taskId],
+    queryFn: () => listPaymentTransactions({ q: taskId, limit: 1 }),
     enabled: isValidTaskId && hasPermission("payment.view"),
   });
 
@@ -365,7 +374,15 @@ export default function TaskDetailsPage() {
   const applications = applicationsData?.data || [];
   const payouts = payoutsData?.data || [];
   const payoutStatus = payouts.find((p: any) => p.taskId === taskId || p.escrow?.taskId === taskId)?.status || task?.payoutStatus;
-  const taskWithPayoutStatus = task ? { ...task, payoutStatus } : undefined;
+  const transaction = transactionData?.data?.find((t: PaymentTransaction) => t.taskId === taskId);
+  const escrowStatus = transaction?.status;
+  const paymentStatus = transaction?.paymentStatus;
+  const taskWithPayoutStatus = task ? {
+    ...task,
+    payoutStatus,
+    escrowStatus: escrowStatus || task?.escrowStatus,
+    paymentStatus: paymentStatus || task?.paymentStatus,
+  } : undefined;
   const customerProfileId = extractCustomerProfileId(task);
 
   // Extract the actual helper's assigneeId from raw task data (MongoDB field)

@@ -641,21 +641,25 @@ export default function TasksPage() {
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-sm">
                           {task.assigneeId ? (
-                            <Link
-                              href={`/users/${task.assigneeId}`}
-                              className="font-medium text-blue-600 hover:text-blue-800 hover:underline capitalize"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {isBatchLoading ? (
-                                task.assigneeName || "Loading..."
-                              ) : helperDetailsByProfileId.has(task.assigneeId) ? (
-                                helperDetailsByProfileId.get(task.assigneeId)?.name ||
-                                helperDetailsByProfileId.get(task.assigneeId)?.fullName ||
-                                "Account Deleted"
-                              ) : (
-                                "Account Deleted"
-                              )}
-                            </Link>
+                            helperDetailsByProfileId.has(task.assigneeId) ? (
+                              <Link
+                                href={`/users/${task.assigneeId}`}
+                                className="font-medium text-blue-600 hover:text-blue-800 hover:underline capitalize"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {isBatchLoading ? (
+                                  task.assigneeName || "Loading..."
+                                ) : (
+                                  helperDetailsByProfileId.get(task.assigneeId)?.name ||
+                                  helperDetailsByProfileId.get(task.assigneeId)?.fullName ||
+                                  "Account Deleted"
+                                )}
+                              </Link>
+                            ) : (
+                              <span className="font-medium text-gray-700 capitalize">
+                                Account Deleted
+                              </span>
+                            )
                           ) : (
                             <span className="text-amber-600 font-medium italic hover:underline">
                               Assign Helper
