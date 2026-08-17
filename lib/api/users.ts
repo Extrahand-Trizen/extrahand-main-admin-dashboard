@@ -50,6 +50,18 @@ export async function getUser(userId: string): Promise<ApiResponse<User>> {
   return res;
 }
 
+export async function getUserCancellationPassStatus(userId: string): Promise<ApiResponse<{ used: number; remaining: number; total: number; month: number; year: number }>> {
+  const segment = encodeURIComponent(userId);
+  const res = await apiRequest<ApiResponse<{ used: number; remaining: number; total: number; month: number; year: number }> | null>(`/api/v1/users/${segment}/cancellation-pass-status`);
+  if (res == null || res.success === false) {
+    throw new Error(
+      (res as ApiResponse<{ used: number; remaining: number; total: number; month: number; year: number }> | null)?.error ||
+        'Cancellation pass status could not be loaded',
+    );
+  }
+  return res;
+}
+
 /**
  * Update user
  */

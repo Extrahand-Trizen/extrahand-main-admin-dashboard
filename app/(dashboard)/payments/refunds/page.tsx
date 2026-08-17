@@ -143,9 +143,42 @@ export default function PaymentRefundsPage() {
                 ) : enrichedRows.map((row) => (
                   <tr key={row.refundId} className="border-t">
                     <td className="px-3 py-2 font-mono text-xs">{row.refundId}</td>
-                    <td className="px-3 py-2">{row.CustomerUid ? <Link className="text-blue-600 hover:underline" href={`/users/${encodeURIComponent(row.links?.customerUserId || row.CustomerUid)}`}>{enrichmentMap?.[row.id] !== undefined ? (enrichmentMap[row.id]?.customerName ?? "Account Deleted") : row.CustomerUid}</Link> : "—"}</td>
-                    <td className="px-3 py-2">{row.taskId ? <Link className="text-blue-600 hover:underline" href={`/tasks/${encodeURIComponent(row.links?.taskId || row.taskId)}`}>{enrichmentMap?.[row.id] !== undefined ? (enrichmentMap[row.id]?.taskTitle ?? "Task Deleted") : row.taskId}</Link> : "—"}</td>
-                    <td className="px-3 py-2">{row.performerUid ? <Link className="text-blue-600 hover:underline" href={`/users/${encodeURIComponent(row.links?.helperUserId || row.performerUid)}`}>{enrichmentMap?.[row.id] !== undefined ? (enrichmentMap[row.id]?.helperName ?? "Account Deleted") : row.performerUid}</Link> : "—"}</td>
+                    <td className="px-3 py-2">
+                      {row.CustomerUid || row.links?.customerUserId ? (
+                        <Link
+                          className="text-blue-600 hover:underline"
+                          href={`/users/${encodeURIComponent(row.links?.customerUserId || row.CustomerUid || '')}`}
+                        >
+                          {row.links?.customerName || (enrichmentMap?.[row.id] !== undefined ? (enrichmentMap[row.id]?.customerName ?? "Account Deleted") : row.CustomerUid)}
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      {row.taskId || row.links?.taskId ? (
+                        <Link
+                          className="text-blue-600 hover:underline"
+                          href={`/tasks/${encodeURIComponent(row.links?.taskId || row.taskId || '')}`}
+                        >
+                          {row.links?.taskTitle || (enrichmentMap?.[row.id] !== undefined ? (enrichmentMap[row.id]?.taskTitle ?? "Task Deleted") : row.taskId)}
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      {row.performerUid || row.links?.helperUserId ? (
+                        <Link
+                          className="text-blue-600 hover:underline"
+                          href={`/users/${encodeURIComponent(row.links?.helperUserId || row.performerUid || '')}`}
+                        >
+                          {row.links?.helperName || (enrichmentMap?.[row.id] !== undefined ? (enrichmentMap[row.id]?.helperName ?? "Account Deleted") : row.performerUid)}
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                     <td className="px-3 py-2">₹{row.refundAmount}</td>
                     <td className="px-3 py-2">
                       {canUpdateRefund ? (

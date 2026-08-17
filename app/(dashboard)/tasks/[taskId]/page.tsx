@@ -48,10 +48,11 @@ import {
   updateTaskCallStatus,
 } from "@/lib/api/task-calls";
 import { getUser } from "@/lib/api/users";
-import { listPaymentPayouts, listPaymentTransactions } from "@/lib/api/payments";
-import { PaymentTransaction } from "@/types";
+import { listPaymentPayouts, listPaymentTransactions, listPaymentRefunds, processRefund } from "@/lib/api/payments";
+import { PaymentTransaction, PaymentRefund } from "@/types";
 import AssignHelperModal from "@/components/assign-helper-modal";
 import { TaskProgressCard } from "@/components/task-progress-card";
+import { BookNowDispatchLogCard } from "@/components/book-now-dispatch-log-card";
 import { unassignHelper } from "@/lib/api/tasks";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -218,9 +219,16 @@ export default function TaskDetailsPage() {
 
   const { data: transactionData } = useQuery({
     queryKey: ["task-transactions", taskId],
-    queryFn: () => listPaymentTransactions({ q: taskId, limit: 1 }),
+    queryFn: () => listPaymentTransactions({ q: taskId, limit: 5 }),
     enabled: isValidTaskId && hasPermission("payment.view"),
   });
+
+  const { data: refundsData } = useQuery({
+    queryKey: ["task-refunds", taskId],
+    queryFn: () => listPaymentRefunds({ q: taskId, limit: 5 }),
+    enabled: isValidTaskId && hasPermission("payment.view"),
+  });
+
 
   const deleteMutation = useMutation({
     mutationFn: ({ taskId, reason }: { taskId: string; reason: string }) =>
@@ -295,6 +303,66 @@ export default function TaskDetailsPage() {
     },
     onError: (error: any) => {
       toast.error(error.message || "Failed to add note");
+    },
+  });
+
+  const refundMutation = useMutation({
+    mutationFn: (params: {
+      razorpayOrderId?: string;
+      razorpayPaymentId?: string;
+      taskId?: string;
+      taskStartDate: string;
+    }) =>
+      processRefund({
+        razorpayOrderId: params.razorpayOrderId,
+        razorpayPaymentId: params.razorpayPaymentId,
+        taskId: params.taskId,
+        reason: "Admin refund - Full customer refund via Razorpay",
+        cancelledBy: "performer",
+        taskStartDate: params.taskStartDate,
+        cancelledAt: new Date().toISOString(),
+      }),
+    onSuccess: (data: any) => {
+      const refundAmount =
+        transaction?.amountInRupees ||
+        (task?.budget ? String(Math.round(task.budget * 1.18 * 100) / 100) : String(task?.budget || ''));
+
+      const newRefundRecord: PaymentRefund = {
+        id: Date.now(),
+        refundId: data?.data?.refund?.refundId || data?.data?.refundId || `refund_${Date.now()}`,
+        paymentId: transaction?.razorpayPaymentId || '',
+        taskId: taskId,
+        refundAmount: String(refundAmount),
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+      };
+
+      // Instantly update task-refunds cache for immediate zero-delay display
+      queryClient.setQueryData(['task-refunds', taskId], (old: any) => ({
+        success: true,
+        data: [newRefundRecord, ...(old?.data || [])],
+      }));
+
+      // Instantly update task cache
+      queryClient.setQueryData(['task', taskId], (old: any) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            escrowStatus: 'refunded',
+            paymentStatus: 'refunded',
+          },
+        };
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['task', taskId] });
+      queryClient.invalidateQueries({ queryKey: ['task-transactions', taskId] });
+      queryClient.invalidateQueries({ queryKey: ['task-refunds', taskId] });
+      toast.success('Refund processed successfully via Razorpay');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to process refund");
     },
   });
 
@@ -374,16 +442,50 @@ export default function TaskDetailsPage() {
   const applications = applicationsData?.data || [];
   const payouts = payoutsData?.data || [];
   const payoutStatus = payouts.find((p: any) => p.taskId === taskId || p.escrow?.taskId === taskId)?.status || task?.payoutStatus;
-  const transaction = transactionData?.data?.find((t: PaymentTransaction) => t.taskId === taskId);
+  const transaction = transactionData?.data?.find(
+    (t: PaymentTransaction) =>
+      (t.taskId && String(t.taskId) === String(taskId)) ||
+      (t.escrowId && String(t.escrowId) === String(taskId)) ||
+      (t.id && String(t.id) === String((task as any)?.transactionId || (task as any)?.paymentTransactionId))
+  );
+  const refund = refundsData?.data?.find(
+    (r: PaymentRefund) =>
+      (r.taskId && String(r.taskId) === String(taskId)) ||
+      (transaction?.razorpayPaymentId && String(r.paymentId) === String(transaction.razorpayPaymentId))
+  );
+  const isThisTaskRefunded =
+    Boolean(refund) ||
+    task?.escrowStatus === "refunded" ||
+    task?.paymentStatus === "refunded" ||
+    (transaction?.status === "refunded" && String(transaction.taskId) === String(taskId));
+
   const escrowStatus = transaction?.status;
   const paymentStatus = transaction?.paymentStatus;
   const taskWithPayoutStatus = task ? {
     ...task,
     payoutStatus,
-    escrowStatus: escrowStatus || task?.escrowStatus,
-    paymentStatus: paymentStatus || task?.paymentStatus,
+    escrowStatus: isThisTaskRefunded ? "refunded" : (escrowStatus || task?.escrowStatus),
+    paymentStatus: isThisTaskRefunded ? "refunded" : (paymentStatus || task?.paymentStatus),
   } : undefined;
+
   const customerProfileId = extractCustomerProfileId(task);
+
+  const handleRefund = () => {
+    const orderId = transaction?.razorpayOrderId || (task as any)?.razorpayOrderId;
+    const paymentId = transaction?.razorpayPaymentId || (task as any)?.razorpayPaymentId;
+
+    if (!orderId && !taskId) {
+      toast.error("Payment transaction details not found");
+      return;
+    }
+    refundMutation.mutate({
+      razorpayOrderId: orderId ? String(orderId) : undefined,
+      razorpayPaymentId: paymentId ? String(paymentId) : undefined,
+      taskId: taskId,
+      taskStartDate: task?.createdAt || new Date().toISOString(),
+    });
+  };
+
 
   // Extract the actual helper's assigneeId from raw task data (MongoDB field)
   const rawAssigneeId = (task as any)?.assigneeId;
@@ -464,6 +566,17 @@ export default function TaskDetailsPage() {
     accepted: "success",
     rejected: "destructive",
   };
+
+  const isPaymentCaptured =
+    transaction?.paymentStatus === "captured" ||
+    transaction?.status === "held" ||
+    transaction?.status === "released" ||
+    (task?.bookingSource === "book_now" && task?.paymentStatus === "captured");
+  const isAlreadyRefunded =
+    isThisTaskRefunded ||
+    (transaction?.status === "cancelled" && String(transaction.taskId) === String(taskId)) ||
+    (task?.status === "cancelled" && (task?.escrowStatus === "refunded" || transaction?.status === "refunded"));
+  const canRefund = (isPaymentCaptured || task?.bookingSource === "book_now") && !isAlreadyRefunded;
 
   if (!hasPermission("task.view")) {
     return (
@@ -706,12 +819,18 @@ export default function TaskDetailsPage() {
 
           <TaskProgressCard
             task={taskWithPayoutStatus as any}
+            refund={refund}
+            transaction={transaction}
             onAssignHelper={() => setAssignModalOpen(true)}
+            onRefundCustomer={handleRefund}
+            isRefunding={refundMutation.isPending}
+            canRefund={canRefund}
           />
 
           {/* Applications / Helper Assignment */}
           {task.bookingSource === "book_now" ? (
-            <Card>
+            <>
+              <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle>Helper Assignment</CardTitle>
@@ -809,6 +928,10 @@ export default function TaskDetailsPage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Book Now Auto-Assignment Dispatch Log */}
+            <BookNowDispatchLogCard task={task} />
+          </>
           ) : hasPermission("task.application.list") ? (
             <Card>
               <CardHeader>

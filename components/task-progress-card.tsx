@@ -1,10 +1,20 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import {
   CheckCircle,
   Circle,
@@ -13,13 +23,19 @@ import {
   Wrench,
   Star,
   X,
+  RotateCcw,
 } from 'lucide-react'
 import { cn, formatCurrency, formatDateTime } from '@/lib/utils'
-import { Task } from '@/types'
+import { Task, PaymentRefund, PaymentTransaction } from '@/types'
 
 interface TaskProgressCardProps {
   task: Task
+  refund?: PaymentRefund | null
+  transaction?: PaymentTransaction | null
   onAssignHelper?: () => void
+  onRefundCustomer?: () => void
+  isRefunding?: boolean
+  canRefund?: boolean
 }
 
 type StepState = 'done' | 'active' | 'future' | 'cancelled'
@@ -83,8 +99,8 @@ function getPaymentState(task: Task): { captured: boolean; failed: boolean; init
   }
   const ps = task.paymentStatus?.toLowerCase()
   const es = task.escrowStatus?.toLowerCase()
-  const captured = ps === 'captured' || es === 'held' || es === 'released'
-  const failed = ps === 'failed' || es === 'cancelled' || es === 'refunded'
+  const captured = ps === 'captured' || es === 'held' || es === 'released' || es === 'refunded' || ps === 'refunded'
+  const failed = ps === 'failed' || es === 'cancelled'
   const initiated = !!(ps && ps !== 'failed') || !!(es)
   return { captured, failed, initiated }
 }
@@ -101,7 +117,7 @@ function getPaymentBadge(task: Task, budget: number): { label: string; className
   }
   if (failed) {
     return {
-      label: `${formatCurrency(budget)} · ${task.paymentStatus === 'failed' ? 'Failed' : task.escrowStatus === 'refunded' ? 'Refunded' : 'Cancelled'}`,
+      label: `${formatCurrency(budget)} · ${task.paymentStatus === 'failed' ? 'Failed' : 'Cancelled'}`,
       className: 'bg-red-50 text-red-700 border-red-200',
     }
   }
@@ -111,10 +127,38 @@ function getPaymentBadge(task: Task, budget: number): { label: string; className
   }
 }
 
-function getLifecycleSteps(task: Task): LifecycleStep[] {
+function checkIsTaskRefunded(task: Task, refund?: PaymentRefund | null): boolean {
+  if (refund) {
+    const currentTaskId = String(task.taskId || (task as any)._id || (task as any).id || '')
+    if (refund.taskId && String(refund.taskId) === currentTaskId) return true
+    if (!refund.taskId) return true
+    return false
+  }
+  const es = task.escrowStatus?.toLowerCase()
+  const ps = task.paymentStatus?.toLowerCase()
+  return es === 'refunded' || ps === 'refunded' || (task as any)?.isRefunded === true
+}
+
+function getLifecycleSteps(task: Task, refund?: PaymentRefund | null): LifecycleStep[] {
   const status = normalizeStatus(task.status)
   const slotLabel = getSlotHoursLabel(task)
   const { captured: paymentCaptured, failed: paymentFailed } = getPaymentState(task)
+
+  const isRefunded = checkIsTaskRefunded(task, refund)
+  const currentTaskId = String(task.taskId || (task as any)._id || (task as any).id || '')
+  const hasMatchingRefundRecord = Boolean(refund && (!refund.taskId || String(refund.taskId) === currentTaskId))
+
+  const refundStep: LifecycleStep = {
+    id: 'refund',
+    label: 'Payment refunded',
+    state: 'done',
+    timestamp: (hasMatchingRefundRecord && refund?.createdAt) || (task as any)?.refundedAt || task.updatedAt,
+    badge: {
+      label: `${formatCurrency(hasMatchingRefundRecord && refund?.refundAmount ? Number(refund.refundAmount) : task.budget)} · Refunded`,
+      className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    },
+    detail: hasMatchingRefundRecord && refund?.status ? `Refund ${refund.status} via Razorpay` : 'Full customer refund processed via Razorpay',
+  }
 
   if (status === 'cancelled') {
     const cancelIndex = getCancellationStepIndex(task)
@@ -127,6 +171,13 @@ function getLifecycleSteps(task: Task): LifecycleStep[] {
         timestamp: task.createdAt,
         badge: getPaymentBadge(task, task.budget),
       },
+    ]
+
+    if (isRefunded) {
+      steps.push(refundStep)
+    }
+
+    steps.push(
       {
         id: 'helper',
         label: 'Helper assignment',
@@ -158,7 +209,7 @@ function getLifecycleSteps(task: Task): LifecycleStep[] {
         state: cancelIndex === 4 ? 'cancelled' : 'future',
         timestamp: task.completedAt,
       },
-    ]
+    )
 
     return steps
   }
@@ -175,7 +226,6 @@ function getLifecycleSteps(task: Task): LifecycleStep[] {
 
   const paymentDone = paymentCaptured
   const paymentActive = !paymentCaptured && !paymentFailed && status !== 'open'
-  const paymentFuture = !paymentCaptured && !paymentFailed && status === 'open'
 
   const helperDetail = helperActive
     ? task.assigneeName
@@ -185,14 +235,21 @@ function getLifecycleSteps(task: Task): LifecycleStep[] {
         : 'No helper assigned'
     : task.assigneeName
 
-  return [
+  const steps: LifecycleStep[] = [
     {
       id: 'payment',
-      label: paymentFailed ? 'Payment failed' : 'Payment captured',
+      label: paymentFailed && !isRefunded ? 'Payment failed' : 'Payment captured',
       state: paymentDone ? 'done' : paymentActive ? 'active' : 'future',
       timestamp: paymentDone ? task.createdAt : undefined,
       badge: getPaymentBadge(task, task.budget),
     },
+  ]
+
+  if (isRefunded) {
+    steps.push(refundStep)
+  }
+
+  steps.push(
     {
       id: 'helper',
       label: 'Helper assignment',
@@ -224,14 +281,20 @@ function getLifecycleSteps(task: Task): LifecycleStep[] {
       state: proofDone ? 'done' : proofActive ? 'active' : 'future',
       timestamp: task.completedAt,
     },
-  ]
+  )
+
+  return steps
 }
 
-function StepIcon({ step, index }: { step: LifecycleStep; index: number }) {
-  const icons = [CheckCircle, User, KeyRound, Wrench, CheckCircle]
-  const StepIconComponent = icons[index] ?? Circle
-
+function StepIcon({ step }: { step: LifecycleStep; index?: number }) {
   if (step.state === 'done') {
+    if (step.id === 'refund') {
+      return (
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
+          <RotateCcw className="h-4 w-4" />
+        </div>
+      )
+    }
     return (
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
         <CheckCircle className="h-4 w-4" />
@@ -240,6 +303,12 @@ function StepIcon({ step, index }: { step: LifecycleStep; index: number }) {
   }
 
   if (step.state === 'active') {
+    const StepIconComponent =
+      step.id === 'helper' ? User :
+      step.id === 'otp' ? KeyRound :
+      step.id === 'in-progress' ? Wrench :
+      step.id === 'proof' ? CheckCircle : Circle
+
     return (
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
         <StepIconComponent className="h-4 w-4" />
@@ -255,6 +324,13 @@ function StepIcon({ step, index }: { step: LifecycleStep; index: number }) {
     )
   }
 
+  const StepIconComponent =
+    step.id === 'refund' ? RotateCcw :
+    step.id === 'helper' ? User :
+    step.id === 'otp' ? KeyRound :
+    step.id === 'in-progress' ? Wrench :
+    step.id === 'proof' ? CheckCircle : Circle
+
   return (
     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-gray-200 bg-white text-gray-300">
       <StepIconComponent className="h-4 w-4" />
@@ -264,6 +340,7 @@ function StepIcon({ step, index }: { step: LifecycleStep; index: number }) {
 
 function getEscrowValueClass(escrowStatus: string): string {
   const normalized = escrowStatus.toLowerCase()
+  if (normalized.includes('refund')) return 'text-purple-600 font-medium'
   if (normalized.includes('release')) return 'text-amber-600 font-medium'
   return 'text-emerald-600 font-medium'
 }
@@ -287,24 +364,38 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function TaskProgressCard({ task, onAssignHelper }: TaskProgressCardProps) {
+export function TaskProgressCard({ task, refund, transaction, onAssignHelper, onRefundCustomer, isRefunding, canRefund }: TaskProgressCardProps) {
   const proofSectionRef = useRef<HTMLDivElement>(null)
-  const steps = getLifecycleSteps(task)
+  const [refundDialogOpen, setRefundDialogOpen] = useState(false)
+  const steps = getLifecycleSteps(task, refund)
   const status = normalizeStatus(task.status)
 
+  const isRefunded = checkIsTaskRefunded(task, refund)
+  const currentTaskId = String(task.taskId || (task as any)._id || (task as any).id || '')
+  const hasMatchingRefundRecord = Boolean(refund && (!refund.taskId || String(refund.taskId) === currentTaskId))
+
+  const fullRefundAmount =
+    (transaction?.amountInRupees ? Number(transaction.amountInRupees) : null) ||
+    (hasMatchingRefundRecord && refund?.refundAmount ? Number(refund.refundAmount) : null) ||
+    (task.budget ? Math.round(task.budget * 1.18 * 100) / 100 : 0)
+
   const { captured: paymentCaptured, failed: paymentFailed } = getPaymentState(task)
-  const escrowStatus = task.escrowStatus
-    ? task.escrowStatus.charAt(0).toUpperCase() + task.escrowStatus.slice(1)
-    : paymentFailed
-      ? 'Failed'
-      : 'Awaiting payment'
-  const payoutStatus = task.payoutStatus ?? 'Pending completion'
+  const escrowStatus = isRefunded
+    ? 'Refunded'
+    : task.escrowStatus
+      ? task.escrowStatus.charAt(0).toUpperCase() + task.escrowStatus.slice(1)
+      : paymentFailed
+        ? 'Failed'
+        : 'Awaiting payment'
+  const payoutStatus = isRefunded ? 'Cancelled (Refunded)' : (task.payoutStatus ?? 'Pending completion')
+  const partnerConfirmed = task.bookingSource === 'book_now' && Boolean(task.confirmed)
 
   const scrollToProof = () => {
     proofSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle className="text-lg font-semibold">Work progress</CardTitle>
@@ -368,12 +459,53 @@ export function TaskProgressCard({ task, onAssignHelper }: TaskProgressCardProps
                     )}
 
                     {step.badge && (
-                      <Badge
-                        variant="outline"
-                        className={cn('mt-2', step.badge.className)}
-                      >
-                        {step.badge.label}
-                      </Badge>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <Badge
+                          variant="outline"
+                          className={cn(step.badge.className)}
+                        >
+                          {step.badge.label}
+                        </Badge>
+                        {step.id === 'payment' && canRefund && !isRefunded && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="h-7 text-xs px-2.5"
+                            onClick={() => setRefundDialogOpen(true)}
+                            disabled={isRefunding}
+                          >
+                            Refund customer
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                    {!step.badge && step.id === 'payment' && canRefund && !isRefunded && (
+                      <div className="mt-2">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="h-7 text-xs px-2.5"
+                          onClick={() => setRefundDialogOpen(true)}
+                          disabled={isRefunding}
+                        >
+                          Refund customer
+                        </Button>
+                      </div>
+                    )}
+
+                    {step.id === 'helper' && task.bookingSource === 'book_now' && (
+                      <div className="mt-2">
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            partnerConfirmed
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200',
+                          )}
+                        >
+                          {partnerConfirmed ? 'Confirmed by partner' : 'Not confirmed by partner'}
+                        </Badge>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -405,6 +537,14 @@ export function TaskProgressCard({ task, onAssignHelper }: TaskProgressCardProps
                 {paymentCaptured ? `${formatCurrency(task.budget)} captured` : 'Not yet captured'}
               </span>
             </div>
+            {isRefunded && (
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-gray-600">Customer refund</span>
+                <span className="font-medium text-emerald-600">
+                  {formatCurrency(hasMatchingRefundRecord && refund?.refundAmount ? Number(refund.refundAmount) : task.budget)} refunded
+                </span>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-4">
               <span className="text-gray-600">Escrow</span>
               <span className={getEscrowValueClass(escrowStatus)}>{escrowStatus}</span>
@@ -488,5 +628,39 @@ export function TaskProgressCard({ task, onAssignHelper }: TaskProgressCardProps
         </div>
       </CardContent>
     </Card>
+
+    <AlertDialog open={refundDialogOpen} onOpenChange={setRefundDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            Refund full amount of {formatCurrency(fullRefundAmount)} to customer?
+          </AlertDialogTitle>
+          <AlertDialogDescription className="space-y-2">
+            <span>
+              Are you sure you want to refund this payment? The complete amount of{' '}
+              <strong className="text-gray-900 font-semibold">{formatCurrency(fullRefundAmount)}</strong>{' '}
+              paid by the customer (including {formatCurrency(task.budget)} work amount + all GST/taxes and fees) will be refunded directly to their original payment source via Razorpay.
+            </span>
+            <span className="block text-xs text-red-600 font-medium mt-1">
+              This action will reverse the transaction and cannot be undone.
+            </span>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isRefunding}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-red-600 text-white hover:bg-red-700"
+            disabled={isRefunding}
+            onClick={() => {
+              onRefundCustomer?.()
+              setRefundDialogOpen(false)
+            }}
+          >
+            {isRefunding ? 'Processing...' : `Confirm refund (${formatCurrency(fullRefundAmount)})`}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   )
 }

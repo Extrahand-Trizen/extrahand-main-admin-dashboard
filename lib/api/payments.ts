@@ -99,6 +99,7 @@ export async function listPaymentRefunds(filters?: {
   status?: string;
   transactionType?: 'all' | 'real' | 'team';
   environment?: 'production' | 'development';
+  q?: string;
   limit?: number;
   offset?: number;
 }): Promise<PaymentListResponse<PaymentRefund>> {
@@ -108,6 +109,7 @@ export async function listPaymentRefunds(filters?: {
     params.append('transactionType', filters.transactionType);
   }
   if (filters?.environment) params.append('environment', filters.environment);
+  if (filters?.q) params.append('q', filters.q);
   if (filters?.limit) params.append('limit', String(filters.limit));
   if (filters?.offset) params.append('offset', String(filters.offset));
   const query = params.toString();
@@ -241,6 +243,25 @@ export async function deletePaymentPayout(payoutId: string): Promise<ApiResponse
 export async function deletePaymentRefund(refundId: string): Promise<ApiResponse<any>> {
   return apiRequest<ApiResponse<any>>(`/api/v1/payments/refunds/${encodeURIComponent(refundId)}`, {
     method: 'DELETE',
+  });
+}
+
+export async function processRefund(body: {
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  taskId?: string;
+  reason?: string;
+  cancelledBy: 'poster' | 'performer';
+  taskStartDate: string;
+  cancelledAt: string;
+  userId?: string;
+  amount?: number;
+  assignedAt?: string;
+  feeBaseAmount?: number;
+}): Promise<ApiResponse<any>> {
+  return apiRequest<ApiResponse<any>>('/api/v1/payments/refunds/process', {
+    method: 'POST',
+    body: JSON.stringify(body),
   });
 }
 

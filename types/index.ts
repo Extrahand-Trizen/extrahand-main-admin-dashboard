@@ -251,6 +251,8 @@ export interface Task {
   cancelledAt?: string | null;
   cancelledById?: string | null;
   cancellationReason?: string | null;
+  confirmed?: boolean | null;
+  confirmedAt?: string | null;
   completionProof?: { url: string; type: string }[] | null;
   completionStatus?: string | null;
   completionNotes?: string | null;
@@ -259,6 +261,32 @@ export interface Task {
   paymentStatus?: string | null;
   escrowStatus?: string | null;
   payoutStatus?: string | null;
+  dispatchLogs?: DispatchAreaLog[];
+}
+
+export interface DispatchCandidateLog {
+  partnerId?: string;
+  partnerUid?: string;
+  name: string;
+  status: 'eligible' | 'ineligible' | 'assigned' | 'notified' | 'timed_out' | 'declined';
+  reasons?: string[];
+  details?: string;
+  shiftTiming?: string;
+  distanceKm?: number | null;
+  notifiedAt?: string | null;
+  respondedAt?: string | null;
+}
+
+export interface DispatchAreaLog {
+  area: string;
+  isJobArea?: boolean;
+  distanceKm: number;
+  matchedCategoryCount: number;
+  eligibleCount: number;
+  notifiedCount: number;
+  acceptedCount?: number;
+  assignedCount?: number;
+  candidates: DispatchCandidateLog[];
 }
 
 export interface TaskApplication {

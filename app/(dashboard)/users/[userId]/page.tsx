@@ -38,6 +38,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   getUser,
+  getUserCancellationPassStatus,
   banUser,
   unbanUser,
   suspendUser,
@@ -86,6 +87,39 @@ const formatKycStatus = (status: boolean | string | null | undefined): string =>
   return status
     .replace(/[_-]+/g, " ")
     .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const PARTNER_SHIFT_LABELS: Record<string, string> = {
+  morning_full_time: "Morning Full-Time (8 AM–4 PM)",
+  general_day_full_time: "General Day Full-Time (10 AM–6 PM)",
+  evening_full_time: "Evening Full-Time (11:30 AM–7:30 PM)",
+  morning_rush: "Morning Rush (8 AM–12 PM)",
+  mid_day_block: "Mid-Day Block (12 PM–4 PM)",
+  afternoon_block: "Afternoon Block (3:30 PM–7:30 PM)",
+  evening_rush: "Evening Rush (5:30 PM–9:30 PM)",
+};
+
+const getPartnerShiftLabels = (partnerProfile?: any): string[] => {
+  const rawShifts = Array.isArray(partnerProfile?.workShifts)
+    ? partnerProfile.workShifts
+    : [];
+
+  if (rawShifts.length > 0) {
+    return rawShifts
+      .map((shiftId: string) => PARTNER_SHIFT_LABELS[shiftId] || shiftId)
+      .filter(Boolean);
+  }
+
+  if (partnerProfile?.workShiftType) {
+    return [partnerProfile.workShiftType];
+  }
+
+  return [];
+};
+
+const getSafeNumber = (value: unknown): number => {
+  const numericValue = Number(value ?? 0);
+  return Number.isFinite(numericValue) ? numericValue : 0;
 };
 
 export default function UserDetailsPage() {
@@ -138,10 +172,23 @@ export default function UserDetailsPage() {
 
   const user = data?.data;
 
+  const isPartnerUser =
+    user?.role === "Partner" ||
+    user?.roles?.includes("Partner") ||
+    Boolean(user?.partnerProfile?.status || user?.partnerProfile?.workAreas?.length || user?.partnerProfile?.categories?.length);
+
   const { data: registrationSourceResponse, isLoading: registrationSourceLoading } = useQuery({
     queryKey: ["user-registration-source", userId],
     queryFn: () => getUserRegistrationSource(userId),
     enabled: !!userId && hasPermission("user.view"),
+    retry: false,
+  });
+
+  const partnerUid = user?.uid || user?.userId || userId;
+  const { data: partnerPassStatusResponse } = useQuery({
+    queryKey: ["partner-cancellation-pass-status", partnerUid],
+    queryFn: () => getUserCancellationPassStatus(String(partnerUid)),
+    enabled: !!partnerUid && isPartnerUser && hasPermission("user.view"),
     retry: false,
   });
 
@@ -157,10 +204,9 @@ export default function UserDetailsPage() {
   const registrationSource = registrationSourceResponse?.data;
 
   const postgresBankAccounts = bankAccountsResponse?.data?.bankAccounts ?? [];
-  const firstVerifiedBank = postgresBankAccounts.find(
-    (a: any) => a?.isVerified || a?.isBankVerified
-  ) || postgresBankAccounts[0];
-  const combinedBankVerified = Boolean(user?.isBankVerified) || !!firstVerifiedBank;
+  const combinedBankVerified = Boolean(user?.isBankVerified) || postgresBankAccounts.some(
+    (account: any) => account?.isVerified || account?.isBankVerified,
+  );
   const banMutation = useMutation({
     mutationFn: ({ userId, reason }: { userId: string; reason: string }) =>
       banUser(userId, reason),
@@ -253,7 +299,10 @@ export default function UserDetailsPage() {
   const postedTasksValue = Number(user?.postedTasks ?? 0);
   const earnedAmountValue = Number(user?.earnedAmount ?? 0);
   const isEmailVerified = Boolean(user?.isEmailVerified ?? user?.isVerified);
-  const isPhoneVerified = true;
+  const isPhoneVerified =
+    typeof user?.phoneVerified === "boolean"
+      ? user.phoneVerified
+      : Boolean(user?.phone);
   const aadhaarKyc = user?.aadhaarKyc;
   const aadhaarRawStatus =
     user?.isAadhaarVerified
@@ -410,6 +459,19 @@ export default function UserDetailsPage() {
   const requestedTab = (searchParams.get("tab") || "").toLowerCase();
   const allowedTabs = new Set(["overview", "profile", "verification", "statistics", "business"]);
   const initialTab = allowedTabs.has(requestedTab) ? requestedTab : "overview";
+
+  const partnerShiftLabels = getPartnerShiftLabels(user.partnerProfile);
+  const partnerPassesUsed = getSafeNumber(
+    partnerPassStatusResponse?.data?.used ??
+      (user as any)?.cancellationPassStatus?.used ??
+      (user as any)?.partnerStats?.passesUsed ??
+      (user as any)?.passesUsed ??
+      (user as any)?.partnerCancellationPass?.usedPasses
+  );
+  const partnerAcceptedWorks = getSafeNumber((user as any)?.partnerStats?.acceptedWorks ?? (user as any)?.acceptedWorks ?? (user as any)?.acceptedTasks);
+  const partnerCancelledBase = getSafeNumber((user as any)?.partnerStats?.cancelledWorks ?? (user as any)?.cancelledWorks ?? (user as any)?.cancelledTasks);
+  const partnerPassesDisplay = Math.min(partnerPassesUsed, 3);
+  const partnerCancelledDisplay = partnerCancelledBase + Math.max(partnerPassesUsed - 3, 0);
 
   return (
     <div className="space-y-6">
@@ -1158,7 +1220,44 @@ export default function UserDetailsPage() {
                       <Badge variant="secondary">Not Verified</Badge>
                     )}
                   </div>
-
+                  {user.isBankVerified && (
+                    <div className="mt-2 space-y-1 text-sm">
+                      {user.maskedBankAccount && (
+                        <p className="text-gray-600">
+                          <span className="font-medium">Account:</span>{" "}
+                          {user.maskedBankAccount}
+                        </p>
+                      )}
+                      {user.bankAccount && (
+                        <div className="space-y-1">
+                          {user.bankAccount.accountHolderName && (
+                            <p className="text-gray-600">
+                              <span className="font-medium">Holder:</span>{" "}
+                              {user.bankAccount.accountHolderName}
+                            </p>
+                          )}
+                          {user.bankAccount.bankName && (
+                            <p className="text-gray-600">
+                              <span className="font-medium">Bank:</span>{" "}
+                              {user.bankAccount.bankName}
+                            </p>
+                          )}
+                          {user.bankAccount.ifsc && (
+                            <p className="text-gray-600">
+                              <span className="font-medium">IFSC:</span>{" "}
+                              {user.bankAccount.ifsc}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {user.bankVerifiedAt && (
+                        <p className="text-gray-600">
+                          <span className="font-medium">Verified:</span>{" "}
+                          {formatDateTime(user.bankVerifiedAt)}
+                        </p>
+                      )}
+                    </div>
+                  )}
                   {isSuperAdmin && (
                     <div className="mt-4">
                       <Button
@@ -1394,6 +1493,49 @@ export default function UserDetailsPage() {
               </CardContent>
             </Card>
           </div>
+
+          {isPartnerUser && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Partner Performance</CardTitle>
+                <CardDescription>Availability and work activity for this partner</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-4">
+                <div className="rounded-lg border p-4 md:col-span-2">
+                  <p className="text-sm text-gray-600">Shift Timings</p>
+                  <div className="mt-2 space-y-1">
+                    {partnerShiftLabels.length > 0 ? (
+                      partnerShiftLabels.map((shift) => (
+                        <p key={shift} className="text-sm font-medium text-gray-900">
+                          {shift}
+                        </p>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500">No shift timings selected</p>
+                    )}
+                  </div>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-gray-500">Passes Used</p>
+                  <p className="mt-2 text-2xl font-semibold text-gray-900">
+                    {partnerPassesDisplay}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-gray-500">Works Accepted</p>
+                  <p className="mt-2 text-2xl font-semibold text-gray-900">
+                    {partnerAcceptedWorks}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4 md:col-span-2">
+                  <p className="text-xs text-gray-500">Works Cancelled</p>
+                  <p className="mt-2 text-2xl font-semibold text-gray-900">
+                    {partnerCancelledDisplay}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="grid gap-4 md:grid-cols-4">
             <Card>
