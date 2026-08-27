@@ -19,6 +19,7 @@ export interface TaskCallListItem {
   notifiedOn: string;
   status: TaskCallStatus;
   followUpDate?: string | null;
+  nextRetryAt?: string | null;
   notesCount: number;
   updatedAt: string;
 }
@@ -33,11 +34,19 @@ export interface TaskCallNote {
   createdAt: string;
 }
 
+export interface TaskCallAttempt {
+  attemptedAt: string;
+  outcome: TaskCallStatus;
+  nextRetryAt?: string | null;
+}
+
 export interface TaskCallDetails {
   taskId: string;
   notificationId?: string;
   status: TaskCallStatus;
   followUpDate?: string | null;
+  nextRetryAt?: string | null;
+  callAttempts: TaskCallAttempt[];
   notes: TaskCallNote[];
   updatedAt?: string | null;
 }
@@ -69,12 +78,13 @@ export async function updateTaskCallStatus(
   taskId: string,
   status: TaskCallStatus,
   followUpDate?: string,
+  nextRetryAt?: string,
 ): Promise<ApiResponse<TaskCallDetails>> {
   return apiRequest<ApiResponse<TaskCallDetails>>(
     `/api/v1/task-calls/${encodeURIComponent(taskId)}/status`,
     {
       method: 'PATCH',
-      body: JSON.stringify({ status, followUpDate }),
+      body: JSON.stringify({ status, followUpDate, nextRetryAt }),
     },
   );
 }

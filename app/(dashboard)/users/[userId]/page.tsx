@@ -472,6 +472,26 @@ export default function UserDetailsPage() {
   const partnerCancelledBase = getSafeNumber((user as any)?.partnerStats?.cancelledWorks ?? (user as any)?.cancelledWorks ?? (user as any)?.cancelledTasks);
   const partnerPassesDisplay = Math.min(partnerPassesUsed, 3);
   const partnerCancelledDisplay = partnerCancelledBase + Math.max(partnerPassesUsed - 3, 0);
+  const partnerDocuments = [
+    ...(user.aadhaarKyc?.documents || []).map((document) => ({
+      label: `Aadhaar · ${document.label}`,
+      url: document.url,
+    })),
+    ...(user.partnerProfile?.selfie ? [{ label: "Live selfie", url: user.partnerProfile.selfie }] : []),
+    ...(user.partnerProfile?.dlFront ? [{ label: "Driving licence · Front", url: user.partnerProfile.dlFront }] : []),
+    ...(user.partnerProfile?.dlBack ? [{ label: "Driving licence · Back", url: user.partnerProfile.dlBack }] : []),
+    ...(user.partnerProfile?.rc ? [{ label: "Vehicle RC", url: user.partnerProfile.rc }] : []),
+    ...(user.partnerProfile?.workPhotos || []).map((url, index) => ({
+      label: `Work photo ${index + 1}`,
+      url,
+    })),
+    ...Object.entries(user.partnerProfile?.experienceProofs || {}).flatMap(([group, urls]) =>
+      urls.map((url, index) => ({
+        label: `${group.replace(/_/g, " ")} proof ${index + 1}`,
+        url,
+      })),
+    ),
+  ];
 
   return (
     <div className="space-y-6">
@@ -1028,6 +1048,44 @@ export default function UserDetailsPage() {
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Partner Documents</CardTitle>
+              <CardDescription>Documents and images uploaded during partner onboarding</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {partnerDocuments.map((document) => (
+                  <a
+                    key={`${document.label}-${document.url}`}
+                    href={document.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
+                  >
+                    <div className="border-b border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700">
+                      {document.label}
+                    </div>
+                    <img
+                      src={document.url}
+                      alt={document.label}
+                      className="h-48 w-full object-contain"
+                    />
+                  </a>
+                ))}
+              </div>
+              {partnerDocuments.length === 0 && (
+                <p className="py-6 text-center text-sm text-gray-500">
+                  No uploaded partner documents available.
+                </p>
+              )}
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+                <span className="font-medium">PAN:</span>{" "}
+                {user.isPANVerified ? `Verified${user.maskedPan ? ` · ${user.maskedPan}` : ""}` : "Not verified"}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Verification Tab */}

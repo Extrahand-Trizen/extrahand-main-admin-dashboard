@@ -154,6 +154,28 @@ export const listUsers = async (params?: {
   return res?.data;
 };
 
+export interface TaskPostedEmailSettings {
+  recipients: string[];
+  excludedPhones: string[];
+}
+
+export const getTaskPostedEmailSettings = async () => {
+  const res = await apiRequest<{ success: boolean; data: TaskPostedEmailSettings }>(
+    '/api/v1/admin/settings/task-posted-email',
+  );
+  return res?.data;
+};
+
+export const updateTaskPostedEmailSettings = async (
+  settings: TaskPostedEmailSettings,
+) => {
+  const res = await apiRequest<{ success: boolean; data: TaskPostedEmailSettings }>(
+    '/api/v1/admin/settings/task-posted-email',
+    { method: 'PUT', body: JSON.stringify(settings) },
+  );
+  return res?.data;
+};
+
 export const updateUser = async (
   userId: string,
   updates: {

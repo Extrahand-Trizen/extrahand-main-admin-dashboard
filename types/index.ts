@@ -130,6 +130,13 @@ export interface User {
     categories?: string[];
     workAreas?: string[];
     businessName?: string;
+    selfie?: string;
+    dlNumber?: string;
+    dlFront?: string;
+    dlBack?: string;
+    rc?: string;
+    workPhotos?: string[];
+    experienceProofs?: Record<string, string[]>;
   };
   isFaceVerified?: boolean;
   phoneVerified?: boolean;

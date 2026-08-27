@@ -50,6 +50,32 @@ export async function getTask(taskId: string): Promise<ApiResponse<Task>> {
   return apiRequest<ApiResponse<Task>>(`/api/v1/tasks/${taskId}`);
 }
 
+export async function sendTaskPostedEmail(taskId: string): Promise<ApiResponse<{
+  sent: boolean;
+  skipped?: boolean;
+  reason?: string;
+}>> {
+  return apiRequest<ApiResponse<{
+    sent: boolean;
+    skipped?: boolean;
+    reason?: string;
+  }>>(`/api/v1/tasks/${taskId}/send-email`, { method: 'POST' });
+}
+
+export interface TaskPostedEmailStatus {
+  taskId: string;
+  status: 'sent' | 'failed' | 'skipped';
+  recipients: string[];
+  lastAttemptAt: string;
+  error?: string;
+}
+
+export async function getTaskPostedEmailStatus(taskId: string): Promise<ApiResponse<TaskPostedEmailStatus | null>> {
+  return apiRequest<ApiResponse<TaskPostedEmailStatus | null>>(
+    `/api/v1/tasks/${taskId}/email-status`,
+  );
+}
+
 /**
  * Update task
  */

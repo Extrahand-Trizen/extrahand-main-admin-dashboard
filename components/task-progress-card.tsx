@@ -1,10 +1,17 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +43,164 @@ interface TaskProgressCardProps {
   onRefundCustomer?: () => void
   isRefunding?: boolean
   canRefund?: boolean
+}
+
+type CancellationCalculation = {
+  workType: string
+  policy: string
+  policyDetail: string
+  paidAmount: number
+  cancellationFee: number
+  policyFee: number
+  refundAmount: number
+  postedAt: string
+  paymentAt: string
+  workStartAt: string
+  evaluatedAt: string
+  timeStatus: string
+  formula: string
+  isEstimate: boolean
+}
+
+function money(value: number): string {
+  const exactValue = Math.max(0, Math.round(value * 100) / 100)
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(exactValue)
+}
+
+function parseScheduledStart(task: Task): Date | null {
+  if (!task.scheduledDate) return null
+  const start = new Date(task.scheduledDate)
+  if (Number.isNaN(start.getTime())) return null
+  const match = String(task.scheduledTimeStart || '').trim().match(/^(\d{1,2}):(\d{2})(?:\s*([AP]M))?$/i)
+  if (match) {
+    let hours = Number(match[1])
+    const minutes = Number(match[2])
+    const meridiem = match[3]?.toUpperCase()
+    if (meridiem === 'PM' && hours < 12) hours += 12
+    if (meridiem === 'AM' && hours === 12) hours = 0
+    start.setHours(hours, minutes, 0, 0)
+  }
+  return start
+}
+
+function getWorkType(task: Task): 'book_now' | 'hourly' | 'post_work' {
+  const source = String(task.bookingSource || '').toLowerCase().replace(/[-\s]/g, '_')
+  const taskDetails = task as Task & { categorySlug?: string; categoryLabel?: string }
+  const hourlySignals = [
+    taskDetails.categorySlug,
+    taskDetails.categoryLabel,
+    task.category,
+    task.title,
+    task.description,
+  ].map((value) => String(value || '').toLowerCase())
+  const isHourly = hourlySignals.some((value) =>
+    value.includes('hourly-helper') || value.includes('hourly helper') ||
+    value.includes('helper ·') || value.includes('helper -') ||
+    value.includes('on-demand help'),
+  )
+  if (isHourly || source.includes('hourly')) return 'hourly'
+  if (source === 'book_now') return 'book_now'
+  return 'post_work'
+}
+
+function getCancellationCalculation(
+  task: Task,
+  refund: PaymentRefund | null | undefined,
+  transaction: PaymentTransaction | null | undefined,
+  now: Date,
+): CancellationCalculation {
+  const workType = getWorkType(task)
+  const workTypeLabel = workType === 'book_now' ? 'Book Now' : workType === 'hourly' ? 'Hourly Helper' : 'Post & Choose'
+  const paidAmount = Number(transaction?.amountInRupees) || Number(task.budget) * 1.18
+  const evaluatedAt = task.cancelledAt ? new Date(task.cancelledAt) : now
+  const postedAt = new Date(task.createdAt)
+  const paymentAt = transaction?.createdAt ? new Date(transaction.createdAt) : postedAt
+  const workStart = parseScheduledStart(task)
+  const hoursUntilStart = workStart ? (workStart.getTime() - evaluatedAt.getTime()) / 3600000 : null
+  const timeStatus = hoursUntilStart === null
+    ? 'Scheduled start is unavailable'
+    : hoursUntilStart >= 0
+      ? `${hoursUntilStart < 1 ? `${Math.round(hoursUntilStart * 60)} minutes` : `${hoursUntilStart.toFixed(1)} hours`} remaining`
+      : `${Math.abs(hoursUntilStart).toFixed(1)} hours past scheduled start`
+  const isEstimate = !task.cancelledAt
+  let cancellationFee = 0
+  let policy = 'Free cancellation'
+  let policyDetail = ''
+
+  if (workType === 'book_now') {
+    const category = String(task.category || '').toLowerCase()
+    const fees = category.includes('ac')
+      ? { within24: 99, within4: 149, reached: 249, label: 'AC Services' }
+      : category.includes('appliance')
+        ? { within24: 99, within4: 99, reached: 149, label: 'Appliance Repair' }
+        : { within24: 99, within4: 199, reached: 299, label: 'Home Cleaning' }
+    const partnerReached = Boolean(task.startedAt || task.inProgressAt)
+    if (partnerReached) {
+      cancellationFee = fees.reached
+      policy = `Partner reached location (${fees.label})`
+      policyDetail = `Fixed ${money(cancellationFee)} fee after partner arrival.`
+    } else if (hoursUntilStart !== null && hoursUntilStart > 24) {
+      policy = `More than 24 hours before service (${fees.label})`
+      policyDetail = 'Free cancellation.'
+    } else if (hoursUntilStart !== null && hoursUntilStart > 4) {
+      cancellationFee = fees.within24
+      policy = `Within 24 hours (${fees.label})`
+      policyDetail = `Fixed ${money(cancellationFee)} cancellation fee.`
+    } else {
+      cancellationFee = fees.within4
+      policy = `Within 4 hours (${fees.label})`
+      policyDetail = `Fixed ${money(cancellationFee)} cancellation fee.`
+    }
+  } else if (workType === 'hourly') {
+    const arrived = Boolean(task.startedAt || task.inProgressAt)
+    if (arrived) {
+      cancellationFee = Math.min(99, paidAmount)
+      policy = 'After helper arrival'
+      policyDetail = `First-hour rate (${money(99)}), capped at the amount paid.`
+    } else if (hoursUntilStart !== null && hoursUntilStart > 2) {
+      policy = 'More than 120 minutes before start'
+      policyDetail = 'Free cancellation.'
+    } else {
+      cancellationFee = Math.min(49, paidAmount)
+      policy = 'Within 120 minutes before start'
+      policyDetail = `Flat ${money(cancellationFee)} late-cancellation fee.`
+    }
+  } else if (hoursUntilStart !== null && hoursUntilStart > 24) {
+    policy = 'More than 24 hours before work'
+    policyDetail = 'Free cancellation.'
+  } else if (hoursUntilStart !== null && hoursUntilStart > 1) {
+    cancellationFee = paidAmount * 0.1
+    policy = 'Within 24 hours before work'
+    policyDetail = '10% of the work amount.'
+  } else {
+    cancellationFee = paidAmount * 0.2
+    policy = 'Within 1 hour before work'
+    policyDetail = '20% of the work amount.'
+  }
+
+  const refundAmount = Math.max(0, paidAmount - cancellationFee)
+
+  return {
+    workType: workTypeLabel,
+    policy,
+    policyDetail,
+    paidAmount,
+    cancellationFee,
+    policyFee: cancellationFee,
+    refundAmount,
+    postedAt: postedAt.toISOString(),
+    paymentAt: paymentAt.toISOString(),
+    workStartAt: workStart?.toISOString() || '',
+    evaluatedAt: evaluatedAt.toISOString(),
+    timeStatus,
+    formula: `${money(paidAmount)} paid - ${money(cancellationFee)} policy fee = ${money(refundAmount)} calculated refund`,
+    isEstimate,
+  }
 }
 
 type StepState = 'done' | 'active' | 'future' | 'cancelled'
@@ -367,8 +532,16 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 export function TaskProgressCard({ task, refund, transaction, onAssignHelper, onRefundCustomer, isRefunding, canRefund }: TaskProgressCardProps) {
   const proofSectionRef = useRef<HTMLDivElement>(null)
   const [refundDialogOpen, setRefundDialogOpen] = useState(false)
+  const [calculationDialogOpen, setCalculationDialogOpen] = useState(false)
+  const [calculationNow, setCalculationNow] = useState(() => new Date())
   const steps = getLifecycleSteps(task, refund)
   const status = normalizeStatus(task.status)
+
+  useEffect(() => {
+    if (!calculationDialogOpen) return undefined
+    const interval = window.setInterval(() => setCalculationNow(new Date()), 60000)
+    return () => window.clearInterval(interval)
+  }, [calculationDialogOpen])
 
   const isRefunded = checkIsTaskRefunded(task, refund)
   const currentTaskId = String(task.taskId || (task as any)._id || (task as any).id || '')
@@ -389,6 +562,8 @@ export function TaskProgressCard({ task, refund, transaction, onAssignHelper, on
         : 'Awaiting payment'
   const payoutStatus = isRefunded ? 'Cancelled (Refunded)' : (task.payoutStatus ?? 'Pending completion')
   const partnerConfirmed = task.bookingSource === 'book_now' && Boolean(task.confirmed)
+  const cancellationCalculation = getCancellationCalculation(task, refund, transaction, calculationNow)
+  const actualRefundAmount = refund?.refundAmount ? Number(refund.refundAmount) : null
 
   const scrollToProof = () => {
     proofSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -477,6 +652,32 @@ export function TaskProgressCard({ task, refund, transaction, onAssignHelper, on
                             Refund customer
                           </Button>
                         )}
+                        {step.id === 'refund' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs px-2.5"
+                            onClick={() => {
+                              setCalculationNow(new Date())
+                              setCalculationDialogOpen(true)
+                            }}
+                          >
+                            View calculations
+                          </Button>
+                        )}
+                        {step.id === 'payment' && !isRefunded && (getWorkType(task) !== 'post_work' || paymentCaptured) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs px-2.5"
+                            onClick={() => {
+                              setCalculationNow(new Date())
+                              setCalculationDialogOpen(true)
+                            }}
+                          >
+                            View calculations
+                          </Button>
+                        )}
                       </div>
                     )}
                     {!step.badge && step.id === 'payment' && canRefund && !isRefunded && (
@@ -525,6 +726,45 @@ export function TaskProgressCard({ task, refund, transaction, onAssignHelper, on
             </Button>
           )}
         </div>
+
+        <Dialog open={calculationDialogOpen} onOpenChange={setCalculationDialogOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Cancellation calculation</DialogTitle>
+              <DialogDescription>
+                {cancellationCalculation.workType} policy evaluated using the payment and schedule data on this work.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 text-sm">
+              <div className="grid grid-cols-1 gap-2 rounded-md border border-gray-200 bg-gray-50 p-3 sm:grid-cols-2">
+                <div><span className="text-gray-500">Work posted</span><p className="font-medium">{formatDateTime(cancellationCalculation.postedAt)}</p></div>
+                <div><span className="text-gray-500">Payment captured</span><p className="font-medium">{formatDateTime(cancellationCalculation.paymentAt)}</p></div>
+                <div><span className="text-gray-500">Work starts</span><p className="font-medium">{cancellationCalculation.workStartAt ? formatDateTime(cancellationCalculation.workStartAt) : 'Unavailable'}</p></div>
+                <div><span className="text-gray-500">{isRefunded ? 'Cancelled at' : 'Evaluated at'}</span><p className="font-medium">{formatDateTime(cancellationCalculation.evaluatedAt)}</p></div>
+              </div>
+              <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                <span className="text-gray-500">Time status</span>
+                <span className="font-medium text-gray-900">{cancellationCalculation.timeStatus}</span>
+              </div>
+              <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
+                <p className="font-semibold text-blue-900">{cancellationCalculation.policy}</p>
+                <p className="mt-1 text-blue-800">{cancellationCalculation.policyDetail}</p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between"><span className="text-gray-500">Total amount paid</span><span className="font-medium">{money(cancellationCalculation.paidAmount)}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Policy cancellation fee</span><span className="font-medium text-red-700">{money(cancellationCalculation.policyFee)}</span></div>
+                {isRefunded && actualRefundAmount !== null && Number.isFinite(actualRefundAmount) ? (
+                  <div className="flex justify-between border-t border-gray-200 pt-2"><span className="font-semibold">Amount refunded</span><span className="font-semibold text-emerald-700">{money(actualRefundAmount)}</span></div>
+                ) : (
+                  <div className="flex justify-between border-t border-gray-200 pt-2"><span className="font-semibold">Calculated refund</span><span className="font-semibold text-emerald-700">{money(cancellationCalculation.refundAmount)}</span></div>
+                )}
+              </div>
+              <p className="rounded-md bg-gray-100 p-2 font-mono text-xs text-gray-700">{isRefunded && actualRefundAmount !== null && Number.isFinite(actualRefundAmount) ? `${money(cancellationCalculation.paidAmount)} paid - ${money(Math.max(0, cancellationCalculation.paidAmount - actualRefundAmount))} retained = ${money(actualRefundAmount)} refunded` : cancellationCalculation.formula}</p>
+              <p className="text-xs text-gray-500">The amount paid includes any captured tax. Tax is refunded as part of the remaining refund; it is not calculated as a separate line.</p>
+              {cancellationCalculation.isEstimate && <p className="text-xs text-amber-700">This is a live estimate based on the current time. The final amount is determined when cancellation is submitted.</p>}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <Separator />
 

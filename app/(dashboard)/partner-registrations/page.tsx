@@ -187,6 +187,35 @@ export default function PartnerRegistrationsPage() {
     ({ page, limit, total: 0, pages: 1 } as const);
   const summary = data?.summary || {};
 
+  const getPartnerDocuments = (partner: User) => {
+    const aadhaarDocuments = partner.aadhaarKyc?.documents ||
+      (partner.aadhaarKyc?.imageUrls || []).map((url, index) => ({
+        label: `Aadhaar ${index + 1}`,
+        url,
+      }));
+    const profile = partner.partnerProfile;
+    return [
+      ...aadhaarDocuments.map((document) => ({
+        label: `Aadhaar · ${document.label}`,
+        url: document.url,
+      })),
+      ...(profile?.selfie ? [{ label: 'Live selfie', url: profile.selfie }] : []),
+      ...(profile?.dlFront ? [{ label: 'Driving licence · Front', url: profile.dlFront }] : []),
+      ...(profile?.dlBack ? [{ label: 'Driving licence · Back', url: profile.dlBack }] : []),
+      ...(profile?.rc ? [{ label: 'Vehicle RC', url: profile.rc }] : []),
+      ...(profile?.workPhotos || []).map((url, index) => ({
+        label: `Work photo ${index + 1}`,
+        url,
+      })),
+      ...Object.entries(profile?.experienceProofs || {}).flatMap(([category, urls]) =>
+        urls.map((url, index) => ({
+          label: `${category.replace(/_/g, ' ')} proof ${index + 1}`,
+          url,
+        })),
+      ),
+    ];
+  };
+
   const dynamicPartnerCategories = Array.from(
     new Set(
       users.flatMap((user) => user.partnerProfile?.categories || []),
@@ -704,6 +733,37 @@ export default function PartnerRegistrationsPage() {
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <span>📄</span> Documents & Proofs
                 </h3>
+
+                <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <p className="font-medium text-sm mb-1">PAN Verification</p>
+                  <p className="text-sm text-gray-700">
+                    {selectedPartner.isPANVerified ? 'Verified' : 'Not verified'}
+                    {selectedPartner.maskedPan ? ` · ${selectedPartner.maskedPan}` : ''}
+                  </p>
+                </div>
+
+                {getPartnerDocuments(selectedPartner).length > 0 && (
+                  <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {getPartnerDocuments(selectedPartner).map((document) => (
+                      <a
+                        key={`${document.label}-${document.url}`}
+                        href={document.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="overflow-hidden rounded-lg border border-gray-200 bg-gray-50 hover:shadow-sm"
+                      >
+                        <div className="border-b border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700">
+                          {document.label}
+                        </div>
+                        <img
+                          src={document.url}
+                          alt={document.label}
+                          className="h-40 w-full object-contain"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                )}
 
                 {/* Experience Proofs */}
                 {(selectedPartner.partnerProfile as any)?.experienceProofs && (

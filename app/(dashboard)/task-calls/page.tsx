@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatDateTime } from "@/lib/utils";
 import { listTaskCalls, TaskCallStatus } from "@/lib/api/task-calls";
 
 const statusLabels: Record<TaskCallStatus, string> = {
@@ -101,6 +101,7 @@ export default function TaskCallsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="pending_calls">Pending Calls</SelectItem>
             <SelectItem value="not_updated">Not Updated</SelectItem>
             <SelectItem value="genuine">Genuine</SelectItem>
             <SelectItem value="not_genuine">Not Genuine</SelectItem>
@@ -140,7 +141,7 @@ export default function TaskCallsPage() {
                     <TableHead>Category</TableHead>
                     <TableHead>Notified On</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Callback Date</TableHead>
+                    <TableHead>Next Retry</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -162,9 +163,9 @@ export default function TaskCallsPage() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        {row.followUpDate ? (
+                        {(row.nextRetryAt || row.followUpDate) ? (
                           <span className="text-sm text-blue-700">
-                            {formatDate(row.followUpDate)}
+                            {formatDateTime((row.nextRetryAt || row.followUpDate) as string)}
                           </span>
                         ) : (
                           <span className="text-gray-400">-</span>

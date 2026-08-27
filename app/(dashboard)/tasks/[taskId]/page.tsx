@@ -23,6 +23,7 @@ import {
   Edit,
   MessageSquare,
   Search,
+  Mail,
 } from "lucide-react";
 import {
   Card,
@@ -40,6 +41,8 @@ import {
   requestTaskDelete,
   getTaskApplications,
   updateApplicationStatus,
+  sendTaskPostedEmail,
+  getTaskPostedEmailStatus,
 } from "@/lib/api/tasks";
 import {
   addTaskCallNote,
@@ -149,7 +152,7 @@ export default function TaskDetailsPage() {
   const { user } = useAuth();
   const taskId = params.taskId as string;
   const isValidTaskId = Boolean(taskId && taskId !== "undefined" && taskId !== "null");
-  const canManageTaskCalls = isOperationsRole(user?.role);
+  const canManageTaskCalls = isOperationsRole(user?.role) || isSuperAdmin;
 
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
@@ -171,10 +174,12 @@ export default function TaskDetailsPage() {
     open: boolean;
     status: TaskCallStatus;
     followUpDate: string;
+    nextRetryAt: string;
   }>({
     open: false,
     status: "not_updated",
     followUpDate: "",
+    nextRetryAt: "",
   });
   const [noteDialog, setNoteDialog] = useState({
     open: false,
@@ -208,6 +213,13 @@ export default function TaskDetailsPage() {
     queryKey: ["task-call", taskId],
     queryFn: () => getTaskCall(taskId),
     enabled: isValidTaskId && canManageTaskCalls,
+    retry: false,
+  });
+
+  const { data: taskPostedEmailStatusData, isLoading: taskPostedEmailStatusLoading } = useQuery({
+    queryKey: ["task-posted-email-status", taskId],
+    queryFn: () => getTaskPostedEmailStatus(taskId),
+    enabled: isValidTaskId && hasPermission("task.view"),
     retry: false,
   });
 
@@ -278,15 +290,17 @@ export default function TaskDetailsPage() {
     mutationFn: ({
       status,
       followUpDate,
+      nextRetryAt,
     }: {
       status: TaskCallStatus;
       followUpDate?: string;
-    }) => updateTaskCallStatus(taskId, status, followUpDate),
+      nextRetryAt?: string;
+    }) => updateTaskCallStatus(taskId, status, followUpDate, nextRetryAt),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["task-call", taskId] });
       queryClient.invalidateQueries({ queryKey: ["task-calls"] });
       toast.success("Works call stage updated");
-      setStageDialog({ open: false, status: "not_updated", followUpDate: "" });
+      setStageDialog({ open: false, status: "not_updated", followUpDate: "", nextRetryAt: "" });
     },
     onError: (error: any) => {
       toast.error(error.message || "Failed to update works call stage");
@@ -304,6 +318,21 @@ export default function TaskDetailsPage() {
     onError: (error: any) => {
       toast.error(error.message || "Failed to add note");
     },
+  });
+
+  const sendTaskPostedEmailMutation = useMutation({
+    mutationFn: () => sendTaskPostedEmail(taskId),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["task-posted-email-status", taskId] });
+      if (result?.skipped) {
+        toast.info("Email skipped because this customer is excluded");
+      } else if (result?.sent) {
+        toast.success("Work-posted email sent to all configured recipients");
+      } else {
+        toast.error("Email was not sent");
+      }
+    },
+    onError: (error: any) => toast.error(error?.message || "Failed to send email"),
   });
 
   const refundMutation = useMutation({
@@ -414,6 +443,7 @@ export default function TaskDetailsPage() {
       open: true,
       status: existingStatus,
       followUpDate: existingDate,
+      nextRetryAt: "",
     });
   };
 
@@ -422,10 +452,16 @@ export default function TaskDetailsPage() {
       toast.error("Follow-up date is required");
       return;
     }
+    if (stageDialog.status === "call_not_lifted" && !stageDialog.nextRetryAt) {
+      toast.error("Next retry time is required");
+      return;
+    }
     updateTaskCallStatusMutation.mutate({
       status: stageDialog.status,
       followUpDate:
         stageDialog.status === "follow_up" ? stageDialog.followUpDate : undefined,
+        nextRetryAt:
+          stageDialog.status === "call_not_lifted" ? stageDialog.nextRetryAt : undefined,
     });
   };
 
@@ -672,6 +708,14 @@ export default function TaskDetailsPage() {
         <div className="flex items-center gap-2">
           {canManageTaskCalls && (
             <>
+              <Button
+                variant="outline"
+                onClick={() => sendTaskPostedEmailMutation.mutate()}
+                disabled={sendTaskPostedEmailMutation.isPending}
+              >
+                <Mail className="mr-2 h-4 w-4" />
+                {sendTaskPostedEmailMutation.isPending ? "Sending..." : "Send Email"}
+              </Button>
               <Button variant="outline" onClick={openStageDialog}>
                 <Edit className="mr-2 h-4 w-4" />
                 Move Stage
@@ -1149,13 +1193,16 @@ export default function TaskDetailsPage() {
                 <div className="flex items-center justify-between gap-3">
                   <CardTitle className="text-lg">Works Verification</CardTitle>
                   {!taskCallLoading && (
-                    <span
+                    <button
+                      type="button"
+                      onClick={openStageDialog}
+                      aria-label="Update works verification status"
                       className={`inline-flex rounded-md border px-2 py-1 text-xs font-medium ${
                         taskCallStatusClasses[taskCall?.status || "not_updated"]
-                      }`}
+                      } cursor-pointer transition-opacity hover:opacity-80`}
                     >
                       {taskCallStatusLabels[taskCall?.status || "not_updated"]}
-                    </span>
+                    </button>
                   )}
                 </div>
               </CardHeader>
@@ -1170,12 +1217,61 @@ export default function TaskDetailsPage() {
                   <>
                     <div>
                       <Label className="text-xs font-medium text-gray-500">
-                        Call status
+                        Attempt history
                       </Label>
-                      <p className="mt-1 text-sm font-medium text-gray-900">
-                        {taskCallStatusLabels[taskCall?.status || "not_updated"]}
-                      </p>
+                      {taskCall?.callAttempts?.length ? (
+                        <div className="mt-2 space-y-2">
+                          {taskCall.callAttempts.map((attempt, index) => (
+                            <div
+                              key={`${attempt.attemptedAt}-${index}`}
+                              className="flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2"
+                            >
+                              <span className="text-sm font-medium text-gray-900">
+                                Attempt {index + 1}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`inline-flex rounded-md border px-2 py-1 text-xs font-medium ${
+                                    taskCallStatusClasses[attempt.outcome]
+                                  }`}
+                                >
+                                  {taskCallStatusLabels[attempt.outcome]}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  {formatDateTime(attempt.attemptedAt)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-1 text-sm text-gray-500">No attempts recorded.</p>
+                      )}
                     </div>
+                    {taskCall?.status === "call_not_lifted" && taskCall.nextRetryAt && (
+                      <div className="border-t border-gray-200 pt-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <Label className="text-xs font-medium text-gray-500">
+                              Next attempt
+                            </Label>
+                            <p className="mt-1 text-sm font-medium text-blue-700">
+                              {formatDateTime(taskCall.nextRetryAt)}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={openStageDialog}
+                            aria-label="Update next call status"
+                            className={`inline-flex rounded-md border px-2 py-1 text-xs font-medium ${
+                              taskCallStatusClasses[taskCall.status]
+                            } cursor-pointer transition-opacity hover:opacity-80`}
+                          >
+                            {taskCallStatusLabels[taskCall.status]}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     {taskCall?.followUpDate && (
                       <div>
                         <Label className="text-xs font-medium text-gray-500">
@@ -1187,9 +1283,21 @@ export default function TaskDetailsPage() {
                       </div>
                     )}
                     <div>
-                      <Label className="text-xs font-medium text-gray-500">
-                        Internal notes
-                      </Label>
+                      <div className="flex items-center justify-between gap-3">
+                        <Label className="text-xs font-medium text-gray-500">
+                          Internal notes
+                        </Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8"
+                          onClick={() => setNoteDialog({ open: true, note: "" })}
+                        >
+                          <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
+                          Add Note
+                        </Button>
+                      </div>
                       {taskCall?.notes?.length ? (
                         <div className="mt-2 space-y-3">
                           {taskCall.notes.map((item, index) => (
@@ -1215,7 +1323,72 @@ export default function TaskDetailsPage() {
                 )}
               </CardContent>
             </Card>
+
           )}
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="text-lg">Email Notification</CardTitle>
+                  {taskPostedEmailStatusData?.data?.status === "sent" ? (
+                    <Badge variant="success">Sent successfully</Badge>
+                  ) : taskPostedEmailStatusData?.data?.status === "failed" ? (
+                    <Badge variant="destructive">Failed</Badge>
+                  ) : taskPostedEmailStatusData?.data?.status === "skipped" ? (
+                    <Badge variant="secondary">Skipped</Badge>
+                  ) : (
+                    <Badge variant="outline">Not sent yet</Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {taskPostedEmailStatusLoading ? (
+                  <Skeleton className="h-16 w-full" />
+                ) : taskPostedEmailStatusData?.data ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <Label className="text-xs font-medium text-gray-500">Sent to</Label>
+                        <p className="mt-1 font-medium text-gray-900">
+                          {taskPostedEmailStatusData.data.recipients.length} recipient{taskPostedEmailStatusData.data.recipients.length === 1 ? "" : "s"}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-gray-500">Last sent at</Label>
+                        <p className="mt-1 font-medium text-gray-900">
+                          {formatDateTime(taskPostedEmailStatusData.data.lastAttemptAt)}
+                        </p>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-gray-500">Recipient emails</Label>
+                      <div className="mt-1 space-y-1">
+                        {taskPostedEmailStatusData.data.recipients.map((recipient) => (
+                          <p key={recipient} className="break-all text-sm text-gray-900">
+                            {recipient}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                    {taskPostedEmailStatusData.data.error && (
+                      <p className="text-sm text-red-700">{taskPostedEmailStatusData.data.error}</p>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => sendTaskPostedEmailMutation.mutate()}
+                      disabled={sendTaskPostedEmailMutation.isPending}
+                    >
+                      <Send className="mr-2 h-4 w-4" />
+                      {sendTaskPostedEmailMutation.isPending ? "Sending..." : "Retry email"}
+                    </Button>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500">No email attempt has been recorded.</p>
+                )}
+              </CardContent>
+            </Card>
         </div>
       </div>
 
@@ -1234,7 +1407,7 @@ export default function TaskDetailsPage() {
         open={stageDialog.open}
         onOpenChange={(open) => {
           if (!open) {
-            setStageDialog({ open: false, status: "not_updated", followUpDate: "" });
+            setStageDialog({ open: false, status: "not_updated", followUpDate: "", nextRetryAt: "" });
           } else {
             setStageDialog((dialog) => ({ ...dialog, open: true }));
           }
@@ -1289,12 +1462,30 @@ export default function TaskDetailsPage() {
                 />
               </div>
             )}
+            {stageDialog.status === "call_not_lifted" && (
+              <div className="space-y-2">
+                <Label htmlFor="next-retry-at">Next retry time *</Label>
+                <input
+                  id="next-retry-at"
+                  type="datetime-local"
+                  value={stageDialog.nextRetryAt}
+                  min={new Date().toISOString().slice(0, 16)}
+                  onChange={(event) =>
+                    setStageDialog((dialog) => ({
+                      ...dialog,
+                      nextRetryAt: event.target.value,
+                    }))
+                  }
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button
               variant="outline"
               onClick={() =>
-                setStageDialog({ open: false, status: "not_updated", followUpDate: "" })
+                setStageDialog({ open: false, status: "not_updated", followUpDate: "", nextRetryAt: "" })
               }
             >
               Cancel
