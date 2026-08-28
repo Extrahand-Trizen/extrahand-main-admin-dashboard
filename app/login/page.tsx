@@ -12,6 +12,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 
+const getPostLoginPath = () => {
+  if (typeof window === 'undefined') return '/dashboard';
+
+  const returnTo = new URLSearchParams(window.location.search).get('returnTo');
+  return returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//')
+    ? returnTo
+    : '/dashboard';
+};
+
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,7 +33,7 @@ export default function LoginPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      router.replace('/dashboard');
+      router.replace(getPostLoginPath());
     }
   }, [isAuthenticated, authLoading, router]);
 
@@ -53,7 +62,7 @@ export default function LoginPage() {
           description: `Welcome back, ${response.data.user.name}!`,
         });
         
-        router.push('/dashboard');
+        router.push(getPostLoginPath());
       } else {
         setError('Invalid email or password');
       }

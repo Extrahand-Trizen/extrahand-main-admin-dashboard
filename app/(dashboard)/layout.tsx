@@ -27,7 +27,8 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      router.push('/login');
+      const returnTo = `${window.location.pathname}${window.location.search}`;
+      router.push(`/login?returnTo=${encodeURIComponent(returnTo)}`);
     }
   }, [isAuthenticated, loading, router]);
 
