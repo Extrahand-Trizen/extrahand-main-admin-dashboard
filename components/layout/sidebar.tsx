@@ -16,6 +16,7 @@ import {
   Shield,
   ShieldCheck,
   PhoneCall,
+  ShoppingBag,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -45,6 +46,12 @@ const navigation: Array<{
     name: 'Works',
     href: '/tasks',
     icon: Briefcase,
+    permission: 'task.list',
+  },
+  {
+    name: 'Qcommerce orders',
+    href: '/qcommerce-orders',
+    icon: ShoppingBag,
     permission: 'task.list',
   },
 ];

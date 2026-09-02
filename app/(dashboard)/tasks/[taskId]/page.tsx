@@ -324,9 +324,9 @@ export default function TaskDetailsPage() {
     mutationFn: () => sendTaskPostedEmail(taskId),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["task-posted-email-status", taskId] });
-      if (result?.skipped) {
+      if (result?.data?.skipped) {
         toast.info("Email skipped because this customer is excluded");
-      } else if (result?.sent) {
+      } else if (result?.data?.sent) {
         toast.success("Work-posted email sent to all configured recipients");
       } else {
         toast.error("Email was not sent");
