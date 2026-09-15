@@ -610,7 +610,6 @@ export default function TaskDetailsPage() {
     (task?.bookingSource === "book_now" && task?.paymentStatus === "captured");
   const isAlreadyRefunded =
     isThisTaskRefunded ||
-    (transaction?.status === "cancelled" && String(transaction.taskId) === String(taskId)) ||
     (task?.status === "cancelled" && (task?.escrowStatus === "refunded" || transaction?.status === "refunded"));
   const canRefund = (isPaymentCaptured || task?.bookingSource === "book_now") && !isAlreadyRefunded;
 
