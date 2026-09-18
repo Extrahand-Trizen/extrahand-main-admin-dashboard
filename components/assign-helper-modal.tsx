@@ -24,6 +24,12 @@ interface AssignHelperModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   taskId: string;
+  onAssignmentStarted?: (assignment: {
+    helperProfileId: string;
+    helperName: string;
+    role: AssignmentRole;
+  }) => void;
+  onAssignmentFailed?: () => void;
   onAssigned: (assignment: {
     helperProfileId: string;
     helperName: string;
@@ -38,6 +44,8 @@ export default function AssignHelperModal({
   open,
   onOpenChange,
   taskId,
+  onAssignmentStarted,
+  onAssignmentFailed,
   onAssigned,
 }: AssignHelperModalProps) {
   const [step, setStep] = useState<Step>("search");
@@ -75,25 +83,24 @@ export default function AssignHelperModal({
         const helperProfileId =
           selectedHelper._id || selectedHelper.profileId || selectedHelper.userId;
         const helperName = selectedHelper.name;
+        const assignment = { helperProfileId, helperName, role };
 
+        onAssignmentStarted?.(assignment);
         await assignHelper(taskId, helperUid, helperProfileId, helperName, role);
 
         setAssigned(true);
         const modeLabel = role === "partner" ? "Partner (Book Now screen)" : "Helper (Tasker home screen)";
         toast.success(`"${selectedHelper.name}" assigned as ${modeLabel}`);
-        onAssigned({
-          helperProfileId,
-          helperName,
-          role,
-        });
+        onAssigned(assignment);
         onOpenChange(false);
       } catch (error: any) {
+        onAssignmentFailed?.();
         toast.error(error.message || "Failed to assign");
       } finally {
         setAssigning(false);
       }
     },
-    [selectedHelper, taskId, onAssigned, onOpenChange]
+    [selectedHelper, taskId, onAssignmentStarted, onAssignmentFailed, onAssigned, onOpenChange]
   );
 
   const handleClose = () => {

@@ -568,6 +568,42 @@ export default function TaskDetailsPage() {
   });
   const assignedHelper = assignedHelperData?.data;
 
+  const updateTaskAssignment = (assignment: {
+    helperProfileId: string;
+    helperName: string;
+    role: "helper" | "partner";
+  } | null) => {
+    queryClient.setQueryData(["task", taskId], (current: typeof taskData) => {
+      if (!current?.data) return current;
+
+      return {
+        ...current,
+        data: assignment
+          ? {
+              ...current.data,
+              assigneeId: assignment.helperProfileId,
+              assigneeName: assignment.helperName,
+              assignedHelperName: assignment.helperName,
+              assignedAt: new Date().toISOString(),
+              status: "assigned",
+              ...(assignment.role === "partner"
+                ? { partnerId: assignment.helperProfileId, partnerName: assignment.helperName }
+                : {}),
+            }
+          : {
+              ...current.data,
+              assigneeId: null,
+              assigneeName: null,
+              assignedHelperName: null,
+              assignedAt: null,
+              partnerId: null,
+              partnerName: null,
+              status: "open",
+            },
+      };
+    });
+  };
+
   const helperDetailQueries = useQueries({
     queries: uniqueHelperProfileIds.map((profileId) => ({
       queryKey: ["user-from-task-helper", profileId],
@@ -974,10 +1010,11 @@ export default function TaskDetailsPage() {
                         onClick={async () => {
                           if (!confirm('Unassign this helper from the task?')) return;
                           try {
+                            updateTaskAssignment(null);
                             await unassignHelper(taskId);
                             toast.success('Helper unassigned successfully');
-                            refetch();
                           } catch (err: any) {
+                            refetch();
                             toast.error(err?.message || 'Failed to unassign helper');
                           }
                         }}
@@ -1425,24 +1462,10 @@ export default function TaskDetailsPage() {
         open={assignModalOpen}
         onOpenChange={setAssignModalOpen}
         taskId={taskId}
+        onAssignmentStarted={updateTaskAssignment}
+        onAssignmentFailed={() => refetch()}
         onAssigned={({ helperProfileId, helperName, role }) => {
-          queryClient.setQueryData(["task", taskId], (current: typeof taskData) => {
-            if (!current?.data) return current;
-
-            return {
-              ...current,
-              data: {
-                ...current.data,
-                assigneeId: helperProfileId,
-                assigneeName: helperName,
-                assignedAt: new Date().toISOString(),
-                status: "assigned",
-                ...(role === "partner"
-                  ? { partnerId: helperProfileId, partnerName: helperName }
-                  : {}),
-              },
-            };
-          });
+          updateTaskAssignment({ helperProfileId, helperName, role });
         }}
       />
 
