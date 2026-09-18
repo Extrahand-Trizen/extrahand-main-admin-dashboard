@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   PhoneCall,
   ShoppingBag,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -46,6 +47,12 @@ const navigation: Array<{
     name: 'Works',
     href: '/tasks',
     icon: Briefcase,
+    permission: 'task.list',
+  },
+  {
+    name: 'Assignment Management',
+    href: '/assignment-management',
+    icon: SlidersHorizontal,
     permission: 'task.list',
   },
   {
@@ -90,6 +97,9 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
   );
   const [paymentsSectionOpen, setPaymentsSectionOpen] = useState(
     pathname?.startsWith('/payments')
+  );
+  const [assignmentSectionOpen, setAssignmentSectionOpen] = useState(
+    pathname?.startsWith('/assignment-management')
   );
 
   const handleLinkClick = () => {
@@ -157,24 +167,70 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
               pathname === item.href || pathname?.startsWith(item.href + '/');
             return (
               <Fragment key={item.name}>
-                <Link
-                  href={item.href}
-                  onClick={handleLinkClick}
-                  className={cn(
-                    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
-                    isActive
-                      ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
-                      : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
-                  )}
-                >
-                  <item.icon
+                {item.href === '/assignment-management' ? (
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => setAssignmentSectionOpen(!assignmentSectionOpen)}
+                      className={cn(
+                        'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                        isActive
+                          ? 'bg-yellow-50 text-yellow-700'
+                          : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
+                      )}
+                    >
+                      <span className="flex items-center gap-3">
+                        <item.icon className={cn('h-5 w-5', isActive ? 'text-yellow-600' : 'text-gray-400')} />
+                        {item.name}
+                      </span>
+                      {assignmentSectionOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </button>
+                  {assignmentSectionOpen && <div className="ml-6 space-y-1 border-l border-gray-200 pl-2">
+                    <Link
+                      href="/assignment-management/preferred-partners"
+                      onClick={handleLinkClick}
+                      className={cn(
+                        'block rounded-md px-3 py-2 text-xs font-medium transition-colors',
+                        pathname?.startsWith('/assignment-management/preferred-partners')
+                          ? 'bg-yellow-50 text-yellow-700'
+                          : 'text-gray-500 hover:bg-yellow-50/50 hover:text-yellow-600'
+                      )}
+                    >
+                      Preferred Partners
+                    </Link>
+                    <Link
+                      href="/assignment-management/area-rules"
+                      onClick={handleLinkClick}
+                      className={cn(
+                        'block rounded-md px-3 py-2 text-xs font-medium transition-colors',
+                        pathname?.startsWith('/assignment-management/area-rules')
+                          ? 'bg-yellow-50 text-yellow-700'
+                          : 'text-gray-500 hover:bg-yellow-50/50 hover:text-yellow-600'
+                      )}
+                    >
+                      Area Rules
+                    </Link>
+                  </div>}
+                  </div>
+                ) : (
+                  <Link
+                    href={item.href}
+                    onClick={handleLinkClick}
                     className={cn(
-                      'h-5 w-5',
-                      isActive ? 'text-yellow-600' : 'text-gray-400'
+                      'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                      isActive
+                        ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
+                        : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
                     )}
-                  />
-                  {item.name}
-                </Link>
+                  >
+                    <item.icon
+                      className={cn(
+                        'h-5 w-5',
+                        isActive ? 'text-yellow-600' : 'text-gray-400'
+                      )}
+                    />
+                    {item.name}
+                  </Link>
+                )}
                 {item.href === '/dashboard' && isOperationsAdminRole && (
                   <>
                     <Link
