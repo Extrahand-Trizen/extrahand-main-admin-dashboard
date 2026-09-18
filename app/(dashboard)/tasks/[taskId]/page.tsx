@@ -133,12 +133,12 @@ const taskCallStatusLabels: Record<TaskCallStatus, string> = {
 };
 
 const taskCallStatusClasses: Record<TaskCallStatus, string> = {
-  not_updated: "bg-amber-50 text-amber-700 border-amber-200",
-  genuine: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  not_genuine: "bg-red-50 text-red-700 border-red-200",
-  call_not_lifted: "bg-gray-100 text-gray-700 border-gray-200",
-  follow_up: "bg-blue-50 text-blue-700 border-blue-200",
-  completed: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  not_updated: "bg-amber-500 text-white border-amber-600",
+  genuine: "bg-emerald-600 text-white border-emerald-700",
+  not_genuine: "bg-red-600 text-white border-red-700",
+  call_not_lifted: "bg-gray-600 text-white border-gray-700",
+  follow_up: "bg-blue-600 text-white border-blue-700",
+  completed: "bg-indigo-600 text-white border-indigo-700 shadow-sm",
 };
 
 const isOperationsRole = (role?: string | null) =>
@@ -296,8 +296,17 @@ export default function TaskDetailsPage() {
       followUpDate?: string;
       nextRetryAt?: string;
     }) => updateTaskCallStatus(taskId, status, followUpDate, nextRetryAt),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["task-call", taskId] });
+    onSuccess: (result) => {
+      if (result?.data) {
+        queryClient.setQueryData(["task-call", taskId], (current: typeof taskCallData) => ({
+          ...current,
+          ...result,
+          data: {
+            ...current?.data,
+            ...result.data,
+          },
+        }));
+      }
       queryClient.invalidateQueries({ queryKey: ["task-calls"] });
       toast.success("Works call stage updated");
       setStageDialog({ open: false, status: "not_updated", followUpDate: "", nextRetryAt: "" });
@@ -1210,13 +1219,13 @@ export default function TaskDetailsPage() {
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between gap-3">
-                  <CardTitle className="text-lg">Works Verification</CardTitle>
+                  <CardTitle className="text-lg">Verification Stage</CardTitle>
                   {!taskCallLoading && (
                     <button
                       type="button"
                       onClick={openStageDialog}
                       aria-label="Update works verification status"
-                      className={`inline-flex rounded-md border px-2 py-1 text-xs font-medium ${
+                      className={`inline-flex rounded-md border px-3 py-1.5 text-xs font-semibold shadow-sm ${
                         taskCallStatusClasses[taskCall?.status || "not_updated"]
                       } cursor-pointer transition-opacity hover:opacity-80`}
                     >
