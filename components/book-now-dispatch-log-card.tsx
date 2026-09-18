@@ -1,13 +1,16 @@
 "use client";
 
 import React, { useState } from "react";
-import { ChevronDown, ChevronUp, ListFilter } from "lucide-react";
+import { ChevronDown, ChevronUp, ListFilter, ShieldCheck, ShieldX } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Task, DispatchAreaLog } from "@/types";
 
 interface BookNowDispatchLogCardProps {
   task: Task;
 }
+
+const GENDER_ICON: Record<string, string> = { male: "♂", female: "♀" };
+const GENDER_LABEL: Record<string, string> = { male: "Male", female: "Female", any: "Any" };
 
 export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
   const [isOpen, setIsOpen] = useState(true);
@@ -27,6 +30,14 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
   const taskTimeStr = formatTaskTime(task);
   const taskAreaName = task.location || "Yapral";
   const isAssigned = Boolean(task.assigneeId || (task as any).assignedHelperName || (task as any).partnerId);
+
+  // Gender preference from task
+  const prefGender = (task as any).preferredHelperGender as string | undefined;
+  const isHourlyTask =
+    (task as any).categorySlug === "hourly-helper" ||
+    (task as any).categorySlug === "hourly-based" ||
+    (task as any).budget?.type === "hourly";
+  const hasStrictGenderCheck = isHourlyTask && prefGender && prefGender !== "any";
 
   // Use task.dispatchLogs if present, otherwise generate realistic dispatch log data based on task context
   const dispatchLogs: DispatchAreaLog[] =
@@ -123,6 +134,36 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
 
       {isOpen && (
         <CardContent className="p-4 pt-3 space-y-5">
+          {/* ── Gender Preference Banner ── */}
+          {isHourlyTask && (
+            <div
+              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium border ${
+                hasStrictGenderCheck
+                  ? prefGender === "female"
+                    ? "bg-pink-50 border-pink-200 text-pink-800"
+                    : "bg-blue-50 border-blue-200 text-blue-800"
+                  : "bg-gray-50 border-gray-200 text-gray-600"
+              }`}
+            >
+              <ShieldCheck className="h-3.5 w-3.5 flex-shrink-0" />
+              <span>
+                {hasStrictGenderCheck ? (
+                  <>
+                    <strong>Strict gender check active</strong> — customer requested{" "}
+                    <strong>
+                      {GENDER_ICON[prefGender!]} {GENDER_LABEL[prefGender!]}
+                    </strong>{" "}
+                    helper only. Partners of other gender are strictly excluded.
+                  </>
+                ) : prefGender === "any" || !prefGender ? (
+                  "No gender preference — any eligible partner can be assigned."
+                ) : (
+                  `Gender preference: ${GENDER_LABEL[prefGender] ?? prefGender}`
+                )}
+              </span>
+            </div>
+          )}
+
           {dispatchLogs.map((areaLog, idx) => {
             const hasEligibleOrNotified =
               areaLog.eligibleCount > 0 ||
@@ -161,6 +202,9 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                     areaLog.candidates.map((cand, cIdx) => {
                       const isCandidateEligible =
                         cand.status === "eligible" || cand.status === "assigned" || cand.status === "notified";
+                      const genderFailed = cand.genderCheckResult === "failed";
+                      const genderPassed = cand.genderCheckResult === "passed";
+                      const candGender = cand.gender;
 
                       return (
                         <div key={cIdx} className="flex items-start gap-2 text-xs leading-relaxed">
@@ -173,8 +217,30 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                               ✕
                             </span>
                           )}
-                          <span className="text-gray-700">
+                          <span className="text-gray-700 flex-1">
                             <span className="font-medium text-gray-900">{cand.name}</span>
+                            {/* Gender badge */}
+                            {candGender && (
+                              <span
+                                className={`inline-flex items-center gap-0.5 ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold border ${
+                                  genderFailed
+                                    ? "bg-red-50 border-red-200 text-red-700"
+                                    : genderPassed
+                                    ? candGender === "female"
+                                      ? "bg-pink-50 border-pink-200 text-pink-700"
+                                      : "bg-blue-50 border-blue-200 text-blue-700"
+                                    : "bg-gray-50 border-gray-200 text-gray-500"
+                                }`}
+                              >
+                                {GENDER_ICON[candGender] ?? "?"} {candGender.charAt(0).toUpperCase() + candGender.slice(1)}
+                                {genderFailed && (
+                                  <ShieldX className="h-2.5 w-2.5 ml-0.5 text-red-500" />
+                                )}
+                                {genderPassed && (
+                                  <ShieldCheck className="h-2.5 w-2.5 ml-0.5 text-emerald-500" />
+                                )}
+                              </span>
+                            )}
                             {cand.details ? ` — ${cand.details}` : ""}
                           </span>
                         </div>
@@ -204,3 +270,4 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
 }
 
 export default BookNowDispatchLogCard;
+

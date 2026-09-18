@@ -193,8 +193,8 @@ export default function TasksPage() {
         followUpStatus:
           followUpFilter !== "all" ? followUpFilter : undefined,
         assignedTo: assignedToFilter !== "all" ? assignedToFilter : undefined,
-        sortBy: workTypeFilter === "book_now" ? "createdAt" : "scheduledDate",
-        sortOrder: workTypeFilter === "book_now" ? "desc" : deadlineSortOrder,
+        sortBy: "createdAt",
+        sortOrder: deadlineSortOrder,
         page,
         limit,
       }),
@@ -480,7 +480,7 @@ export default function TasksPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="deadlineSort">Deadline order</Label>
+              <Label htmlFor="createdSort">Created order</Label>
               <Select
                 value={deadlineSortOrder}
                 onValueChange={(value) => {
@@ -488,8 +488,8 @@ export default function TasksPage() {
                   setPage(1);
                 }}
               >
-                <SelectTrigger id="deadlineSort">
-                  <SelectValue placeholder="Latest to old" />
+                <SelectTrigger id="createdSort">
+                  <SelectValue placeholder="Latest to oldest" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="desc">Latest to oldest</SelectItem>

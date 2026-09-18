@@ -844,6 +844,26 @@ export default function TaskDetailsPage() {
                     </div>
                   </div>
                 )}
+                {task.preferredHelperGender && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">
+                      Helper Preference
+                    </Label>
+                    <div className="mt-1">
+                      {task.preferredHelperGender === "female" ? (
+                        <Badge className="bg-pink-100 text-pink-800 border-pink-300 font-medium">
+                          ♀ Female only (Strict)
+                        </Badge>
+                      ) : task.preferredHelperGender === "male" ? (
+                        <Badge className="bg-blue-100 text-blue-800 border-blue-300 font-medium">
+                          ♂ Male only (Strict)
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">Any Gender</Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="pt-4 border-t border-gray-200">
                 <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -1396,8 +1416,24 @@ export default function TaskDetailsPage() {
         open={assignModalOpen}
         onOpenChange={setAssignModalOpen}
         taskId={taskId}
-        onAssigned={() => {
-          queryClient.invalidateQueries({ queryKey: ["task", taskId] });
+        onAssigned={({ helperProfileId, helperName, role }) => {
+          queryClient.setQueryData(["task", taskId], (current: typeof taskData) => {
+            if (!current?.data) return current;
+
+            return {
+              ...current,
+              data: {
+                ...current.data,
+                assigneeId: helperProfileId,
+                assigneeName: helperName,
+                assignedAt: new Date().toISOString(),
+                status: "assigned",
+                ...(role === "partner"
+                  ? { partnerId: helperProfileId, partnerName: helperName }
+                  : {}),
+              },
+            };
+          });
         }}
       />
 

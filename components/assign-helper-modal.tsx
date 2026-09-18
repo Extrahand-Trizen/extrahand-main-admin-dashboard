@@ -24,7 +24,11 @@ interface AssignHelperModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   taskId: string;
-  onAssigned: () => void;
+  onAssigned: (assignment: {
+    helperProfileId: string;
+    helperName: string;
+    role: AssignmentRole;
+  }) => void;
 }
 
 type Step = "search" | "role";
@@ -77,10 +81,12 @@ export default function AssignHelperModal({
         setAssigned(true);
         const modeLabel = role === "partner" ? "Partner (Book Now screen)" : "Helper (Tasker home screen)";
         toast.success(`"${selectedHelper.name}" assigned as ${modeLabel}`);
-        onAssigned();
-        setTimeout(() => {
-          onOpenChange(false);
-        }, 1500);
+        onAssigned({
+          helperProfileId,
+          helperName,
+          role,
+        });
+        onOpenChange(false);
       } catch (error: any) {
         toast.error(error.message || "Failed to assign");
       } finally {

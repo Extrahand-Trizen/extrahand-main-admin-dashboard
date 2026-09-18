@@ -269,6 +269,7 @@ export interface Task {
   escrowStatus?: string | null;
   payoutStatus?: string | null;
   dispatchLogs?: DispatchAreaLog[];
+  preferredHelperGender?: 'any' | 'male' | 'female' | null;
 }
 
 export interface DispatchCandidateLog {
@@ -282,6 +283,8 @@ export interface DispatchCandidateLog {
   distanceKm?: number | null;
   notifiedAt?: string | null;
   respondedAt?: string | null;
+  gender?: string | null;
+  genderCheckResult?: 'passed' | 'failed' | null;
 }
 
 export interface DispatchAreaLog {
