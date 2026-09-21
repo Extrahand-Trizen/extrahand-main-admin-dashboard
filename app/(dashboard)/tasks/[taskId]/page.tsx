@@ -537,6 +537,12 @@ export default function TaskDetailsPage() {
   const assigneeProfileId: string = rawAssigneeId && rawAssigneeId !== "null"
     ? String(rawAssigneeId).trim()
     : "";
+  const persistedAssignedHelperName =
+    (task as any)?.assignedHelperName ||
+    (task as any)?.assigneeName ||
+    (task as any)?.assignedToName ||
+    (task as any)?.assignedTo?.name ||
+    "";
 
   const uniqueHelperProfileIds = Array.from(
     new Set(
@@ -965,9 +971,10 @@ export default function TaskDetailsPage() {
                         <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 text-gray-700 font-medium text-sm">
                           {(
                             assignedHelperError
-                              ? "Account Deleted"
+                              ? persistedAssignedHelperName || "Account Deleted"
                               : assignedHelper?.name ||
                                 assignedHelper?.fullName ||
+                                persistedAssignedHelperName ||
                                 "H"
                           )
                             .charAt(0)
@@ -976,13 +983,14 @@ export default function TaskDetailsPage() {
                         <div>
                           <p className="text-sm font-medium text-gray-900">
                             {assignedHelperError ? (
-                              "Account Deleted"
+                              persistedAssignedHelperName || "Account Deleted"
                             ) : assignedHelper ? (
                               assignedHelper.name ||
                               assignedHelper.fullName ||
+                              persistedAssignedHelperName ||
                               "Account Deleted"
                             ) : (
-                              "Loading..."
+                              persistedAssignedHelperName || "Loading..."
                             )}
                           </p>
                           <p className="text-xs text-gray-500">
