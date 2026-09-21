@@ -74,3 +74,12 @@ h3 {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
+
+.date-input-no-native-icon::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.date-input-no-native-icon {
+  appearance: none;
+  -webkit-appearance: none;
+}

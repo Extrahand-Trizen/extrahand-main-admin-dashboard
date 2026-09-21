@@ -14,6 +14,7 @@ import {
   ChevronsRight,
   Briefcase,
   Send,
+  Calendar,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -108,6 +109,9 @@ export default function TasksPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [followUpFilter, setFollowUpFilter] = useState<string>("all");
   const [assignedToFilter, setAssignedToFilter] = useState<string>("all");
+  const [workDateFilter, setWorkDateFilter] = useState<string>("all");
+  const [customDateFrom, setCustomDateFrom] = useState("");
+  const [customDateTo, setCustomDateTo] = useState("");
   const [deadlineSortOrder, setDeadlineSortOrder] = useState<'asc' | 'desc'>("desc");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
@@ -141,6 +145,9 @@ export default function TasksPage() {
         if (parsed.categoryFilter !== undefined) setCategoryFilter(parsed.categoryFilter);
         if (parsed.followUpFilter !== undefined) setFollowUpFilter(parsed.followUpFilter);
         if (parsed.assignedToFilter !== undefined) setAssignedToFilter(parsed.assignedToFilter);
+        if (parsed.workDateFilter !== undefined) setWorkDateFilter(parsed.workDateFilter);
+        if (parsed.customDateFrom !== undefined) setCustomDateFrom(parsed.customDateFrom);
+        if (parsed.customDateTo !== undefined) setCustomDateTo(parsed.customDateTo);
         if (parsed.deadlineSortOrder !== undefined) setDeadlineSortOrder(parsed.deadlineSortOrder);
         if (parsed.page !== undefined) setPage(parsed.page);
         if (parsed.limit !== undefined) setLimit(parsed.limit);
@@ -162,6 +169,9 @@ export default function TasksPage() {
         categoryFilter,
         followUpFilter,
         assignedToFilter,
+        workDateFilter,
+        customDateFrom,
+        customDateTo,
         deadlineSortOrder,
         page,
         limit
@@ -169,7 +179,27 @@ export default function TasksPage() {
     } catch (e) {
       console.error("Error saving filters to sessionStorage", e);
     }
-  }, [search, workTypeFilter, statusFilter, categoryFilter, followUpFilter, assignedToFilter, deadlineSortOrder, page, limit, isLoaded]);
+  }, [search, workTypeFilter, statusFilter, categoryFilter, followUpFilter, assignedToFilter, workDateFilter, customDateFrom, customDateTo, deadlineSortOrder, page, limit, isLoaded]);
+
+  const getDateString = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const workDateRange = useMemo(() => {
+    if (workDateFilter === "custom") {
+      return { from: customDateFrom || undefined, to: customDateTo || undefined };
+    }
+    if (workDateFilter === "all") return { from: undefined, to: undefined };
+
+    const date = new Date();
+    if (workDateFilter === "tomorrow") date.setDate(date.getDate() + 1);
+    if (workDateFilter === "yesterday") date.setDate(date.getDate() - 1);
+    const value = getDateString(date);
+    return { from: value, to: value };
+  }, [workDateFilter, customDateFrom, customDateTo]);
 
   const { data, isLoading, error } = useQuery({
     queryKey: [
@@ -180,6 +210,9 @@ export default function TasksPage() {
       categoryFilter,
       followUpFilter,
       assignedToFilter,
+      workDateFilter,
+      workDateRange.from,
+      workDateRange.to,
       deadlineSortOrder,
       page,
       limit,
@@ -193,6 +226,8 @@ export default function TasksPage() {
         followUpStatus:
           followUpFilter !== "all" ? followUpFilter : undefined,
         assignedTo: assignedToFilter !== "all" ? assignedToFilter : undefined,
+        scheduledDateFrom: workDateRange.from,
+        scheduledDateTo: workDateRange.to,
         sortBy: "createdAt",
         sortOrder: deadlineSortOrder,
         page,
@@ -358,7 +393,7 @@ export default function TasksPage() {
           <CardTitle className="text-lg">Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-8">
             <div className="space-y-2">
               <Label htmlFor="search">Search</Label>
               <div className="relative">
@@ -479,6 +514,67 @@ export default function TasksPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="workDate">Work Date</Label>
+              <Select
+                value={workDateFilter}
+                onValueChange={(value) => {
+                  setWorkDateFilter(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger id="workDate">
+                  <SelectValue placeholder="All dates" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Dates</SelectItem>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="tomorrow">Tomorrow</SelectItem>
+                  <SelectItem value="yesterday">Yesterday</SelectItem>
+                  <SelectItem value="custom">Custom Date</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {workDateFilter === "custom" && (
+              <div className="min-w-0 space-y-2 md:col-span-2">
+                <div className="grid min-w-0 grid-cols-2 gap-2">
+                  <div className="min-w-0 space-y-1">
+                    <span className="text-xs text-gray-500">From</span>
+                    <div className="relative">
+                      <Input
+                        aria-label="From date"
+                        type="date"
+                        value={customDateFrom}
+                        onClick={(event) => event.currentTarget.showPicker?.()}
+                        onChange={(e) => {
+                          setCustomDateFrom(e.target.value);
+                          setPage(1);
+                        }}
+                        className="date-input-no-native-icon pr-9"
+                      />
+                      <Calendar className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
+                    </div>
+                  </div>
+                  <div className="min-w-0 space-y-1">
+                    <span className="text-xs text-gray-500">To</span>
+                    <div className="relative">
+                      <Input
+                        aria-label="To date"
+                        type="date"
+                        value={customDateTo}
+                        onClick={(event) => event.currentTarget.showPicker?.()}
+                        onChange={(e) => {
+                          setCustomDateTo(e.target.value);
+                          setPage(1);
+                        }}
+                        className="date-input-no-native-icon pr-9"
+                      />
+                      <Calendar className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="createdSort">Created order</Label>
               <Select

@@ -568,6 +568,8 @@ export interface TaskFilters {
   assigneeId?: string;
   assignedTo?: string;
   bookingSource?: string;
+  scheduledDateFrom?: string;
+  scheduledDateTo?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   page?: number;
