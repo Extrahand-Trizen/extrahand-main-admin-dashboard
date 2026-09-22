@@ -108,6 +108,7 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = useState<string>("open");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [followUpFilter, setFollowUpFilter] = useState<string>("all");
+  const [paymentTypeFilter, setPaymentTypeFilter] = useState<string>("all");
   const [assignedToFilter, setAssignedToFilter] = useState<string>("all");
   const [workDateFilter, setWorkDateFilter] = useState<string>("all");
   const [customDateFrom, setCustomDateFrom] = useState("");
@@ -144,6 +145,7 @@ export default function TasksPage() {
         if (parsed.statusFilter !== undefined) setStatusFilter(parsed.statusFilter);
         if (parsed.categoryFilter !== undefined) setCategoryFilter(parsed.categoryFilter);
         if (parsed.followUpFilter !== undefined) setFollowUpFilter(parsed.followUpFilter);
+        if (parsed.paymentTypeFilter !== undefined) setPaymentTypeFilter(parsed.paymentTypeFilter);
         if (parsed.assignedToFilter !== undefined) setAssignedToFilter(parsed.assignedToFilter);
         if (parsed.workDateFilter !== undefined) setWorkDateFilter(parsed.workDateFilter);
         if (parsed.customDateFrom !== undefined) setCustomDateFrom(parsed.customDateFrom);
@@ -168,6 +170,7 @@ export default function TasksPage() {
         statusFilter,
         categoryFilter,
         followUpFilter,
+        paymentTypeFilter,
         assignedToFilter,
         workDateFilter,
         customDateFrom,
@@ -179,7 +182,7 @@ export default function TasksPage() {
     } catch (e) {
       console.error("Error saving filters to sessionStorage", e);
     }
-  }, [search, workTypeFilter, statusFilter, categoryFilter, followUpFilter, assignedToFilter, workDateFilter, customDateFrom, customDateTo, deadlineSortOrder, page, limit, isLoaded]);
+  }, [search, workTypeFilter, statusFilter, categoryFilter, followUpFilter, paymentTypeFilter, assignedToFilter, workDateFilter, customDateFrom, customDateTo, deadlineSortOrder, page, limit, isLoaded]);
 
   const getDateString = (date: Date) => {
     const year = date.getFullYear();
@@ -209,6 +212,7 @@ export default function TasksPage() {
       statusFilter,
       categoryFilter,
       followUpFilter,
+      paymentTypeFilter,
       assignedToFilter,
       workDateFilter,
       workDateRange.from,
@@ -225,6 +229,7 @@ export default function TasksPage() {
         category: categoryFilter !== "all" ? categoryFilter : undefined,
         followUpStatus:
           followUpFilter !== "all" ? followUpFilter : undefined,
+        paymentType: paymentTypeFilter !== "all" ? paymentTypeFilter : undefined,
         assignedTo: assignedToFilter !== "all" ? assignedToFilter : undefined,
         scheduledDateFrom: workDateRange.from,
         scheduledDateTo: workDateRange.to,
@@ -312,15 +317,55 @@ export default function TasksPage() {
 
   const tasks = data?.data || [];
 
+  // Client-side payment type filter — applied on top of the server result.
+  const clientFilteredTasks = useMemo(() => {
+    if (paymentTypeFilter === 'all') return tasks;
+    return (tasks as any[]).filter((task) => {
+      // If task has isFreeCoupon enriched from server:
+      if (typeof task.isFreeCoupon === 'boolean') {
+        if (paymentTypeFilter === 'free_coupon') return task.isFreeCoupon;
+        if (paymentTypeFilter === 'paid') return !task.isFreeCoupon;
+        return true;
+      }
+      // Fallback if isFreeCoupon not directly present:
+      const slug = String(task.categorySlug || '').trim().toLowerCase();
+      const cat = String(task.category || '').trim().toLowerCase();
+      const label = String(task.categoryLabel || '').trim().toLowerCase();
+      const title = String(task.title || '').trim().toLowerCase();
+      const bType = String(task.budgetType || task.budget?.type || '').trim().toLowerCase();
+      const isHourly =
+        slug === 'hourly-helper' ||
+        slug === 'hourly-based' ||
+        cat === 'hourly-helper' ||
+        cat === 'hourly-based' ||
+        label === 'hourly based' ||
+        label === 'hourly helper' ||
+        title.startsWith('helper ·') ||
+        title.startsWith('helper -') ||
+        title.includes('helper') ||
+        bType === 'hourly' ||
+        Boolean(task.hourlyHelper);
+
+      const paymentAmount = typeof task.paymentAmount === 'number'
+        ? task.paymentAmount
+        : Number(task.budget ?? 0);
+
+      const isFree = isHourly && paymentAmount === 0;
+      if (paymentTypeFilter === 'free_coupon') return isFree;
+      if (paymentTypeFilter === 'paid') return !isFree;
+      return true;
+    });
+  }, [tasks, paymentTypeFilter]);
+
   const uniqueHelperProfileIds = useMemo(() => {
     return Array.from(
       new Set(
-        tasks
+        clientFilteredTasks
           .map((task: any) => task.assigneeId)
           .filter(Boolean)
       )
     ) as string[];
-  }, [tasks]);
+  }, [clientFilteredTasks]);
 
   const { data: batchUsersData, isLoading: isBatchLoading } = useQuery({
     queryKey: ["users-batch", uniqueHelperProfileIds.join(',')],
@@ -393,7 +438,7 @@ export default function TasksPage() {
           <CardTitle className="text-lg">Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-8">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-5">
             <div className="space-y-2">
               <Label htmlFor="search">Search</Label>
               <div className="relative">
@@ -496,6 +541,25 @@ export default function TasksPage() {
               </Select>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="paymentType">Payment Type</Label>
+              <Select
+                value={paymentTypeFilter}
+                onValueChange={(value) => {
+                  setPaymentTypeFilter(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger id="paymentType">
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="free_coupon">Free (Coupon)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="assignedTo">Assigned To</Label>
               <Select
                 value={assignedToFilter}
@@ -536,7 +600,7 @@ export default function TasksPage() {
               </Select>
             </div>
             {workDateFilter === "custom" && (
-              <div className="min-w-0 space-y-2 md:col-span-2">
+              <div className="min-w-0 space-y-2 sm:col-span-2 xl:col-span-2">
                 <div className="grid min-w-0 grid-cols-2 gap-2">
                   <div className="min-w-0 space-y-1">
                     <span className="text-xs text-gray-500">From</span>
@@ -603,14 +667,14 @@ export default function TasksPage() {
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">Works List</CardTitle>
             <Badge variant="secondary">
-              {pagination.total} works
+              {paymentTypeFilter !== 'all' ? clientFilteredTasks.length : pagination.total} works
             </Badge>
           </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <TableSkeleton rows={5} />
-          ) : !data || error || tasks.length === 0 ? (
+          ) : !data || error || clientFilteredTasks.length === 0 ? (
             <div className="text-center py-8 text-gray-500">No works found</div>
           ) : (
             <>
@@ -650,7 +714,7 @@ export default function TasksPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {tasks.map((task) => {
+                    {(clientFilteredTasks as Task[]).map((task) => {
                       const taskIdentifier = getTaskIdentifier(
                         task as Partial<Task> & { _id?: string; id?: string },
                       );
@@ -772,7 +836,14 @@ export default function TasksPage() {
                           )}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-sm font-medium">
-                          {formatCurrency(task.budget)}
+                          <div>
+                            <span>{formatCurrency(task.budget)}</span>
+                            {task.isFreeCoupon && (
+                              <div className="text-[11px] font-normal text-emerald-600">
+                                Free{task.couponCode ? ` (${task.couponCode})` : ' (Coupon)'}
+                              </div>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-sm text-gray-500">
                           {task.bookingSource === "book_now" ? (

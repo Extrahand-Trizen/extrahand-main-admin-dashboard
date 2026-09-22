@@ -238,6 +238,12 @@ export interface Task {
   taskCallUpdatedAt?: string | null;
   customerId: string;
   budget: number;
+  /** Budget type from original task: 'hourly' | 'fixed'. Populated by normalizeTask in admin server. */
+  budgetType?: 'hourly' | 'fixed';
+  isHourly?: boolean;
+  paymentAmount?: number;
+  isFreeCoupon?: boolean;
+  couponCode?: string | null;
   location?: string;
   createdAt: string;
   updatedAt: string;
@@ -568,6 +574,7 @@ export interface TaskFilters {
   assigneeId?: string;
   assignedTo?: string;
   bookingSource?: string;
+  paymentType?: string; // 'paid' | 'free_coupon' | 'all'
   scheduledDateFrom?: string;
   scheduledDateTo?: string;
   sortBy?: string;
