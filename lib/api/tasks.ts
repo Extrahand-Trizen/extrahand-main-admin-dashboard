@@ -15,7 +15,7 @@ export async function listTasks(filters?: TaskFilters): Promise<ApiResponse<Task
   if (filters?.customerId) params.append('customerId', filters.customerId);
   if (filters?.assigneeId) params.append('assigneeId', filters.assigneeId);
   if (filters?.assignedTo && filters.assignedTo !== 'all') params.append('assignedTo', filters.assignedTo);
-  if (filters?.bookingSource && filters.bookingSource !== 'all') params.append('bookingSource', filters.bookingSource);
+  if (filters?.bookingSource) params.append('bookingSource', filters.bookingSource);
   if (filters?.paymentType && filters.paymentType !== 'all') params.append('paymentType', filters.paymentType);
   if (filters?.scheduledDateFrom) params.append('scheduledDateFrom', filters.scheduledDateFrom);
   if (filters?.scheduledDateTo) params.append('scheduledDateTo', filters.scheduledDateTo);

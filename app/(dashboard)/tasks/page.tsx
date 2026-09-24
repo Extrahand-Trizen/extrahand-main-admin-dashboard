@@ -224,7 +224,7 @@ export default function TasksPage() {
     queryFn: () =>
       listTasks({
         search: search || undefined,
-        bookingSource: workTypeFilter !== "all" ? workTypeFilter : undefined,
+        bookingSource: workTypeFilter,
         status: statusFilter !== "all" ? statusFilter : undefined,
         category: categoryFilter !== "all" ? categoryFilter : undefined,
         followUpStatus:
