@@ -124,6 +124,7 @@ export default function TasksPage() {
   const [followUpFilter, setFollowUpFilter] = useState<string>("all");
   const [paymentTypeFilter, setPaymentTypeFilter] = useState<string>("all");
   const [assignedToFilter, setAssignedToFilter] = useState<string>("all");
+  const [postedByFilter, setPostedByFilter] = useState<string>("all");
   const [workDateFilter, setWorkDateFilter] = useState<string>("all");
   const [customDateFrom, setCustomDateFrom] = useState("");
   const [customDateTo, setCustomDateTo] = useState("");
@@ -161,6 +162,7 @@ export default function TasksPage() {
         if (parsed.followUpFilter !== undefined) setFollowUpFilter(parsed.followUpFilter);
         if (parsed.paymentTypeFilter !== undefined) setPaymentTypeFilter(parsed.paymentTypeFilter);
         if (parsed.assignedToFilter !== undefined) setAssignedToFilter(parsed.assignedToFilter);
+        if (parsed.postedByFilter !== undefined) setPostedByFilter(parsed.postedByFilter);
         if (parsed.workDateFilter !== undefined) setWorkDateFilter(parsed.workDateFilter);
         if (parsed.customDateFrom !== undefined) setCustomDateFrom(parsed.customDateFrom);
         if (parsed.customDateTo !== undefined) setCustomDateTo(parsed.customDateTo);
@@ -187,6 +189,7 @@ export default function TasksPage() {
         followUpFilter,
         paymentTypeFilter,
         assignedToFilter,
+        postedByFilter,
         workDateFilter,
         customDateFrom,
         customDateTo,
@@ -197,7 +200,7 @@ export default function TasksPage() {
     } catch (e) {
       console.error("Error saving filters to sessionStorage", e);
     }
-  }, [search, workTypeFilter, statusFilter, categoryFilter, followUpFilter, paymentTypeFilter, assignedToFilter, workDateFilter, customDateFrom, customDateTo, scheduledTimeSortOrder, page, limit, isLoaded]);
+  }, [search, workTypeFilter, statusFilter, categoryFilter, followUpFilter, paymentTypeFilter, assignedToFilter, postedByFilter, workDateFilter, customDateFrom, customDateTo, scheduledTimeSortOrder, page, limit, isLoaded]);
 
   const getDateString = (date: Date) => {
     const year = date.getFullYear();
@@ -221,6 +224,7 @@ export default function TasksPage() {
     setFollowUpFilter("all");
     setPaymentTypeFilter("all");
     setAssignedToFilter("all");
+    setPostedByFilter("all");
     setWorkDateFilter("all");
     setCustomDateFrom("");
     setCustomDateTo("");
@@ -241,6 +245,7 @@ export default function TasksPage() {
     followUpFilter !== "all" ||
     paymentTypeFilter !== "all" ||
     assignedToFilter !== "all" ||
+    postedByFilter !== "all" ||
     workDateFilter !== "all" ||
     customDateFrom ||
     customDateTo ||
@@ -270,6 +275,7 @@ export default function TasksPage() {
       followUpFilter,
       paymentTypeFilter,
       assignedToFilter,
+      postedByFilter,
       workDateFilter,
       workDateRange.from,
       workDateRange.to,
@@ -287,6 +293,10 @@ export default function TasksPage() {
           followUpFilter !== "all" ? followUpFilter : undefined,
         paymentType: paymentTypeFilter !== "all" ? paymentTypeFilter : undefined,
         assignedTo: assignedToFilter !== "all" ? assignedToFilter : undefined,
+        postedBy:
+          postedByFilter === "customer" || postedByFilter === "team"
+            ? postedByFilter
+            : undefined,
         scheduledDateFrom: workDateRange.from,
         scheduledDateTo: workDateRange.to,
         sortBy: "scheduledDate",
@@ -372,7 +382,6 @@ export default function TasksPage() {
   };
 
   const tasks = data?.data || [];
-
   // Client-side filters (work date by schedule time, payment type) — applied on top of the server result.
   const clientFilteredTasks = useMemo(() => {
     let list = tasks;
@@ -665,6 +674,25 @@ export default function TasksPage() {
               </Select>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="postedBy">Posted By</Label>
+              <Select
+                value={postedByFilter}
+                onValueChange={(value) => {
+                  setPostedByFilter(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger id="postedBy">
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="customer">Customer</SelectItem>
+                  <SelectItem value="team">Team</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="workDate">Work Date</Label>
               <Select
                 value={workDateFilter}
@@ -738,8 +766,8 @@ export default function TasksPage() {
                   <SelectValue placeholder="Latest scheduled time" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="desc">Latest to earliest</SelectItem>
-                  <SelectItem value="asc">Earliest to latest</SelectItem>
+                  <SelectItem value="desc">Newest</SelectItem>
+                  <SelectItem value="asc">Oldest</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -803,9 +831,6 @@ export default function TasksPage() {
                       </TableHead>
                       <TableHead className="hidden lg:table-cell">
                         Deadline / Schedule
-                      </TableHead>
-                      <TableHead className="hidden lg:table-cell">
-                        Created
                       </TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -969,9 +994,6 @@ export default function TasksPage() {
                               {formatDate(task.scheduledDate)}
                             </span>
                           )}
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell text-sm text-gray-500">
-                          {formatDate(task.createdAt)}
                         </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>

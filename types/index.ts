@@ -573,6 +573,7 @@ export interface TaskFilters {
   customerId?: string;
   assigneeId?: string;
   assignedTo?: string;
+  postedBy?: 'customer' | 'team';
   bookingSource?: string;
   paymentType?: string; // 'paid' | 'free_coupon' | 'all'
   scheduledDateFrom?: string;
