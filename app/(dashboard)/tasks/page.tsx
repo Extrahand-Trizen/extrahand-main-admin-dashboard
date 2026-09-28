@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -53,7 +53,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { listTasks, deleteTask, requestTaskDelete } from "@/lib/api/tasks";
-import { listUsers } from "@/lib/api/users";
+import { getUser, listUsers } from "@/lib/api/users";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { CATEGORY_OPTIONS } from "@/lib/category-options";
@@ -65,6 +65,14 @@ import { TableSkeleton } from "@/components/LoadingSkeleton";
 
 const getTaskIdentifier = (task: Partial<Task> & { _id?: string; id?: string }) =>
   task.taskId || task._id || task.id || "";
+
+const getTaskCustomerId = (
+  task: Partial<Task> & {
+    CustomerId?: string;
+    requesterId?: string;
+    requesterProfileId?: string;
+  },
+) => String(task.CustomerId || task.customerId || task.requesterId || task.requesterProfileId || "").trim();
 
 const statusColors: Record<string, string> = {
   open: "success",
@@ -293,10 +301,7 @@ export default function TasksPage() {
           followUpFilter !== "all" ? followUpFilter : undefined,
         paymentType: paymentTypeFilter !== "all" ? paymentTypeFilter : undefined,
         assignedTo: assignedToFilter !== "all" ? assignedToFilter : undefined,
-        postedBy:
-          postedByFilter === "customer" || postedByFilter === "team"
-            ? postedByFilter
-            : undefined,
+        postedBy: postedByFilter !== "all" ? postedByFilter as "customer" | "team" : undefined,
         scheduledDateFrom: workDateRange.from,
         scheduledDateTo: workDateRange.to,
         sortBy: "scheduledDate",
@@ -382,6 +387,7 @@ export default function TasksPage() {
   };
 
   const tasks = data?.data || [];
+
   // Client-side filters (work date by schedule time, payment type) — applied on top of the server result.
   const clientFilteredTasks = useMemo(() => {
     let list = tasks;
@@ -451,6 +457,35 @@ export default function TasksPage() {
       return (firstTime - secondTime) * (scheduledTimeSortOrder === "asc" ? 1 : -1);
     });
   }, [tasks, workDateFilter, workDateRange.from, workDateRange.to, paymentTypeFilter, scheduledTimeSortOrder]);
+
+  const uniqueCustomerProfileIds = useMemo(() => {
+    return Array.from(
+      new Set(
+        clientFilteredTasks
+          .map((task: any) => getTaskCustomerId(task))
+          .filter(Boolean)
+      )
+    );
+  }, [clientFilteredTasks]);
+
+  const customerQueries = useQueries({
+    queries: uniqueCustomerProfileIds.map((customerId) => ({
+      queryKey: ["user-from-task-customer", customerId],
+      queryFn: () => getUser(customerId),
+      enabled: hasPermission("user.view"),
+      retry: false,
+    })),
+  });
+
+  const customerDetailsById = new Map(
+    uniqueCustomerProfileIds.map((customerId, index) => [
+      customerId,
+      customerQueries[index]?.data?.data,
+    ]),
+  );
+  const loadingCustomerIds = new Set(
+    uniqueCustomerProfileIds.filter((_, index) => customerQueries[index]?.isLoading),
+  );
 
   const uniqueHelperProfileIds = useMemo(() => {
     return Array.from(
@@ -766,8 +801,8 @@ export default function TasksPage() {
                   <SelectValue placeholder="Latest scheduled time" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="desc">Newest</SelectItem>
-                  <SelectItem value="asc">Oldest</SelectItem>
+                  <SelectItem value="desc">Latest to earliest</SelectItem>
+                  <SelectItem value="asc">Earliest to latest</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -811,6 +846,9 @@ export default function TasksPage() {
                         Works
                       </TableHead>
                       <TableHead className="sm:hidden">Details</TableHead>
+                      <TableHead className="hidden lg:table-cell">
+                        Customer
+                      </TableHead>
                       <TableHead className="hidden md:table-cell">
                         Category
                       </TableHead>
@@ -840,6 +878,7 @@ export default function TasksPage() {
                       const taskIdentifier = getTaskIdentifier(
                         task as Partial<Task> & { _id?: string; id?: string },
                       );
+                      const customerId = getTaskCustomerId(task);
                       return (
                       <TableRow 
                         key={taskIdentifier || `${task.title}-${task.createdAt}`}
@@ -887,6 +926,33 @@ export default function TasksPage() {
                               )}
                             </div>
                           </div>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-sm">
+                          {customerId ? (
+                            customerDetailsById.get(customerId) ? (
+                              <Link
+                                href={`/users/${customerId}`}
+                                className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {customerDetailsById.get(customerId)?.name ||
+                                  customerDetailsById.get(customerId)?.fullName ||
+                                  customerId}
+                              </Link>
+                            ) : loadingCustomerIds.has(customerId) ? (
+                              <span className="text-gray-500">Loading...</span>
+                            ) : (
+                              <Link
+                                href={`/users/${customerId}`}
+                                className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {customerId}
+                              </Link>
+                            )
+                          ) : (
+                            <span className="text-gray-400">N/A</span>
+                          )}
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
                           {task.category && (

@@ -138,6 +138,7 @@ export interface User {
     workPhotos?: string[];
     experienceProofs?: Record<string, string[]>;
   };
+  helperWorkAreas?: string[];
   isFaceVerified?: boolean;
   phoneVerified?: boolean;
   isAdminVerified?: boolean;

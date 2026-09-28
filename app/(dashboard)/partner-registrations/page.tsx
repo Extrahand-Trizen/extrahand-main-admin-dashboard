@@ -99,6 +99,32 @@ const getUserAreaLabel = (user: User) => {
   return "—";
 };
 
+const getPartnerWorkAreaLabels = (user: User) => {
+  const workAreas = user.helperWorkAreas?.length
+    ? user.helperWorkAreas
+    : user.partnerProfile?.workAreas || [];
+  const specialLabels: Record<string, string> = {
+    'bn-reddy-nagar': 'B.N. Reddy Nagar',
+    'dr-a-s-rao-nagar': 'Dr. A.S. Rao Nagar',
+    'rk-puram': 'R.K. Puram',
+    'meerpet-hb-colony': 'Meerpet H.B. Colony',
+    'lb-nagar': 'LB Nagar',
+  };
+
+  return workAreas.map((area) => {
+    const normalizedArea = area.trim();
+    if (specialLabels[normalizedArea.toLowerCase()]) {
+      return specialLabels[normalizedArea.toLowerCase()];
+    }
+    if (/^[a-z0-9]+(?:[-_][a-z0-9]+)+$/i.test(normalizedArea)) {
+      return normalizedArea
+        .replace(/[-_]+/g, ' ')
+        .replace(/\b\w/g, (character) => character.toUpperCase());
+    }
+    return normalizedArea;
+  });
+};
+
 export default function PartnerRegistrationsPage() {
   const router = useRouter();
 
@@ -444,7 +470,7 @@ export default function PartnerRegistrationsPage() {
                           {user.partnerProfile?.categories?.join(', ') || '—'}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-sm text-gray-500">
-                          {user.partnerProfile?.workAreas?.join(', ') || '—'}
+                          {getPartnerWorkAreaLabels(user).join(', ') || '—'}
                         </TableCell>
                         <TableCell className="hidden xl:table-cell text-sm text-gray-500">
                           {getUserAreaLabel(user)}
@@ -644,11 +670,11 @@ export default function PartnerRegistrationsPage() {
                     </p>
                   </div>
 
-                  {selectedPartner.partnerProfile?.workAreas && selectedPartner.partnerProfile.workAreas.length > 0 && (
+                  {getPartnerWorkAreaLabels(selectedPartner).length > 0 && (
                     <div>
                       <p className="text-sm text-gray-600 mb-2">Selected Work Areas</p>
                       <div className="flex flex-wrap gap-2">
-                        {selectedPartner.partnerProfile.workAreas.map((area) => (
+                        {getPartnerWorkAreaLabels(selectedPartner).map((area) => (
                           <Badge key={area} variant="outline">
                             {area}
                           </Badge>
