@@ -18,6 +18,7 @@ import {
   PhoneCall,
   ShoppingBag,
   SlidersHorizontal,
+  MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -41,6 +42,12 @@ const navigation: Array<{
     name: 'Partner Registrations',
     href: '/partner-registrations',
     icon: Briefcase,
+    permission: 'user.list',
+  },
+  {
+    name: 'Location Management',
+    href: '/locations',
+    icon: MapPin,
     permission: 'user.list',
   },
   {
