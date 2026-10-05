@@ -63,6 +63,34 @@ import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableSkeleton } from "@/components/LoadingSkeleton";
 
+const TASK_TIME_ZONE = "Asia/Kolkata";
+
+const getDateString = (date: Date) => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: TASK_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return `${year}-${month}-${day}`;
+};
+
+const addDaysToDateString = (dateString: string, days: number) => {
+  const [year, month, day] = dateString.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+};
+
+const getTaskScheduleDateString = (scheduledDate: string | Date | undefined | null) => {
+  if (!scheduledDate) return null;
+  const date = new Date(scheduledDate);
+  if (isNaN(date.getTime())) return null;
+  return getDateString(date);
+};
+
 const getTaskIdentifier = (task: Partial<Task> & { _id?: string; id?: string }) =>
   task.taskId || task._id || task.id || "";
 
@@ -210,20 +238,6 @@ export default function TasksPage() {
     }
   }, [search, workTypeFilter, statusFilter, categoryFilter, followUpFilter, paymentTypeFilter, assignedToFilter, postedByFilter, workDateFilter, customDateFrom, customDateTo, scheduledTimeSortOrder, page, limit, isLoaded]);
 
-  const getDateString = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
-  const getTaskScheduleDateString = (scheduledDate: string | Date | undefined | null) => {
-    if (!scheduledDate) return null;
-    const d = new Date(scheduledDate);
-    if (isNaN(d.getTime())) return null;
-    return getDateString(d);
-  };
-
   const handleClearFilters = () => {
     setSearch("");
     setWorkTypeFilter("all");
@@ -266,10 +280,9 @@ export default function TasksPage() {
     }
     if (workDateFilter === "all") return { from: undefined, to: undefined };
 
-    const date = new Date();
-    if (workDateFilter === "tomorrow") date.setDate(date.getDate() + 1);
-    if (workDateFilter === "yesterday") date.setDate(date.getDate() - 1);
-    const value = getDateString(date);
+    const today = getDateString(new Date());
+    const offset = workDateFilter === "tomorrow" ? 1 : workDateFilter === "yesterday" ? -1 : 0;
+    const value = addDaysToDateString(today, offset);
     return { from: value, to: value };
   }, [workDateFilter, customDateFrom, customDateTo]);
 
