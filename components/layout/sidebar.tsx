@@ -18,6 +18,7 @@ import {
   PhoneCall,
   ShoppingBag,
   SlidersHorizontal,
+  MapPinned,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -29,6 +30,7 @@ const navigation: Array<{
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   permission?: string;
+  superAdminOnly?: boolean;
 }> = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   {
@@ -60,6 +62,12 @@ const navigation: Array<{
     href: '/qcommerce-orders',
     icon: ShoppingBag,
     permission: 'task.list',
+  },
+  {
+    name: 'Location & Pricing',
+    href: '/location-pricing',
+    icon: MapPinned,
+    superAdminOnly: true,
   },
 ];
 
@@ -112,6 +120,7 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
 
   // Filter navigation items based on permissions
   const filteredNavigation = navigation.filter((item) => {
+    if (item.superAdminOnly && !isSuperAdmin) return false;
     if (isPaymentsOnlyRole && item.href === '/dashboard') return false;
     if (!item.permission) return true;
     return hasPermission(item.permission);
