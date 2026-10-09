@@ -39,7 +39,7 @@ const navigation: Array<{
     permission: 'user.list',
   },
   {
-    name: 'Partner Registrations',
+    name: 'Partner Management',
     href: '/partner-registrations',
     icon: Briefcase,
     permission: 'user.list',
@@ -108,6 +108,9 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
   const [assignmentSectionOpen, setAssignmentSectionOpen] = useState(
     pathname?.startsWith('/assignment-management')
   );
+  const [partnerSectionOpen, setPartnerSectionOpen] = useState(
+    pathname?.startsWith('/partner-registrations')
+  );
 
   const handleLinkClick = () => {
     if (onClose) {
@@ -174,7 +177,54 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
               pathname === item.href || pathname?.startsWith(item.href + '/');
             return (
               <Fragment key={item.name}>
-                {item.href === '/assignment-management' ? (
+                {item.href === '/partner-registrations' ? (
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => setPartnerSectionOpen(!partnerSectionOpen)}
+                      aria-expanded={partnerSectionOpen}
+                      className={cn(
+                        'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                        isActive
+                          ? 'bg-yellow-50 text-yellow-700'
+                          : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
+                      )}
+                    >
+                      <span className="flex items-center gap-3">
+                        <item.icon className={cn('h-5 w-5', isActive ? 'text-yellow-600' : 'text-gray-400')} />
+                        {item.name}
+                      </span>
+                      {partnerSectionOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </button>
+                    {partnerSectionOpen && (
+                      <div className="ml-6 space-y-1 pl-2">
+                        <Link
+                          href="/partner-registrations"
+                          onClick={handleLinkClick}
+                          className={cn(
+                            'block rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                            pathname === '/partner-registrations'
+                              ? 'bg-yellow-50 text-yellow-700'
+                              : 'text-gray-700 hover:bg-yellow-50/50 hover:text-yellow-700'
+                          )}
+                        >
+                          Partner Registrations
+                        </Link>
+                        <Link
+                          href="/partner-registrations/category-requests"
+                          onClick={handleLinkClick}
+                          className={cn(
+                            'block rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                            pathname?.startsWith('/partner-registrations/category-requests')
+                              ? 'bg-yellow-50 text-yellow-700'
+                              : 'text-gray-700 hover:bg-yellow-50/50 hover:text-yellow-700'
+                          )}
+                        >
+                          Category Requests
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                ) : item.href === '/assignment-management' ? (
                   <div className="space-y-1">
                     <button
                       onClick={() => setAssignmentSectionOpen(!assignmentSectionOpen)}

@@ -45,6 +45,23 @@ export const updateLocationZone = (
 export const deleteLocationZone = (cityId: string, zoneId: string) =>
   mutateLocation(`/api/v1/locations/cities/${encodeURIComponent(cityId)}/zones/${encodeURIComponent(zoneId)}`, 'DELETE');
 
+export const createCityLocationArea = (cityId: string, name: string) =>
+  mutateLocation(`/api/v1/locations/cities/${encodeURIComponent(cityId)}/areas`, 'POST', { name });
+
+export const updateCityLocationArea = (
+  cityId: string,
+  areaId: string,
+  updates: { name?: string; enabled?: boolean },
+) =>
+  mutateLocation(
+    `/api/v1/locations/cities/${encodeURIComponent(cityId)}/areas/${encodeURIComponent(areaId)}`,
+    'PATCH',
+    updates,
+  );
+
+export const deleteCityLocationArea = (cityId: string, areaId: string) =>
+  mutateLocation(`/api/v1/locations/cities/${encodeURIComponent(cityId)}/areas/${encodeURIComponent(areaId)}`, 'DELETE');
+
 export const createLocationArea = (cityId: string, zoneId: string, name: string) =>
   mutateLocation(
     `/api/v1/locations/cities/${encodeURIComponent(cityId)}/zones/${encodeURIComponent(zoneId)}/areas`,
