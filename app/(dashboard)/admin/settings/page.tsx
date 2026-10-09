@@ -272,8 +272,7 @@ export default function AdminSettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Support Team Assignment (Round-robin) - Hidden as requested */}
-        {/*
+        {/* Support Team Assignment (Round-robin) */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -431,7 +430,6 @@ export default function AdminSettingsPage() {
             </div>
           </CardContent>
         </Card>
-        */}
       </div>
     );
 }
