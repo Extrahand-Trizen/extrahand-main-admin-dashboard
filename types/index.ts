@@ -138,6 +138,7 @@ export interface User {
     workPhotos?: string[];
     experienceProofs?: Record<string, string[]>;
   };
+  helperWorkAreas?: string[];
   isFaceVerified?: boolean;
   phoneVerified?: boolean;
   isAdminVerified?: boolean;
@@ -573,6 +574,7 @@ export interface TaskFilters {
   customerId?: string;
   assigneeId?: string;
   assignedTo?: string;
+  postedBy?: 'customer' | 'team';
   bookingSource?: string;
   paymentType?: string; // 'paid' | 'free_coupon' | 'all'
   scheduledDateFrom?: string;

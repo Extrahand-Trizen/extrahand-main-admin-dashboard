@@ -26,6 +26,7 @@ export async function listUsers(filters?: UserFilters): Promise<ApiResponse<User
   }
   if (filters?.createdFrom) params.append('createdFrom', filters.createdFrom);
   if (filters?.createdTo) params.append('createdTo', filters.createdTo);
+  if (filters?.uids) params.append('uids', filters.uids);
 
   const query = params.toString();
   return apiRequest<ApiResponse<User[]>>(`/api/v1/users${query ? `?${query}` : ''}`);

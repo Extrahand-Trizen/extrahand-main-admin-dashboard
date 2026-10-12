@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -15,6 +15,7 @@ import {
   Briefcase,
   Send,
   Calendar,
+  RotateCcw,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,7 +53,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { listTasks, deleteTask, requestTaskDelete } from "@/lib/api/tasks";
-import { listUsers } from "@/lib/api/users";
+import { getUser, listUsers } from "@/lib/api/users";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { CATEGORY_OPTIONS } from "@/lib/category-options";
@@ -62,8 +63,44 @@ import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableSkeleton } from "@/components/LoadingSkeleton";
 
+const TASK_TIME_ZONE = "Asia/Kolkata";
+
+const getDateString = (date: Date) => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: TASK_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return `${year}-${month}-${day}`;
+};
+
+const addDaysToDateString = (dateString: string, days: number) => {
+  const [year, month, day] = dateString.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+};
+
+const getTaskScheduleDateString = (scheduledDate: string | Date | undefined | null) => {
+  if (!scheduledDate) return null;
+  const date = new Date(scheduledDate);
+  if (isNaN(date.getTime())) return null;
+  return getDateString(date);
+};
+
 const getTaskIdentifier = (task: Partial<Task> & { _id?: string; id?: string }) =>
   task.taskId || task._id || task.id || "";
+
+const getTaskCustomerId = (
+  task: Partial<Task> & {
+    CustomerId?: string;
+    requesterId?: string;
+    requesterProfileId?: string;
+  },
+) => String(task.CustomerId || task.customerId || task.requesterId || task.requesterProfileId || "").trim();
 
 const statusColors: Record<string, string> = {
   open: "success",
@@ -80,6 +117,19 @@ const getDisplayStatus = (task: Task) => {
     }
   }
   return task.status;
+};
+
+const getScheduledTimeMinutes = (time: string | undefined | null) => {
+  if (!time) return null;
+  const match = time.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return null;
+
+  let hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const period = match[3].toUpperCase();
+  if (period === "PM" && hours !== 12) hours += 12;
+  if (period === "AM" && hours === 12) hours = 0;
+  return hours * 60 + minutes;
 };
 
 const followUpStatusLabels: Record<string, string> = {
@@ -110,10 +160,11 @@ export default function TasksPage() {
   const [followUpFilter, setFollowUpFilter] = useState<string>("all");
   const [paymentTypeFilter, setPaymentTypeFilter] = useState<string>("all");
   const [assignedToFilter, setAssignedToFilter] = useState<string>("all");
+  const [postedByFilter, setPostedByFilter] = useState<string>("all");
   const [workDateFilter, setWorkDateFilter] = useState<string>("all");
   const [customDateFrom, setCustomDateFrom] = useState("");
   const [customDateTo, setCustomDateTo] = useState("");
-  const [deadlineSortOrder, setDeadlineSortOrder] = useState<'asc' | 'desc'>("desc");
+  const [scheduledTimeSortOrder, setScheduledTimeSortOrder] = useState<'asc' | 'desc'>("desc");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -147,10 +198,12 @@ export default function TasksPage() {
         if (parsed.followUpFilter !== undefined) setFollowUpFilter(parsed.followUpFilter);
         if (parsed.paymentTypeFilter !== undefined) setPaymentTypeFilter(parsed.paymentTypeFilter);
         if (parsed.assignedToFilter !== undefined) setAssignedToFilter(parsed.assignedToFilter);
+        if (parsed.postedByFilter !== undefined) setPostedByFilter(parsed.postedByFilter);
         if (parsed.workDateFilter !== undefined) setWorkDateFilter(parsed.workDateFilter);
         if (parsed.customDateFrom !== undefined) setCustomDateFrom(parsed.customDateFrom);
         if (parsed.customDateTo !== undefined) setCustomDateTo(parsed.customDateTo);
-        if (parsed.deadlineSortOrder !== undefined) setDeadlineSortOrder(parsed.deadlineSortOrder);
+        if (parsed.scheduledTimeSortOrder !== undefined) setScheduledTimeSortOrder(parsed.scheduledTimeSortOrder);
+        else if (parsed.deadlineSortOrder !== undefined) setScheduledTimeSortOrder(parsed.deadlineSortOrder);
         if (parsed.page !== undefined) setPage(parsed.page);
         if (parsed.limit !== undefined) setLimit(parsed.limit);
       }
@@ -172,24 +225,54 @@ export default function TasksPage() {
         followUpFilter,
         paymentTypeFilter,
         assignedToFilter,
+        postedByFilter,
         workDateFilter,
         customDateFrom,
         customDateTo,
-        deadlineSortOrder,
+        scheduledTimeSortOrder,
         page,
         limit
       }));
     } catch (e) {
       console.error("Error saving filters to sessionStorage", e);
     }
-  }, [search, workTypeFilter, statusFilter, categoryFilter, followUpFilter, paymentTypeFilter, assignedToFilter, workDateFilter, customDateFrom, customDateTo, deadlineSortOrder, page, limit, isLoaded]);
+  }, [search, workTypeFilter, statusFilter, categoryFilter, followUpFilter, paymentTypeFilter, assignedToFilter, postedByFilter, workDateFilter, customDateFrom, customDateTo, scheduledTimeSortOrder, page, limit, isLoaded]);
 
-  const getDateString = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+  const handleClearFilters = () => {
+    setSearch("");
+    setWorkTypeFilter("all");
+    setStatusFilter("all");
+    setCategoryFilter("all");
+    setFollowUpFilter("all");
+    setPaymentTypeFilter("all");
+    setAssignedToFilter("all");
+    setPostedByFilter("all");
+    setWorkDateFilter("all");
+    setCustomDateFrom("");
+    setCustomDateTo("");
+    setScheduledTimeSortOrder("desc");
+    setPage(1);
+    try {
+      sessionStorage.removeItem("tasks_filters");
+    } catch (e) {
+      console.error("Error clearing filters from sessionStorage", e);
+    }
   };
+
+  const hasActiveFilters = Boolean(
+    search ||
+    workTypeFilter !== "all" ||
+    statusFilter !== "all" ||
+    categoryFilter !== "all" ||
+    followUpFilter !== "all" ||
+    paymentTypeFilter !== "all" ||
+    assignedToFilter !== "all" ||
+    postedByFilter !== "all" ||
+    workDateFilter !== "all" ||
+    customDateFrom ||
+    customDateTo ||
+    scheduledTimeSortOrder !== "desc"
+  );
 
   const workDateRange = useMemo(() => {
     if (workDateFilter === "custom") {
@@ -197,10 +280,9 @@ export default function TasksPage() {
     }
     if (workDateFilter === "all") return { from: undefined, to: undefined };
 
-    const date = new Date();
-    if (workDateFilter === "tomorrow") date.setDate(date.getDate() + 1);
-    if (workDateFilter === "yesterday") date.setDate(date.getDate() - 1);
-    const value = getDateString(date);
+    const today = getDateString(new Date());
+    const offset = workDateFilter === "tomorrow" ? 1 : workDateFilter === "yesterday" ? -1 : 0;
+    const value = addDaysToDateString(today, offset);
     return { from: value, to: value };
   }, [workDateFilter, customDateFrom, customDateTo]);
 
@@ -214,27 +296,29 @@ export default function TasksPage() {
       followUpFilter,
       paymentTypeFilter,
       assignedToFilter,
+      postedByFilter,
       workDateFilter,
       workDateRange.from,
       workDateRange.to,
-      deadlineSortOrder,
+      scheduledTimeSortOrder,
       page,
       limit,
     ],
     queryFn: () =>
       listTasks({
         search: search || undefined,
-        bookingSource: workTypeFilter !== "all" ? workTypeFilter : undefined,
+        bookingSource: workTypeFilter,
         status: statusFilter !== "all" ? statusFilter : undefined,
         category: categoryFilter !== "all" ? categoryFilter : undefined,
         followUpStatus:
           followUpFilter !== "all" ? followUpFilter : undefined,
         paymentType: paymentTypeFilter !== "all" ? paymentTypeFilter : undefined,
         assignedTo: assignedToFilter !== "all" ? assignedToFilter : undefined,
+        postedBy: postedByFilter !== "all" ? postedByFilter as "customer" | "team" : undefined,
         scheduledDateFrom: workDateRange.from,
         scheduledDateTo: workDateRange.to,
-        sortBy: "createdAt",
-        sortOrder: deadlineSortOrder,
+        sortBy: "scheduledDate",
+        sortOrder: scheduledTimeSortOrder,
         page,
         limit,
       }),
@@ -317,10 +401,23 @@ export default function TasksPage() {
 
   const tasks = data?.data || [];
 
-  // Client-side payment type filter — applied on top of the server result.
+  // Client-side filters (work date by schedule time, payment type) — applied on top of the server result.
   const clientFilteredTasks = useMemo(() => {
-    if (paymentTypeFilter === 'all') return tasks;
-    return (tasks as any[]).filter((task) => {
+    let list = tasks;
+
+    // Filter by work date using the task's schedule date/time (scheduledDate)
+    if (workDateFilter !== "all" && (workDateRange.from || workDateRange.to)) {
+      list = (list as any[]).filter((task) => {
+        if (!task.scheduledDate) return false;
+        const taskScheduleDateStr = getTaskScheduleDateString(task.scheduledDate);
+        if (!taskScheduleDateStr) return false;
+        if (workDateRange.from && taskScheduleDateStr < workDateRange.from) return false;
+        if (workDateRange.to && taskScheduleDateStr > workDateRange.to) return false;
+        return true;
+      });
+    }
+
+    const filteredList = paymentTypeFilter === 'all' ? list : (list as any[]).filter((task) => {
       // If task has isFreeCoupon enriched from server:
       if (typeof task.isFreeCoupon === 'boolean') {
         if (paymentTypeFilter === 'free_coupon') return task.isFreeCoupon;
@@ -355,7 +452,53 @@ export default function TasksPage() {
       if (paymentTypeFilter === 'paid') return !isFree;
       return true;
     });
-  }, [tasks, paymentTypeFilter]);
+
+    return [...filteredList].sort((firstTask, secondTask) => {
+      const firstDate = firstTask.scheduledDate ? new Date(firstTask.scheduledDate).getTime() : null;
+      const secondDate = secondTask.scheduledDate ? new Date(secondTask.scheduledDate).getTime() : null;
+      if (firstDate !== secondDate) {
+        if (firstDate === null) return 1;
+        if (secondDate === null) return -1;
+        return (firstDate - secondDate) * (scheduledTimeSortOrder === "asc" ? 1 : -1);
+      }
+
+      const firstTime = getScheduledTimeMinutes(firstTask.scheduledTimeStart);
+      const secondTime = getScheduledTimeMinutes(secondTask.scheduledTimeStart);
+      if (firstTime === secondTime) return 0;
+      if (firstTime === null) return 1;
+      if (secondTime === null) return -1;
+      return (firstTime - secondTime) * (scheduledTimeSortOrder === "asc" ? 1 : -1);
+    });
+  }, [tasks, workDateFilter, workDateRange.from, workDateRange.to, paymentTypeFilter, scheduledTimeSortOrder]);
+
+  const uniqueCustomerProfileIds = useMemo(() => {
+    return Array.from(
+      new Set(
+        clientFilteredTasks
+          .map((task: any) => getTaskCustomerId(task))
+          .filter(Boolean)
+      )
+    );
+  }, [clientFilteredTasks]);
+
+  const customerQueries = useQueries({
+    queries: uniqueCustomerProfileIds.map((customerId) => ({
+      queryKey: ["user-from-task-customer", customerId],
+      queryFn: () => getUser(customerId),
+      enabled: hasPermission("user.view"),
+      retry: false,
+    })),
+  });
+
+  const customerDetailsById = new Map(
+    uniqueCustomerProfileIds.map((customerId, index) => [
+      customerId,
+      customerQueries[index]?.data?.data,
+    ]),
+  );
+  const loadingCustomerIds = new Set(
+    uniqueCustomerProfileIds.filter((_, index) => customerQueries[index]?.isLoading),
+  );
 
   const uniqueHelperProfileIds = useMemo(() => {
     return Array.from(
@@ -434,7 +577,7 @@ export default function TasksPage() {
 
       {/* Filters */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <CardTitle className="text-lg">Filters</CardTitle>
         </CardHeader>
         <CardContent>
@@ -579,6 +722,25 @@ export default function TasksPage() {
               </Select>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="postedBy">Posted By</Label>
+              <Select
+                value={postedByFilter}
+                onValueChange={(value) => {
+                  setPostedByFilter(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger id="postedBy">
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="customer">Customer</SelectItem>
+                  <SelectItem value="team">Team</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="workDate">Work Date</Label>
               <Select
                 value={workDateFilter}
@@ -640,22 +802,33 @@ export default function TasksPage() {
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="createdSort">Created order</Label>
+              <Label htmlFor="scheduledTimeSort">Scheduled time</Label>
               <Select
-                value={deadlineSortOrder}
+                value={scheduledTimeSortOrder}
                 onValueChange={(value) => {
-                  setDeadlineSortOrder(value as 'asc' | 'desc');
+                  setScheduledTimeSortOrder(value as 'asc' | 'desc');
                   setPage(1);
                 }}
               >
-                <SelectTrigger id="createdSort">
-                  <SelectValue placeholder="Latest to oldest" />
+                <SelectTrigger id="scheduledTimeSort">
+                  <SelectValue placeholder="Latest scheduled time" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="desc">Latest to oldest</SelectItem>
-                  <SelectItem value="asc">Oldest to latest</SelectItem>
+                  <SelectItem value="desc">Latest to earliest</SelectItem>
+                  <SelectItem value="asc">Earliest to latest</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="flex items-end">
+              <Button
+                variant="outline"
+                onClick={handleClearFilters}
+                disabled={!hasActiveFilters}
+                className="h-10 w-full gap-1.5 text-sm text-gray-600 hover:text-gray-900"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Clear Filters
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -667,7 +840,7 @@ export default function TasksPage() {
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">Works List</CardTitle>
             <Badge variant="secondary">
-              {paymentTypeFilter !== 'all' ? clientFilteredTasks.length : pagination.total} works
+              {paymentTypeFilter !== 'all' || workDateFilter !== 'all' ? clientFilteredTasks.length : pagination.total} works
             </Badge>
           </div>
         </CardHeader>
@@ -686,6 +859,9 @@ export default function TasksPage() {
                         Works
                       </TableHead>
                       <TableHead className="sm:hidden">Details</TableHead>
+                      <TableHead className="hidden lg:table-cell">
+                        Customer
+                      </TableHead>
                       <TableHead className="hidden md:table-cell">
                         Category
                       </TableHead>
@@ -707,9 +883,6 @@ export default function TasksPage() {
                       <TableHead className="hidden lg:table-cell">
                         Deadline / Schedule
                       </TableHead>
-                      <TableHead className="hidden lg:table-cell">
-                        Created
-                      </TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -718,6 +891,7 @@ export default function TasksPage() {
                       const taskIdentifier = getTaskIdentifier(
                         task as Partial<Task> & { _id?: string; id?: string },
                       );
+                      const customerId = getTaskCustomerId(task);
                       return (
                       <TableRow 
                         key={taskIdentifier || `${task.title}-${task.createdAt}`}
@@ -765,6 +939,33 @@ export default function TasksPage() {
                               )}
                             </div>
                           </div>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-sm">
+                          {customerId ? (
+                            customerDetailsById.get(customerId) ? (
+                              <Link
+                                href={`/users/${customerId}`}
+                                className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {customerDetailsById.get(customerId)?.name ||
+                                  customerDetailsById.get(customerId)?.fullName ||
+                                  customerId}
+                              </Link>
+                            ) : loadingCustomerIds.has(customerId) ? (
+                              <span className="text-gray-500">Loading...</span>
+                            ) : (
+                              <Link
+                                href={`/users/${customerId}`}
+                                className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {customerId}
+                              </Link>
+                            )
+                          ) : (
+                            <span className="text-gray-400">N/A</span>
+                          )}
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
                           {task.category && (
@@ -872,9 +1073,6 @@ export default function TasksPage() {
                               {formatDate(task.scheduledDate)}
                             </span>
                           )}
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell text-sm text-gray-500">
-                          {formatDate(task.createdAt)}
                         </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>

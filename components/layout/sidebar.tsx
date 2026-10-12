@@ -19,6 +19,8 @@ import {
   ShoppingBag,
   SlidersHorizontal,
   MapPinned,
+  MapPin,
+  BellRing,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -46,6 +48,12 @@ const navigation: Array<{
     permission: 'user.list',
   },
   {
+    name: 'Location Management',
+    href: '/locations',
+    icon: MapPin,
+    permission: 'user.list',
+  },
+  {
     name: 'Works',
     href: '/tasks',
     icon: Briefcase,
@@ -64,9 +72,15 @@ const navigation: Array<{
     permission: 'task.list',
   },
   {
-    name: 'Location & Pricing',
+    name: 'Location Pricing',
     href: '/location-pricing',
     icon: MapPinned,
+    superAdminOnly: true,
+  },
+  {
+    name: 'Notifications',
+    href: '/notifications',
+    icon: BellRing,
     superAdminOnly: true,
   },
 ];
@@ -108,6 +122,12 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
   );
   const [assignmentSectionOpen, setAssignmentSectionOpen] = useState(
     pathname?.startsWith('/assignment-management')
+  );
+  const [notificationsSectionOpen, setNotificationsSectionOpen] = useState(
+    pathname?.startsWith('/notifications')
+  );
+  const [locationPricingSectionOpen, setLocationPricingSectionOpen] = useState(
+    pathname?.startsWith('/location-pricing')
   );
 
   const handleLinkClick = () => {
@@ -217,6 +237,106 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
                       )}
                     >
                       Area Rules
+                    </Link>
+                  </div>}
+                  </div>
+                ) : item.href === '/location-pricing' ? (
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => setLocationPricingSectionOpen(!locationPricingSectionOpen)}
+                      className={cn(
+                        'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                        isActive
+                          ? 'bg-yellow-50 text-yellow-700'
+                          : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
+                      )}
+                    >
+                      <span className="flex items-center gap-3">
+                        <item.icon className={cn('h-5 w-5', isActive ? 'text-yellow-600' : 'text-gray-400')} />
+                        {item.name}
+                      </span>
+                      {locationPricingSectionOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </button>
+                  {locationPricingSectionOpen && <div className="ml-6 space-y-1 border-l border-gray-200 pl-2">
+                    <Link
+                      href="/location-pricing"
+                      onClick={handleLinkClick}
+                      className={cn(
+                        'block rounded-md px-3 py-2 text-xs font-medium transition-colors',
+                        pathname === '/location-pricing'
+                          ? 'bg-yellow-50 text-yellow-700'
+                          : 'text-gray-500 hover:bg-yellow-50/50 hover:text-yellow-600'
+                      )}
+                    >
+                      Pricing Overview
+                    </Link>
+                    <Link
+                      href="/location-pricing/configure"
+                      onClick={handleLinkClick}
+                      className={cn(
+                        'block rounded-md px-3 py-2 text-xs font-medium transition-colors',
+                        pathname?.startsWith('/location-pricing/configure')
+                          ? 'bg-yellow-50 text-yellow-700'
+                          : 'text-gray-500 hover:bg-yellow-50/50 hover:text-yellow-600'
+                      )}
+                    >
+                      Configure Price
+                    </Link>
+                    <Link
+                      href="/hourly-helper-availability"
+                      onClick={handleLinkClick}
+                      className={cn(
+                        'block rounded-md px-3 py-2 text-xs font-medium transition-colors',
+                        pathname?.startsWith('/hourly-helper-availability')
+                          ? 'bg-yellow-50 text-yellow-700'
+                          : 'text-gray-500 hover:bg-yellow-50/50 hover:text-yellow-600'
+                      )}
+                    >
+                      Hourly Availability
+                    </Link>
+                  </div>}
+                  </div>
+                ) : item.href === '/notifications' ? (
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => setNotificationsSectionOpen(!notificationsSectionOpen)}
+                      className={cn(
+                        'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                        isActive
+                          ? 'bg-yellow-50 text-yellow-700'
+                          : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
+                      )}
+                    >
+                      <span className="flex items-center gap-3">
+                        <item.icon className={cn('h-5 w-5', isActive ? 'text-yellow-600' : 'text-gray-400')} />
+                        {item.name}
+                      </span>
+                      {notificationsSectionOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </button>
+                  {notificationsSectionOpen && <div className="ml-6 space-y-1 border-l border-gray-200 pl-2">
+                    <Link
+                      href="/notifications/send"
+                      onClick={handleLinkClick}
+                      className={cn(
+                        'block rounded-md px-3 py-2 text-xs font-medium transition-colors',
+                        pathname?.startsWith('/notifications/send')
+                          ? 'bg-yellow-50 text-yellow-700'
+                          : 'text-gray-500 hover:bg-yellow-50/50 hover:text-yellow-600'
+                      )}
+                    >
+                      Send Notification
+                    </Link>
+                    <Link
+                      href="/notifications/history"
+                      onClick={handleLinkClick}
+                      className={cn(
+                        'block rounded-md px-3 py-2 text-xs font-medium transition-colors',
+                        pathname?.startsWith('/notifications/history')
+                          ? 'bg-yellow-50 text-yellow-700'
+                          : 'text-gray-500 hover:bg-yellow-50/50 hover:text-yellow-600'
+                      )}
+                    >
+                      History
                     </Link>
                   </div>}
                   </div>

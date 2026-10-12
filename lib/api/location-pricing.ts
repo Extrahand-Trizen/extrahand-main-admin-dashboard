@@ -155,3 +155,64 @@ export function createHourlyPrice(body: { skuId: string; locationType: PricingLo
 export function updateHourlyPrice(id: string, body: Record<string, unknown>) {
   return apiRequest<ApiEnvelope<HourlyPriceRule>>(`/api/v1/location-pricing/hourly-prices/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
 }
+
+export function updateSkuGlobalPrice(skuId: string, offerPrice: number) {
+  return apiRequest<ApiEnvelope<PricingSku>>(`/api/v1/location-pricing/skus/${skuId}/global-price`, {
+    method: 'PATCH',
+    body: JSON.stringify({ offerPrice }),
+  });
+}
+
+export type HourlyAvailabilityItem = {
+  _id: string;
+  locationId: string;
+  locationType: LocationType;
+  displayName: string;
+  canonicalName: string;
+  parentDisplayName?: string;
+  isEnabled: boolean;
+  isExplicit: boolean;
+  eligibleHelperCount: number;
+  updatedAt?: string;
+  updatedBy?: string;
+};
+
+export function listHourlyAvailabilities(params?: { search?: string; type?: string; isEnabled?: boolean }) {
+  const query = new URLSearchParams();
+  if (params?.search) query.set('search', params.search);
+  if (params?.type) query.set('type', params.type);
+  if (params?.isEnabled !== undefined) query.set('isEnabled', String(params.isEnabled));
+  return apiRequest<ApiEnvelope<HourlyAvailabilityItem[]>>(`/api/v1/location-pricing/hourly-availability${query.toString() ? `?${query.toString()}` : ''}`);
+}
+
+export function toggleHourlyAvailability(type: LocationType, id: string, isEnabled: boolean) {
+  return apiRequest<ApiEnvelope<HourlyAvailabilityItem>>(`/api/v1/location-pricing/hourly-availability/${type}/${id}/toggle`, {
+    method: 'POST',
+    body: JSON.stringify({ isEnabled }),
+  });
+}
+
+export type PostCompareAvailabilityItem = {
+  areaId: string;
+  canonicalName: string;
+  displayName: string;
+  isEnabled: boolean;
+  isExplicit: boolean;
+  updatedAt?: string;
+  updatedBy?: string;
+};
+
+export function listPostCompareAreaAvailabilities(search?: string) {
+  const query = new URLSearchParams();
+  if (search?.trim()) query.set('search', search.trim());
+  return apiRequest<ApiEnvelope<PostCompareAvailabilityItem[]>>(
+    `/api/v1/location-pricing/post-compare-availability/areas${query.toString() ? `?${query.toString()}` : ''}`,
+  );
+}
+
+export function togglePostCompareAreaAvailability(areaId: string, isEnabled: boolean) {
+  return apiRequest<ApiEnvelope<PostCompareAvailabilityItem>>(
+    `/api/v1/location-pricing/post-compare-availability/areas/${encodeURIComponent(areaId)}/toggle`,
+    { method: 'POST', body: JSON.stringify({ isEnabled }) },
+  );
+}

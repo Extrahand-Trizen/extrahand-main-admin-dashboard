@@ -768,7 +768,9 @@ export default function TaskDetailsPage() {
               </Button>
               <Button variant="outline" onClick={openStageDialog}>
                 <Edit className="mr-2 h-4 w-4" />
-                Move Stage
+                {taskCallLoading
+                  ? "Move Stage"
+                  : taskCallStatusLabels[taskCall?.status || "not_updated"]}
               </Button>
               <Button
                 variant="outline"
