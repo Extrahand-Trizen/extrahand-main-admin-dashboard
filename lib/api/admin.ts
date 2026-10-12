@@ -176,6 +176,34 @@ export const updateTaskPostedEmailSettings = async (
   return res?.data;
 };
 
+export interface RoundRobinMember {
+  userId: string;
+  name: string;
+  email: string;
+}
+
+export interface RoundRobinTeamSettingsData {
+  teamMembers: RoundRobinMember[];
+  availableOpsAdmins: RoundRobinMember[];
+}
+
+export const getRoundRobinTeamSettings = async (): Promise<RoundRobinTeamSettingsData> => {
+  const res = await apiRequest<{ success: boolean; data: RoundRobinTeamSettingsData }>(
+    '/api/v1/admin/settings/round-robin-team',
+  );
+  return res?.data;
+};
+
+export const updateRoundRobinTeamSettings = async (
+  emails: string[],
+): Promise<RoundRobinTeamSettingsData> => {
+  const res = await apiRequest<{ success: boolean; data: RoundRobinTeamSettingsData }>(
+    '/api/v1/admin/settings/round-robin-team',
+    { method: 'PUT', body: JSON.stringify({ emails }) },
+  );
+  return res?.data;
+};
+
 export const updateUser = async (
   userId: string,
   updates: {

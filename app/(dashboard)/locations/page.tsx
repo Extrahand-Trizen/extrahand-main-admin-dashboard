@@ -12,14 +12,17 @@ import {
   X,
 } from 'lucide-react';
 import {
+  createCityLocationArea,
   createLocationArea,
   createLocationCity,
   createLocationZone,
+  deleteCityLocationArea,
   deleteLocationArea,
   deleteLocationCity,
   deleteLocationZone,
   getLocationCatalog,
   ManagedLocation,
+  updateCityLocationArea,
   updateLocationArea,
   updateLocationCity,
   updateLocationZone,
@@ -135,7 +138,11 @@ export default function LocationManagementPage() {
       setCities(nextCities);
       setSelectedCityId((current) => nextCities.some((city) => city.id === current) ? current : '');
       const selectedCity = nextCities.find((city) => city.id === selectedCityId);
-      setSelectedZoneId((current) => selectedCity?.zones?.some((zone) => zone.id === current) ? current : '');
+      setSelectedZoneId((current) =>
+        !selectedCity?.areas?.length && selectedCity?.zones?.some((zone) => zone.id === current)
+          ? current
+          : '',
+      );
       setError('');
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Could not load locations');
@@ -148,8 +155,17 @@ export default function LocationManagementPage() {
 
   const city = cities.find((entry) => entry.id === selectedCityId) || null;
   const zone = city?.zones?.find((entry) => entry.id === selectedZoneId) || null;
-  const zoneCount = cities.reduce((count, entry) => count + (entry.zones?.length || 0), 0);
-  const areaCount = cities.reduce((count, entry) => count + (entry.zones || []).reduce((zoneTotal, entryZone) => zoneTotal + (entryZone.areas?.length || 0), 0), 0);
+  const showingCityAreas = Boolean(city?.areas?.length);
+  const zoneCount = cities.reduce(
+    (count, entry) => count + (entry.areas?.length ? 0 : entry.zones?.length || 0),
+    0,
+  );
+  const areaCount = cities.reduce((count, entry) =>
+    count + (entry.areas?.length || 0) +
+      (entry.areas?.length ? 0 : (entry.zones || []).reduce(
+        (zoneTotal, entryZone) => zoneTotal + (entryZone.areas?.length || 0),
+        0,
+      )), 0);
 
   const perform = async (action: () => Promise<unknown>) => {
     setSaving(true);
@@ -172,15 +188,26 @@ export default function LocationManagementPage() {
       void perform(() => location ? updateLocationCity(location.id, { name }) : createLocationCity(name));
     } else if (level === 'zone' && city) {
       void perform(() => location ? updateLocationZone(city.id, location.id, { name }) : createLocationZone(city.id, name));
-    } else if (level === 'area' && city && zone) {
-      void perform(() => location ? updateLocationArea(city.id, zone.id, location.id, { name }) : createLocationArea(city.id, zone.id, name));
+    } else if (level === 'area' && city) {
+      if (zone) {
+        void perform(() => location
+          ? updateLocationArea(city.id, zone.id, location.id, { name })
+          : createLocationArea(city.id, zone.id, name));
+      } else {
+        void perform(() => location
+          ? updateCityLocationArea(city.id, location.id, { name })
+          : createCityLocationArea(city.id, name));
+      }
     }
   };
 
   const toggle = (level: LocationLevel, location: ManagedLocation) => {
     if (level === 'city') void perform(() => updateLocationCity(location.id, { enabled: !location.enabled }));
     else if (level === 'zone' && city) void perform(() => updateLocationZone(city.id, location.id, { enabled: !location.enabled }));
-    else if (level === 'area' && city && zone) void perform(() => updateLocationArea(city.id, zone.id, location.id, { enabled: !location.enabled }));
+    else if (level === 'area' && city) {
+      if (zone) void perform(() => updateLocationArea(city.id, zone.id, location.id, { enabled: !location.enabled }));
+      else void perform(() => updateCityLocationArea(city.id, location.id, { enabled: !location.enabled }));
+    }
   };
 
   const remove = (level: LocationLevel, location: ManagedLocation) => {
@@ -191,7 +218,10 @@ export default function LocationManagementPage() {
     if (!window.confirm(message)) return;
     if (level === 'city') void perform(() => deleteLocationCity(location.id));
     else if (level === 'zone' && city) void perform(() => deleteLocationZone(city.id, location.id));
-    else if (level === 'area' && city && zone) void perform(() => deleteLocationArea(city.id, zone.id, location.id));
+    else if (level === 'area' && city) {
+      if (zone) void perform(() => deleteLocationArea(city.id, zone.id, location.id));
+      else void perform(() => deleteCityLocationArea(city.id, location.id));
+    }
   };
 
   const openEditor = (level: LocationLevel, location?: ManagedLocation) => setEditor({ level, location });
@@ -215,7 +245,7 @@ export default function LocationManagementPage() {
 
       {error && <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
-      <div className="grid min-h-[440px] grid-cols-1 overflow-hidden rounded-lg border border-gray-200 bg-white md:grid-cols-3">
+      <div className={`grid min-h-[440px] grid-cols-1 overflow-hidden rounded-lg border border-gray-200 bg-white ${showingCityAreas ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
         <section className="border-b border-gray-200 md:border-b-0 md:border-r" aria-label="Cities">
           <div className="flex h-14 items-center justify-between border-b border-gray-100 px-4">
             <div><h2 className="text-sm font-semibold text-gray-900">Cities</h2><p className="text-xs text-gray-500">Top level</p></div>
@@ -232,39 +262,45 @@ export default function LocationManagementPage() {
           </div>
         </section>
 
-        <section className="border-b border-gray-200 md:border-b-0 md:border-r" aria-label="Zones">
+        <section className="border-b border-gray-200 md:border-b-0 md:border-r" aria-label={showingCityAreas ? 'Areas' : 'Zones'}>
           <div className="flex h-14 items-center justify-between border-b border-gray-100 px-4">
-            <div><h2 className="text-sm font-semibold text-gray-900">Zones</h2><p className="truncate text-xs text-gray-500">{city?.name || 'Choose a city'}</p></div>
-            {canManageLocations && <button type="button" disabled={!city} onClick={() => openEditor('zone')} title="Add zone" aria-label="Add zone" className="rounded-md p-1.5 text-gray-500 hover:bg-amber-50 hover:text-amber-700 disabled:opacity-40"><Plus className="h-4 w-4" /></button>}
+            <div><h2 className="text-sm font-semibold text-gray-900">{showingCityAreas ? 'Areas' : 'Zones'}</h2><p className="truncate text-xs text-gray-500">{showingCityAreas ? `${city?.name} · Areas in this city` : city?.name || 'Choose a city'}</p></div>
+            {canManageLocations && <button type="button" disabled={!city} onClick={() => openEditor(showingCityAreas ? 'area' : 'zone')} title={showingCityAreas ? 'Add area' : 'Add zone'} aria-label={showingCityAreas ? 'Add area' : 'Add zone'} className="rounded-md p-1.5 text-gray-500 hover:bg-amber-50 hover:text-amber-700 disabled:opacity-40"><Plus className="h-4 w-4" /></button>}
           </div>
           <div className="max-h-[520px] overflow-y-auto p-2">
-            {city?.zones?.map((entry) => (
+            {showingCityAreas ? city?.areas?.map((entry) => (
+              <div key={entry.id} className="flex items-center justify-between gap-2 rounded-md px-2.5 py-2 hover:bg-gray-50">
+                <div className="min-w-0"><p className="truncate text-sm font-medium text-gray-800">{entry.name}</p><Status enabled={entry.enabled !== false} /></div>
+                <RowActions location={{ ...entry, enabled: entry.enabled !== false }} canEdit={canManageLocations} onEdit={() => openEditor('area', entry)} onToggle={() => toggle('area', entry)} onDelete={() => remove('area', entry)} />
+              </div>
+            )) : city?.zones?.map((entry) => (
               <div key={entry.id} onClick={() => setSelectedZoneId(entry.id)} className={`flex cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-2 ${entry.id === zone?.id ? 'bg-amber-50 ring-1 ring-amber-200' : 'hover:bg-gray-50'}`}>
                 <div className="min-w-0"><p className="truncate text-sm font-medium text-gray-800">{entry.name}</p><Status enabled={entry.enabled !== false} /></div>
                 <RowActions location={{ ...entry, enabled: entry.enabled !== false }} canEdit={canManageLocations} onEdit={() => openEditor('zone', entry)} onToggle={() => toggle('zone', entry)} onDelete={() => remove('zone', entry)} />
               </div>
             ))}
-            {city && !city.zones?.length && <p className="px-3 py-5 text-sm text-gray-500">No zones in this city.</p>}
+            {city && showingCityAreas && !city.areas?.length && <p className="px-3 py-5 text-sm text-gray-500">No areas in this city.</p>}
+            {city && !showingCityAreas && !city.zones?.length && <p className="px-3 py-5 text-sm text-gray-500">No zones in this city.</p>}
             {!loading && !city && <div className="flex flex-col items-center px-4 py-12 text-center text-gray-400"><Layers className="mb-2 h-6 w-6" /><p className="text-sm font-medium text-gray-600">Select a city</p><p className="mt-1 text-xs">Please select a city from the left to view and manage its zones.</p></div>}
           </div>
         </section>
 
-        <section aria-label="Areas">
+        {!showingCityAreas && <section aria-label="Areas">
           <div className="flex h-14 items-center justify-between border-b border-gray-100 px-4">
-            <div><h2 className="text-sm font-semibold text-gray-900">Areas</h2><p className="truncate text-xs text-gray-500">{zone?.name || 'Choose a zone'}</p></div>
-            {canManageLocations && <button type="button" disabled={!zone} onClick={() => openEditor('area')} title="Add area" aria-label="Add area" className="rounded-md p-1.5 text-gray-500 hover:bg-amber-50 hover:text-amber-700 disabled:opacity-40"><Plus className="h-4 w-4" /></button>}
+            <div><h2 className="text-sm font-semibold text-gray-900">Areas</h2><p className="truncate text-xs text-gray-500">{zone?.name || (city ? `${city.name} · Areas in this city` : 'Choose a city')}</p></div>
+            {canManageLocations && <button type="button" disabled={!city} onClick={() => openEditor('area')} title="Add area" aria-label="Add area" className="rounded-md p-1.5 text-gray-500 hover:bg-amber-50 hover:text-amber-700 disabled:opacity-40"><Plus className="h-4 w-4" /></button>}
           </div>
           <div className="max-h-[520px] overflow-y-auto p-2">
-            {zone?.areas?.map((entry) => (
+            {(zone?.areas ?? city?.areas)?.map((entry) => (
               <div key={entry.id} className="flex items-center justify-between gap-2 rounded-md px-2.5 py-2 hover:bg-gray-50">
                 <div className="min-w-0"><p className="truncate text-sm font-medium text-gray-800">{entry.name}</p><Status enabled={entry.enabled !== false} /></div>
                 <RowActions location={{ ...entry, enabled: entry.enabled !== false }} canEdit={canManageLocations} onEdit={() => openEditor('area', entry)} onToggle={() => toggle('area', entry)} onDelete={() => remove('area', entry)} />
               </div>
             ))}
-            {zone && !zone.areas?.length && <p className="px-3 py-5 text-sm text-gray-500">No areas in this zone.</p>}
-            {!zone && !loading && <div className="flex flex-col items-center px-4 py-12 text-center text-gray-400"><MapPin className="mb-2 h-6 w-6" /><p className="text-sm font-medium text-gray-600">Select a zone</p><p className="mt-1 text-xs">Please select a zone from the middle to view and manage its areas.</p></div>}
+            {(zone || city) && !(zone?.areas ?? city?.areas)?.length && <p className="px-3 py-5 text-sm text-gray-500">No areas {zone ? 'in this zone' : 'in this city'}.</p>}
+            {!city && !loading && <div className="flex flex-col items-center px-4 py-12 text-center text-gray-400"><MapPin className="mb-2 h-6 w-6" /><p className="text-sm font-medium text-gray-600">Select a city</p><p className="mt-1 text-xs">Please select a city to view and manage its areas, with or without a zone.</p></div>}
           </div>
-        </section>
+        </section>}
       </div>
 
       {editor && <LocationEditor editor={editor} saving={saving} onClose={() => setEditor(null)} onSave={saveEditor} />}
