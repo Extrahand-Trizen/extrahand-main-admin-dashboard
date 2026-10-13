@@ -251,6 +251,8 @@ export interface Task {
   assignedTo?: { userId: string; name: string; email?: string } | null;
   assigneeId?: string;
   assigneeName?: string | null;
+  assignedHelperName?: string | null;
+  assignedToName?: string | null;
   scheduledDate?: string;
   dateOption?: string;
   timeSlot?: string;

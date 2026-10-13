@@ -345,7 +345,7 @@ function getLifecycleSteps(task: Task, refund?: PaymentRefund | null): Lifecycle
     steps.push(
       {
         id: 'helper',
-        label: 'Helper assignment',
+        label: task.bookingSource === 'book_now' ? 'Partner assignment' : 'Helper assignment',
         state:
           cancelIndex > 1 ? 'done' : cancelIndex === 1 ? 'cancelled' : 'future',
         timestamp: task.assignedAt,
@@ -396,8 +396,8 @@ function getLifecycleSteps(task: Task, refund?: PaymentRefund | null): Lifecycle
     ? task.assigneeName
       ? task.assigneeName
       : slotLabel
-        ? `No helper assigned · ${slotLabel}`
-        : 'No helper assigned'
+        ? `No ${task.bookingSource === 'book_now' ? 'partner' : 'helper'} assigned · ${slotLabel}`
+        : `No ${task.bookingSource === 'book_now' ? 'partner' : 'helper'} assigned`
     : task.assigneeName
 
   const steps: LifecycleStep[] = [
@@ -417,7 +417,7 @@ function getLifecycleSteps(task: Task, refund?: PaymentRefund | null): Lifecycle
   steps.push(
     {
       id: 'helper',
-      label: 'Helper assignment',
+      label: task.bookingSource === 'book_now' ? 'Partner assignment' : 'Helper assignment',
       state: helperDone ? 'done' : helperActive ? 'active' : 'future',
       timestamp: task.assignedAt,
       detail: helperDetail ?? undefined,
@@ -716,7 +716,7 @@ export function TaskProgressCard({ task, refund, transaction, onAssignHelper, on
 
           {status === 'open' && !task.assignedTo && onAssignHelper && (
             <Button variant="outline" size="sm" onClick={onAssignHelper}>
-              Assign helper manually
+              Assign {task.bookingSource === 'book_now' ? 'partner' : 'helper'} manually
             </Button>
           )}
 

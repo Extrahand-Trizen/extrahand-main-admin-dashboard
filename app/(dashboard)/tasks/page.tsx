@@ -892,6 +892,18 @@ export default function TasksPage() {
                         task as Partial<Task> & { _id?: string; id?: string },
                       );
                       const customerId = getTaskCustomerId(task);
+                      const assignedHelperName =
+                        task.assignedHelperName ||
+                        task.assigneeName ||
+                        task.assignedToName;
+                      const assignedHelper =
+                        task.assigneeId
+                          ? helperDetailsByProfileId.get(task.assigneeId)
+                          : undefined;
+                      const resolvedHelperName =
+                        assignedHelperName ||
+                        assignedHelper?.name ||
+                        assignedHelper?.fullName;
                       return (
                       <TableRow 
                         key={taskIdentifier || `${task.title}-${task.createdAt}`}
@@ -1001,29 +1013,29 @@ export default function TasksPage() {
                           </div>
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-sm">
-                          {task.assigneeId ? (
-                            helperDetailsByProfileId.has(task.assigneeId) ? (
+                          {resolvedHelperName ? (
+                            task.assigneeId ? (
                               <Link
                                 href={`/users/${task.assigneeId}`}
                                 className="font-medium text-blue-600 hover:text-blue-800 hover:underline capitalize"
                                 onClick={(e) => e.stopPropagation()}
                               >
-                                {isBatchLoading ? (
-                                  task.assigneeName || "Loading..."
-                                ) : (
-                                  helperDetailsByProfileId.get(task.assigneeId)?.name ||
-                                  helperDetailsByProfileId.get(task.assigneeId)?.fullName ||
-                                  "Account Deleted"
-                                )}
+                                {resolvedHelperName}
                               </Link>
                             ) : (
                               <span className="font-medium text-gray-700 capitalize">
-                                Account Deleted
+                                {resolvedHelperName}
                               </span>
                             )
+                          ) : task.assigneeId && isBatchLoading ? (
+                            <span className="text-gray-500">Loading...</span>
+                          ) : task.assigneeId ? (
+                            <span className="font-medium text-gray-700 capitalize">
+                              Account Deleted
+                            </span>
                           ) : (
                             <span className="text-amber-600 font-medium italic hover:underline">
-                              Assign Helper
+                              Assign Partner
                             </span>
                           )}
                         </TableCell>

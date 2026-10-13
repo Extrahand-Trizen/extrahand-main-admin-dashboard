@@ -943,13 +943,13 @@ export default function TaskDetailsPage() {
             canRefund={canRefund}
           />
 
-          {/* Applications / Helper Assignment */}
+          {/* Applications / Partner Assignment */}
           {task.bookingSource === "book_now" ? (
             <>
               <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>Helper Assignment</CardTitle>
+                  <CardTitle>Partner Assignment</CardTitle>
                   {assigneeProfileId ? (
                     <Badge variant="success" className="bg-emerald-50 text-emerald-700 border-emerald-200">
                       Assigned
@@ -959,7 +959,7 @@ export default function TaskDetailsPage() {
                   )}
                 </div>
                 <CardDescription>
-                  Assign a helper to this Book Now task
+                  Assign a partner to this Book Now task
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -999,7 +999,7 @@ export default function TaskDetailsPage() {
                             {assignedHelperError ? (
                               "User not found"
                             ) : (
-                              assignedHelper?.email || "Assigned helper"
+                              assignedHelper?.email ||                               "Assigned partner"
                             )}
                           </p>
                         </div>
@@ -1018,14 +1018,14 @@ export default function TaskDetailsPage() {
                         variant="destructive"
                         size="sm"
                         onClick={async () => {
-                          if (!confirm('Unassign this helper from the task?')) return;
+                          if (!confirm('Unassign this partner from the task?')) return;
                           try {
                             updateTaskAssignment(null);
                             await unassignHelper(taskId);
-                            toast.success('Helper unassigned successfully');
+                            toast.success('Partner unassigned successfully');
                           } catch (err: any) {
                             refetch();
-                            toast.error(err?.message || 'Failed to unassign helper');
+                            toast.error(err?.message || 'Failed to unassign partner');
                           }
                         }}
                       >
@@ -1037,11 +1037,11 @@ export default function TaskDetailsPage() {
                   <div className="text-center py-8">
                     <Search className="mx-auto h-8 w-8 text-gray-300 mb-3" />
                     <p className="text-sm text-gray-500 mb-4">
-                      No helper assigned yet. Search and assign a helper to this task.
+                      No partner assigned yet. Search and assign a partner to this task.
                     </p>
                     <Button onClick={() => setAssignModalOpen(true)}>
                       <Search className="mr-2 h-4 w-4" />
-                      Assign Helper
+                      Assign Partner
                     </Button>
                   </div>
                 )}
@@ -1467,7 +1467,7 @@ export default function TaskDetailsPage() {
         </div>
       </div>
 
-      {/* Assign Helper Modal */}
+      {/* Assign Partner Modal */}
       <AssignHelperModal
         open={assignModalOpen}
         onOpenChange={setAssignModalOpen}
