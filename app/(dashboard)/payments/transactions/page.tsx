@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -37,15 +37,66 @@ import { TableSkeleton } from "@/components/LoadingSkeleton";
 type TransactionType = "all" | "real" | "team";
 type HoldStatus = "all" | "held" | "cancelled";
 type Environment = "production" | "development";
+type DatePreset = "today" | "last7Days" | "last30Days";
+
+function toDateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateInputStart(date: string): string | undefined {
+  if (!date) return undefined;
+  return new Date(`${date}T00:00:00`).toISOString();
+}
+
+function dateInputEnd(date: string): string | undefined {
+  if (!date) return undefined;
+  return new Date(`${date}T23:59:59.999`).toISOString();
+}
 
 export default function PaymentTransactionsPage() {
   const { hasPermission, isSuperAdmin } = usePermissions();
   const [q, setQ] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [transactionType, setTransactionType] = useState<TransactionType>("all");
   const [holdStatus, setHoldStatus] = useState<HoldStatus>("all");
   const [environment, setEnvironment] = useState<Environment>("production");
   const PAGE_SIZE = 10;
   const [page, setPage] = useState(1);
+
+  const applyDatePreset = (preset: DatePreset) => {
+    const today = new Date();
+    let start: Date;
+    const end = today;
+
+    switch (preset) {
+      case "today":
+        start = today;
+        break;
+      case "last7Days":
+        start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6);
+        break;
+      case "last30Days":
+        start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29);
+        break;
+    }
+
+    setFromDate(toDateInputValue(start));
+    setToDate(toDateInputValue(end));
+    setPage(1);
+  };
+
+  const queryStartDate = dateInputStart(fromDate || toDate);
+  const queryEndDate = dateInputEnd(toDate || fromDate);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setSearchQuery(q.trim()), 300);
+    return () => window.clearTimeout(timeout);
+  }, [q]);
 
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string } | null>(null);
   const [confirmDeleteText, setConfirmDeleteText] = useState("");
@@ -86,19 +137,22 @@ export default function PaymentTransactionsPage() {
     }
   };
 
-  const { data, refetch, isLoading, isFetching } = useQuery({
-    queryKey: ["payment-transactions", q, transactionType, holdStatus, environment, page],
+  const { data, refetch, isLoading, isFetching, isPlaceholderData } = useQuery({
+    queryKey: ["payment-transactions", searchQuery, transactionType, holdStatus, environment, fromDate, toDate, page],
     queryFn: () =>
       listPaymentTransactions({
-        q: q || undefined,
+        q: searchQuery || undefined,
         transactionType: transactionType !== "all" ? transactionType : undefined,
         holdStatus: holdStatus !== "all" ? holdStatus : undefined,
         environment,
+        startDate: queryStartDate,
+        endDate: queryEndDate,
         limit: PAGE_SIZE,
         offset: (page - 1) * PAGE_SIZE,
       }),
     enabled: hasPermission("payment.list"),
-    retry: false,
+      placeholderData: (previousData) => previousData,
+      retry: false,
   });
 
   const rows = data?.data || [];
@@ -182,56 +236,104 @@ export default function PaymentTransactionsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Search</CardTitle>
+          <CardTitle className="text-lg">Filters</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col gap-2 md:flex-row md:items-center">
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search hold/order/payment/user/task..."
-          />
-          <Select value={environment} onValueChange={(value) => { setEnvironment(value as Environment); setPage(1); }}>
-            <SelectTrigger className="w-44">
-              <SelectValue placeholder="Environment" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="production">Production</SelectItem>
-              <SelectItem value="development">Development</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={transactionType} onValueChange={(value) => setTransactionType(value as TransactionType)}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="All transaction types" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="real">Real</SelectItem>
-              <SelectItem value="team">Team tests</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={holdStatus} onValueChange={(value) => setHoldStatus(value as HoldStatus)}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Hold status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="held">Held</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline" onClick={() => {
-            setQ("");
-            setTransactionType("all");
-            setHoldStatus("all");
-            setEnvironment("production");
-            setPage(1);
-          }}>Reset</Button>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center">
+            <div className="flex-1">
+              <label htmlFor="payment-search" className="mb-1 block text-sm font-medium text-gray-700">Search</label>
+              <Input
+                id="payment-search"
+                value={q}
+                onChange={(e) => { setQ(e.target.value); setPage(1); }}
+                placeholder="Search hold/order/payment/customer/task..."
+              />
+            </div>
+            <Select value={environment} onValueChange={(value) => { setEnvironment(value as Environment); setPage(1); }}>
+              <SelectTrigger className="w-full md:mt-6 md:w-44">
+                <SelectValue placeholder="Environment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="production">Production</SelectItem>
+                <SelectItem value="development">Development</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={transactionType} onValueChange={(value) => { setTransactionType(value as TransactionType); setPage(1); }}>
+              <SelectTrigger className="w-full md:mt-6 md:w-48">
+                <SelectValue placeholder="All transaction types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="real">Real</SelectItem>
+                <SelectItem value="team">Team tests</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={holdStatus} onValueChange={(value) => { setHoldStatus(value as HoldStatus); setPage(1); }}>
+              <SelectTrigger className="w-full md:mt-6 md:w-40">
+                <SelectValue placeholder="Hold status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="held">Held</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="w-full sm:w-52">
+              <label htmlFor="payment-from-date" className="mb-1 block text-sm font-medium text-gray-700">From Date</label>
+              <Input
+                id="payment-from-date"
+                type="date"
+                value={fromDate}
+                max={toDate || undefined}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFromDate(value);
+                  if (toDate && value > toDate) setToDate(value);
+                  setPage(1);
+                }}
+              />
+            </div>
+            <div className="w-full sm:w-52">
+              <label htmlFor="payment-to-date" className="mb-1 block text-sm font-medium text-gray-700">To Date</label>
+              <Input
+                id="payment-to-date"
+                type="date"
+                value={toDate}
+                min={fromDate || undefined}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setToDate(value);
+                  if (fromDate && value < fromDate) setFromDate(value);
+                  setPage(1);
+                }}
+              />
+            </div>
+            <Button variant="outline" onClick={() => applyDatePreset("today")}>Today</Button>
+            <Button variant="outline" onClick={() => applyDatePreset("last7Days")}>Last 7 days</Button>
+            <Button variant="outline" onClick={() => applyDatePreset("last30Days")}>Last 30 days</Button>
+            <Button variant="outline" onClick={() => {
+              setQ("");
+              setFromDate("");
+              setToDate("");
+              setTransactionType("all");
+              setHoldStatus("all");
+              setEnvironment("production");
+              setPage(1);
+            }}>Reset</Button>
+          </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
+          <div className="flex items-center justify-between">
             <CardTitle className="text-lg">Pay-ins</CardTitle>
+            {isFetching && isPlaceholderData && (
+              <span className="text-sm text-gray-500">Updating results…</span>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -272,12 +374,16 @@ export default function PaymentTransactionsPage() {
                         </td>
                         <td className="px-3 py-2">
                           <Link href={`/tasks/${encodeURIComponent(row.links?.taskId || row.taskId)}`} className="text-blue-600 hover:underline">
-                            {enrichmentMap?.[row.id] !== undefined ? (enrichmentMap[row.id]?.taskTitle ?? "Task Deleted") : row.taskId}
+                            {(row.links?.taskTitle && row.links.taskTitle !== row.taskId
+                              ? row.links.taskTitle
+                              : enrichmentMap?.[row.id]?.taskTitle) || row.taskId}
                           </Link>
                         </td>
                         <td className="px-3 py-2">
                           <Link href={`/users/${encodeURIComponent(row.links?.customerUserId || row.posterUid)}`} className="text-blue-600 hover:underline">
-                            {enrichmentMap?.[row.id] !== undefined ? (enrichmentMap[row.id]?.customerName ?? "Account Deleted") : row.posterUid}
+                            {(row.links?.customerName && row.links.customerName !== row.posterUid
+                              ? row.links.customerName
+                              : enrichmentMap?.[row.id]?.customerName) || row.posterUid}
                           </Link>
                         </td>
                         <td className="px-3 py-2">
@@ -285,7 +391,9 @@ export default function PaymentTransactionsPage() {
                             <span className="text-gray-400 italic text-xs">Pending Assignment</span>
                           ) : (
                             <Link href={`/users/${encodeURIComponent(row.links.helperUserId)}`} className="text-blue-600 hover:underline">
-                              {enrichmentMap?.[row.id] !== undefined ? (enrichmentMap[row.id]?.helperName ?? "Account Deleted") : row.links.helperUserId}
+                              {(row.links?.helperName && row.links.helperName !== row.performerUid
+                                ? row.links.helperName
+                                : enrichmentMap?.[row.id]?.helperName) || row.links.helperUserId}
                             </Link>
                           )}
                         </td>

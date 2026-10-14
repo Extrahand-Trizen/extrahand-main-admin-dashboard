@@ -19,6 +19,8 @@ export async function listPaymentTransactions(filters?: {
   transactionType?: 'all' | 'real' | 'team';
   holdStatus?: 'held' | 'cancelled';
   environment?: 'production' | 'development';
+  startDate?: string;
+  endDate?: string;
   limit?: number;
   offset?: number;
 }): Promise<PaymentListResponse<PaymentTransaction>> {
@@ -27,6 +29,8 @@ export async function listPaymentTransactions(filters?: {
   if (filters?.transactionType) params.append('transactionType', filters.transactionType);
   if (filters?.holdStatus) params.append('holdStatus', filters.holdStatus);
   if (filters?.environment) params.append('environment', filters.environment);
+  if (filters?.startDate) params.append('startDate', filters.startDate);
+  if (filters?.endDate) params.append('endDate', filters.endDate);
   if (filters?.limit) params.append('limit', String(filters.limit));
   if (filters?.offset) params.append('offset', String(filters.offset));
   const query = params.toString();
@@ -264,4 +268,3 @@ export async function processRefund(body: {
     body: JSON.stringify(body),
   });
 }
-

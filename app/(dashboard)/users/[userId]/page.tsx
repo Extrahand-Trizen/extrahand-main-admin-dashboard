@@ -193,10 +193,12 @@ export default function UserDetailsPage() {
   });
 
   const canViewPaymentStatus = isSuperAdmin || hasPermission("payment.view");
+  // Payment Service stores bank accounts by Firebase UID, while this page route can be Mongo profile _id.
+  const paymentUserId = user?.uid || user?.userId || userId;
   const { data: bankAccountsResponse, isLoading: bankAccountsLoading, refetch: refetchBankAccounts } = useQuery({
-    queryKey: ["user-bank-accounts-postgres", userId],
-    queryFn: () => getUserBankAccounts(userId),
-    enabled: !!userId && canViewPaymentStatus,
+    queryKey: ["user-bank-accounts-postgres", paymentUserId],
+    queryFn: () => getUserBankAccounts(String(paymentUserId)),
+    enabled: !!paymentUserId && canViewPaymentStatus,
     retry: false,
     staleTime: 30_000,
   });
