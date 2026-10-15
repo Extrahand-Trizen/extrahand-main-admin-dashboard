@@ -495,6 +495,16 @@ function ReviewDialog({
   );
 }
 
+function getSavedFollowUpFilters() {
+  try {
+    const saved = sessionStorage.getItem("aadhaar_followups_filters");
+    if (saved) return JSON.parse(saved);
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function AadhaarFollowUpsPage() {
@@ -503,50 +513,38 @@ export default function AadhaarFollowUpsPage() {
   const searchParams = useSearchParams();
   const reviewUserId = searchParams.get("userId");
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
+  // Initialise directly from sessionStorage — no useEffect round-trip needed
+  const savedFilters = useMemo(() => getSavedFollowUpFilters(), []);
+  const [search, setSearch] = useState<string>(savedFilters?.search ?? "");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>(savedFilters?.search ?? "");
+  const [statusFilter, setStatusFilter] = useState<string>(savedFilters?.statusFilter ?? "all");
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">(savedFilters?.sortOrder ?? "newest");
+  const [page, setPage] = useState<number>(savedFilters?.page ?? 1);
+  const [limit, setLimit] = useState<number>(savedFilters?.limit ?? 20);
   const [selectedRow, setSelectedRow] = useState<KycReviewRow | null>(null);
 
   const queryClient = useQueryClient();
 
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  // Load saved filters on mount
+  // Debounce search input — don't hammer the API on every keystroke
   useEffect(() => {
-    try {
-      const saved = sessionStorage.getItem("aadhaar_followups_filters");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.search !== undefined) setSearch(parsed.search);
-        if (parsed.statusFilter !== undefined) setStatusFilter(parsed.statusFilter);
-        if (parsed.sortOrder !== undefined) setSortOrder(parsed.sortOrder);
-        if (parsed.page !== undefined) setPage(parsed.page);
-        if (parsed.limit !== undefined) setLimit(parsed.limit);
-      }
-    } catch (e) {
-      console.error("Error loading filters from sessionStorage", e);
-    }
-    setIsLoaded(true);
-  }, []);
+    const timeout = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => window.clearTimeout(timeout);
+  }, [search]);
 
-  // Save filters on state changes
+  // Persist filters whenever they change
   useEffect(() => {
-    if (!isLoaded) return;
     try {
       sessionStorage.setItem("aadhaar_followups_filters", JSON.stringify({
         search,
         statusFilter,
         sortOrder,
         page,
-        limit
+        limit,
       }));
-    } catch (e) {
-      console.error("Error saving filters to sessionStorage", e);
+    } catch {
+      // ignore
     }
-  }, [search, statusFilter, sortOrder, page, limit, isLoaded]);
+  }, [search, statusFilter, sortOrder, page, limit]);
 
   // Reset to page 1 when filters change
   const handleStatusFilter = (v: string) => { setStatusFilter(v); setPage(1); };
@@ -626,7 +624,7 @@ export default function AadhaarFollowUpsPage() {
       assignedTo?: string;
     } = { page, limit, sortOrder };
 
-    if (search) params.search = search;
+    if (debouncedSearch) params.search = debouncedSearch;
 
     switch (statusFilter) {
       case "pending":
@@ -650,14 +648,17 @@ export default function AadhaarFollowUpsPage() {
     }
 
     return params;
-  }, [search, statusFilter, page, limit, sortOrder]);
+  }, [debouncedSearch, statusFilter, page, limit, sortOrder]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["aadhaar-followups", search, statusFilter, page, limit, sortOrder],
+    queryKey: ["aadhaar-followups", debouncedSearch, statusFilter, page, limit, sortOrder],
     queryFn: () => listAadhaarFollowUps(kycReviewQuery),
-    enabled: allowed && isLoaded,
+    // No isLoaded gate — state is already initialised on first render
+    enabled: allowed,
     retry: false,
-    placeholderData: (prev) => prev, // keep previous page data while fetching next
+    placeholderData: (prev) => prev,
+    staleTime: 60_000,   // 60 s — reuse cache on revisit
+    gcTime: 5 * 60_000,
   });
 
   const rows = useMemo(() => data?.data || [], [data]);

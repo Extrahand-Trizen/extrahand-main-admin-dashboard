@@ -373,48 +373,45 @@ function ReviewDialog({
   );
 }
 
+function getSavedFilters() {
+  try {
+    const saved = sessionStorage.getItem("kyc_reviews_filters");
+    if (saved) return JSON.parse(saved);
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 export default function KycReviewsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user, isSuperAdmin } = useAuth();
   const searchParams = useSearchParams();
   const reviewUserId = searchParams.get("userId");
-  const [search, setSearch] = useState("");
-  const [reviewStatus, setReviewStatus] = useState("all");
-  const [followUpStatus, setFollowUpStatus] = useState("all");
-  const [claimStatus, setClaimStatus] = useState("all");
-  const [sortOrder, setSortOrder] = useState<"latest" | "oldest">("latest");
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
+
+  // Initialise directly from sessionStorage — no useEffect round-trip needed
+  const savedFilters = useMemo(() => getSavedFilters(), []);
+  const [search, setSearch] = useState<string>(savedFilters?.search ?? "");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>(savedFilters?.search?.trim() ?? "");
+  const [reviewStatus, setReviewStatus] = useState<string>(savedFilters?.reviewStatus ?? "all");
+  const [followUpStatus, setFollowUpStatus] = useState<string>(savedFilters?.followUpStatus ?? "all");
+  const [claimStatus, setClaimStatus] = useState<string>(savedFilters?.claimStatus ?? "all");
+  const [sortOrder, setSortOrder] = useState<"latest" | "oldest">(savedFilters?.sortOrder ?? "latest");
+  const [page, setPage] = useState<number>(savedFilters?.page ?? 1);
+  const [limit, setLimit] = useState<number>(savedFilters?.limit ?? 20);
   const [selectedRow, setSelectedRow] = useState<KycReviewRow | null>(null);
 
   const allowed = isAllReviewsRole(user?.role, isSuperAdmin) || isOperationsRole(user?.role);
 
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  // Load saved filters on mount
+  // Debounce only user-typed search changes (not the initial value)
   useEffect(() => {
-    try {
-      const saved = sessionStorage.getItem("kyc_reviews_filters");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.search !== undefined) setSearch(parsed.search);
-        if (parsed.reviewStatus !== undefined) setReviewStatus(parsed.reviewStatus);
-        if (parsed.followUpStatus !== undefined) setFollowUpStatus(parsed.followUpStatus);
-        if (parsed.claimStatus !== undefined) setClaimStatus(parsed.claimStatus);
-        if (parsed.sortOrder !== undefined) setSortOrder(parsed.sortOrder);
-        if (parsed.page !== undefined) setPage(parsed.page);
-        if (parsed.limit !== undefined) setLimit(parsed.limit);
-      }
-    } catch (e) {
-      console.error("Error loading filters from sessionStorage", e);
-    }
-    setIsLoaded(true);
-  }, []);
+    const timeout = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => window.clearTimeout(timeout);
+  }, [search]);
 
-  // Save filters on state changes
+  // Persist filters whenever they change
   useEffect(() => {
-    if (!isLoaded) return;
     try {
       sessionStorage.setItem("kyc_reviews_filters", JSON.stringify({
         search,
@@ -423,26 +420,20 @@ export default function KycReviewsPage() {
         claimStatus,
         sortOrder,
         page,
-        limit
+        limit,
       }));
-    } catch (e) {
-      console.error("Error saving filters to sessionStorage", e);
+    } catch {
+      // ignore
     }
-  }, [search, reviewStatus, followUpStatus, claimStatus, sortOrder, page, limit, isLoaded]);
-
-  // Reset page to 1 when filters change
-  useEffect(() => {
-    if (!isLoaded) return;
-    setPage(1);
-  }, [search, reviewStatus, followUpStatus, claimStatus, sortOrder, isLoaded]);
+  }, [search, reviewStatus, followUpStatus, claimStatus, sortOrder, page, limit]);
 
   const includeVerified = reviewStatus === "accepted";
 
   const { data, isLoading } = useQuery({
-    queryKey: ["kyc-reviews", search, reviewStatus, followUpStatus, claimStatus, sortOrder, page, limit, includeVerified],
+    queryKey: ["kyc-reviews", debouncedSearch, reviewStatus, followUpStatus, claimStatus, sortOrder, page, limit, includeVerified],
     queryFn: () =>
       listKycReviews({
-        search,
+        search: debouncedSearch,
         reviewStatus,
         followUpStatus,
         claimStatus,
@@ -451,7 +442,11 @@ export default function KycReviewsPage() {
         page,
         limit,
       }),
-    enabled: allowed && isLoaded,
+    // No isLoaded gate — state is already initialised on first render
+    enabled: allowed,
+    placeholderData: (previousData) => previousData,
+    staleTime: 60_000,   // 60 s — reduces background refetches on revisit
+    gcTime: 5 * 60_000,
     retry: false,
   });
 
@@ -490,12 +485,15 @@ export default function KycReviewsPage() {
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPage(1);
+            }}
             placeholder="Search by name, phone, Aadhaar status..."
             className="h-11 pl-9"
           />
         </div>
-        <Select value={reviewStatus} onValueChange={setReviewStatus}>
+        <Select value={reviewStatus} onValueChange={(value) => { setReviewStatus(value); setPage(1); }}>
           <SelectTrigger className="h-11">
             <SelectValue placeholder="Review status" />
           </SelectTrigger>
@@ -506,7 +504,7 @@ export default function KycReviewsPage() {
             <SelectItem value="rejected">Rejected</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={followUpStatus} onValueChange={setFollowUpStatus}>
+        <Select value={followUpStatus} onValueChange={(value) => { setFollowUpStatus(value); setPage(1); }}>
           <SelectTrigger className="h-11">
             <SelectValue placeholder="Follow-up status" />
           </SelectTrigger>
@@ -518,7 +516,7 @@ export default function KycReviewsPage() {
           </SelectContent>
         </Select>
         {isSuperAdmin && (
-          <Select value={claimStatus} onValueChange={setClaimStatus}>
+          <Select value={claimStatus} onValueChange={(value) => { setClaimStatus(value); setPage(1); }}>
             <SelectTrigger className="h-11">
               <SelectValue placeholder="Claim status" />
             </SelectTrigger>
@@ -529,7 +527,7 @@ export default function KycReviewsPage() {
             </SelectContent>
           </Select>
         )}
-        <Select value={sortOrder} onValueChange={(val) => setSortOrder(val as "latest" | "oldest")}>
+        <Select value={sortOrder} onValueChange={(val) => { setSortOrder(val as "latest" | "oldest"); setPage(1); }}>
           <SelectTrigger className="h-11">
             <SelectValue placeholder="Sort order" />
           </SelectTrigger>

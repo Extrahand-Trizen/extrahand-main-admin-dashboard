@@ -72,9 +72,9 @@ export async function listKycReviews(params: {
 } = {}): Promise<KycReviewsResponse> {
   const query = new URLSearchParams();
   if (params.search) query.set("search", params.search);
-  if (params.reviewStatus) query.set("reviewStatus", params.reviewStatus);
-  if (params.followUpStatus) query.set("followUpStatus", params.followUpStatus);
-  if (params.claimStatus) query.set("claimStatus", params.claimStatus);
+  if (params.reviewStatus && params.reviewStatus !== "all") query.set("reviewStatus", params.reviewStatus);
+  if (params.followUpStatus && params.followUpStatus !== "all") query.set("followUpStatus", params.followUpStatus);
+  if (params.claimStatus && params.claimStatus !== "all") query.set("claimStatus", params.claimStatus);
   if (params.includeVerified) query.set("includeVerified", "true");
   if (params.page) query.set("page", String(params.page));
   if (params.limit) query.set("limit", String(params.limit));
