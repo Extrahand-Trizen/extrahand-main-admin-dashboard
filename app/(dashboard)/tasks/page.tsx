@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -53,7 +53,6 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { listTasks, deleteTask, requestTaskDelete } from "@/lib/api/tasks";
-import { getUser, listUsers } from "@/lib/api/users";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { CATEGORY_OPTIONS } from "@/lib/category-options";
@@ -102,7 +101,7 @@ const getTaskCustomerId = (
   },
 ) => String(task.CustomerId || task.customerId || task.requesterId || task.requesterProfileId || "").trim();
 
-const statusColors: Record<string, string> = {
+const statusColors: Record<string, "success" | "destructive" | "warning" | "default"> = {
   open: "success",
   overdue: "destructive",
   in_progress: "warning",
@@ -140,7 +139,7 @@ const followUpStatusLabels: Record<string, string> = {
   follow_up: "Follow up",
 };
 
-const followUpStatusColors: Record<string, string> = {
+const followUpStatusColors: Record<string, "secondary" | "success" | "destructive" | "warning" | "default"> = {
   not_updated: "secondary",
   genuine: "success",
   not_genuine: "destructive",
@@ -148,25 +147,40 @@ const followUpStatusColors: Record<string, string> = {
   follow_up: "default",
 };
 
+function getSavedFilters() {
+  if (typeof window === "undefined") return null;
+  try {
+    const saved = sessionStorage.getItem("tasks_filters");
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function TasksPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { hasPermission, isSuperAdmin } = usePermissions();
 
-  const [search, setSearch] = useState("");
-  const [workTypeFilter, setWorkTypeFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("open");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [followUpFilter, setFollowUpFilter] = useState<string>("all");
-  const [paymentTypeFilter, setPaymentTypeFilter] = useState<string>("all");
-  const [assignedToFilter, setAssignedToFilter] = useState<string>("all");
-  const [postedByFilter, setPostedByFilter] = useState<string>("all");
-  const [workDateFilter, setWorkDateFilter] = useState<string>("all");
-  const [customDateFrom, setCustomDateFrom] = useState("");
-  const [customDateTo, setCustomDateTo] = useState("");
-  const [scheduledTimeSortOrder, setScheduledTimeSortOrder] = useState<'asc' | 'desc'>("desc");
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
+  const savedFilters = useMemo(() => getSavedFilters(), []);
+
+  const [searchInput, setSearchInput] = useState<string>(savedFilters?.search ?? "");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>(savedFilters?.search ?? "");
+  const [workTypeFilter, setWorkTypeFilter] = useState<string>(savedFilters?.workTypeFilter ?? "all");
+  const [statusFilter, setStatusFilter] = useState<string>(savedFilters?.statusFilter ?? "open");
+  const [categoryFilter, setCategoryFilter] = useState<string>(savedFilters?.categoryFilter ?? "all");
+  const [followUpFilter, setFollowUpFilter] = useState<string>(savedFilters?.followUpFilter ?? "all");
+  const [paymentTypeFilter, setPaymentTypeFilter] = useState<string>(savedFilters?.paymentTypeFilter ?? "all");
+  const [assignedToFilter, setAssignedToFilter] = useState<string>(savedFilters?.assignedToFilter ?? "all");
+  const [postedByFilter, setPostedByFilter] = useState<string>(savedFilters?.postedByFilter ?? "all");
+  const [workDateFilter, setWorkDateFilter] = useState<string>(savedFilters?.workDateFilter ?? "all");
+  const [customDateFrom, setCustomDateFrom] = useState<string>(savedFilters?.customDateFrom ?? "");
+  const [customDateTo, setCustomDateTo] = useState<string>(savedFilters?.customDateTo ?? "");
+  const [scheduledTimeSortOrder, setScheduledTimeSortOrder] = useState<'asc' | 'desc'>(
+    savedFilters?.scheduledTimeSortOrder ?? savedFilters?.deadlineSortOrder ?? "desc"
+  );
+  const [page, setPage] = useState<number>(savedFilters?.page ?? 1);
+  const [limit, setLimit] = useState<number>(savedFilters?.limit ?? 20);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
@@ -183,42 +197,20 @@ export default function TasksPage() {
     reason: "",
   });
 
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  // Load saved filters on mount
+  // Debounce search input by 300ms
   useEffect(() => {
-    try {
-      const saved = sessionStorage.getItem("tasks_filters");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.search !== undefined) setSearch(parsed.search);
-        if (parsed.workTypeFilter !== undefined) setWorkTypeFilter(parsed.workTypeFilter);
-        if (parsed.statusFilter !== undefined) setStatusFilter(parsed.statusFilter);
-        if (parsed.categoryFilter !== undefined) setCategoryFilter(parsed.categoryFilter);
-        if (parsed.followUpFilter !== undefined) setFollowUpFilter(parsed.followUpFilter);
-        if (parsed.paymentTypeFilter !== undefined) setPaymentTypeFilter(parsed.paymentTypeFilter);
-        if (parsed.assignedToFilter !== undefined) setAssignedToFilter(parsed.assignedToFilter);
-        if (parsed.postedByFilter !== undefined) setPostedByFilter(parsed.postedByFilter);
-        if (parsed.workDateFilter !== undefined) setWorkDateFilter(parsed.workDateFilter);
-        if (parsed.customDateFrom !== undefined) setCustomDateFrom(parsed.customDateFrom);
-        if (parsed.customDateTo !== undefined) setCustomDateTo(parsed.customDateTo);
-        if (parsed.scheduledTimeSortOrder !== undefined) setScheduledTimeSortOrder(parsed.scheduledTimeSortOrder);
-        else if (parsed.deadlineSortOrder !== undefined) setScheduledTimeSortOrder(parsed.deadlineSortOrder);
-        if (parsed.page !== undefined) setPage(parsed.page);
-        if (parsed.limit !== undefined) setLimit(parsed.limit);
-      }
-    } catch (e) {
-      console.error("Error loading filters from sessionStorage", e);
-    }
-    setIsLoaded(true);
-  }, []);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   // Save filters on state changes
   useEffect(() => {
-    if (!isLoaded) return;
     try {
       sessionStorage.setItem("tasks_filters", JSON.stringify({
-        search,
+        search: debouncedSearch,
         workTypeFilter,
         statusFilter,
         categoryFilter,
@@ -236,10 +228,11 @@ export default function TasksPage() {
     } catch (e) {
       console.error("Error saving filters to sessionStorage", e);
     }
-  }, [search, workTypeFilter, statusFilter, categoryFilter, followUpFilter, paymentTypeFilter, assignedToFilter, postedByFilter, workDateFilter, customDateFrom, customDateTo, scheduledTimeSortOrder, page, limit, isLoaded]);
+  }, [debouncedSearch, workTypeFilter, statusFilter, categoryFilter, followUpFilter, paymentTypeFilter, assignedToFilter, postedByFilter, workDateFilter, customDateFrom, customDateTo, scheduledTimeSortOrder, page, limit]);
 
   const handleClearFilters = () => {
-    setSearch("");
+    setSearchInput("");
+    setDebouncedSearch("");
     setWorkTypeFilter("all");
     setStatusFilter("all");
     setCategoryFilter("all");
@@ -260,7 +253,7 @@ export default function TasksPage() {
   };
 
   const hasActiveFilters = Boolean(
-    search ||
+    searchInput ||
     workTypeFilter !== "all" ||
     statusFilter !== "all" ||
     categoryFilter !== "all" ||
@@ -289,7 +282,7 @@ export default function TasksPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: [
       "tasks",
-      search,
+      debouncedSearch,
       workTypeFilter,
       statusFilter,
       categoryFilter,
@@ -306,7 +299,7 @@ export default function TasksPage() {
     ],
     queryFn: () =>
       listTasks({
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         bookingSource: workTypeFilter,
         status: statusFilter !== "all" ? statusFilter : undefined,
         category: categoryFilter !== "all" ? categoryFilter : undefined,
@@ -322,7 +315,8 @@ export default function TasksPage() {
         page,
         limit,
       }),
-    enabled: hasPermission("task.list") && isLoaded,
+    enabled: hasPermission("task.list"),
+    staleTime: 60_000,
     retry: false,
   });
 
@@ -471,64 +465,7 @@ export default function TasksPage() {
     });
   }, [tasks, workDateFilter, workDateRange.from, workDateRange.to, paymentTypeFilter, scheduledTimeSortOrder]);
 
-  const uniqueCustomerProfileIds = useMemo(() => {
-    return Array.from(
-      new Set(
-        clientFilteredTasks
-          .map((task: any) => getTaskCustomerId(task))
-          .filter(Boolean)
-      )
-    );
-  }, [clientFilteredTasks]);
 
-  const customerQueries = useQueries({
-    queries: uniqueCustomerProfileIds.map((customerId) => ({
-      queryKey: ["user-from-task-customer", customerId],
-      queryFn: () => getUser(customerId),
-      enabled: hasPermission("user.view"),
-      retry: false,
-    })),
-  });
-
-  const customerDetailsById = new Map(
-    uniqueCustomerProfileIds.map((customerId, index) => [
-      customerId,
-      customerQueries[index]?.data?.data,
-    ]),
-  );
-  const loadingCustomerIds = new Set(
-    uniqueCustomerProfileIds.filter((_, index) => customerQueries[index]?.isLoading),
-  );
-
-  const uniqueHelperProfileIds = useMemo(() => {
-    return Array.from(
-      new Set(
-        clientFilteredTasks
-          .map((task: any) => task.assigneeId)
-          .filter(Boolean)
-      )
-    ) as string[];
-  }, [clientFilteredTasks]);
-
-  const { data: batchUsersData, isLoading: isBatchLoading } = useQuery({
-    queryKey: ["users-batch", uniqueHelperProfileIds.join(',')],
-    queryFn: () => listUsers({ uids: uniqueHelperProfileIds.join(','), limit: uniqueHelperProfileIds.length || 1 }),
-    enabled: uniqueHelperProfileIds.length > 0,
-    retry: false,
-  });
-
-  const helperDetailsByProfileId = useMemo(() => {
-    const map = new Map<string, any>();
-    if (batchUsersData?.data && Array.isArray(batchUsersData.data)) {
-      batchUsersData.data.forEach((user: any) => {
-        if (user.uid) map.set(user.uid, user);
-        if (user._id) map.set(user._id, user);
-        if (user.profileId) map.set(user.profileId, user);
-        if (user.userId) map.set(user.userId, user);
-      });
-    }
-    return map;
-  }, [batchUsersData]);
 
   const pagination = data?.pagination || {
     page: 1,
@@ -589,10 +526,9 @@ export default function TasksPage() {
                 <Input
                   id="search"
                   placeholder="Search works..."
-                  value={search}
+                  value={searchInput}
                   onChange={(e) => {
-                    setSearch(e.target.value);
-                    setPage(1);
+                    setSearchInput(e.target.value);
                   }}
                   className="pl-10"
                 />
@@ -855,34 +791,16 @@ export default function TasksPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="hidden sm:table-cell">
-                        Works
-                      </TableHead>
-                      <TableHead className="sm:hidden">Details</TableHead>
-                      <TableHead className="hidden lg:table-cell">
-                        Customer
-                      </TableHead>
-                      <TableHead className="hidden md:table-cell">
-                        Category
-                      </TableHead>
-                      <TableHead className="hidden lg:table-cell">
-                        Status
-                      </TableHead>
-                      <TableHead className="hidden xl:table-cell">
-                        Follow-up
-                      </TableHead>
-                      <TableHead className="hidden lg:table-cell">
-                        Assigned To
-                      </TableHead>
-                      <TableHead className="hidden xl:table-cell">
-                        Assigned Ops Admin
-                      </TableHead>
-                      <TableHead className="hidden lg:table-cell">
-                        Budget
-                      </TableHead>
-                      <TableHead className="hidden lg:table-cell">
-                        Deadline / Schedule
-                      </TableHead>
+                      <TableHead className="hidden sm:table-cell">Works</TableHead>
+                      <TableHead className="sm:hidden">Work</TableHead>
+                      <TableHead className="hidden lg:table-cell">Customer</TableHead>
+                      <TableHead className="hidden md:table-cell">Category</TableHead>
+                      <TableHead className="hidden lg:table-cell">Status</TableHead>
+                      <TableHead className="hidden xl:table-cell">Follow-up</TableHead>
+                      <TableHead className="hidden lg:table-cell">Assigned To</TableHead>
+                      <TableHead className="hidden xl:table-cell">Assigned Ops Admin</TableHead>
+                      <TableHead className="hidden lg:table-cell">Budget</TableHead>
+                      <TableHead className="hidden lg:table-cell">Deadline / Schedule</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -892,18 +810,13 @@ export default function TasksPage() {
                         task as Partial<Task> & { _id?: string; id?: string },
                       );
                       const customerId = getTaskCustomerId(task);
-                      const assignedHelperName =
+                      const customerDisplayName =
+                        (task as Task & { customerName?: string }).customerName || customerId;
+                      const resolvedHelperName =
+                        (task as any).assigneeName ||
                         task.assignedHelperName ||
                         task.assigneeName ||
                         task.assignedToName;
-                      const assignedHelper =
-                        task.assigneeId
-                          ? helperDetailsByProfileId.get(task.assigneeId)
-                          : undefined;
-                      const resolvedHelperName =
-                        assignedHelperName ||
-                        assignedHelper?.name ||
-                        assignedHelper?.fullName;
                       return (
                       <TableRow 
                         key={taskIdentifier || `${task.title}-${task.createdAt}`}
@@ -915,77 +828,35 @@ export default function TasksPage() {
                         }}
                       >
                         <TableCell>
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                            <div className="flex items-center gap-3">
-                              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 text-blue-700">
-                                <Briefcase className="h-5 w-5" />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="font-medium text-gray-900 truncate">
-                                  {task.title}
-                                </div>
-                                <div className="text-sm text-gray-500 truncate line-clamp-1">
-                                  {task.description}
-                                </div>
-                              </div>
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center justify-center w-10 h-10 shrink-0 rounded-lg bg-blue-100 text-blue-700">
+                              <Briefcase className="h-5 w-5" />
                             </div>
-                            <div className="flex items-center gap-2 sm:hidden">
-                              <Badge variant={statusColors[getDisplayStatus(task)] as any}>
-                                {getDisplayStatus(task)}
-                              </Badge>
-                              <Badge
-                                variant={
-                                  followUpStatusColors[
-                                    task.taskCallStatus || "not_updated"
-                                  ] as any
-                                }
-                              >
-                                {
-                                  followUpStatusLabels[
-                                    task.taskCallStatus || "not_updated"
-                                  ]
-                                }
-                              </Badge>
-                              {task.category && (
-                                <Badge variant="outline">{task.category}</Badge>
-                              )}
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium text-gray-900 truncate">
+                                {task.title}
+                              </div>
                             </div>
                           </div>
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-sm">
                           {customerId ? (
-                            customerDetailsById.get(customerId) ? (
-                              <Link
-                                href={`/users/${customerId}`}
-                                className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {customerDetailsById.get(customerId)?.name ||
-                                  customerDetailsById.get(customerId)?.fullName ||
-                                  customerId}
-                              </Link>
-                            ) : loadingCustomerIds.has(customerId) ? (
-                              <span className="text-gray-500">Loading...</span>
-                            ) : (
-                              <Link
-                                href={`/users/${customerId}`}
-                                className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {customerId}
-                              </Link>
-                            )
+                            <Link
+                              href={`/users/${customerId}`}
+                              className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              {customerDisplayName}
+                            </Link>
                           ) : (
                             <span className="text-gray-400">N/A</span>
                           )}
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
-                          {task.category && (
-                            <Badge variant="outline">{task.category}</Badge>
-                          )}
+                          {task.category && <Badge variant="outline">{task.category}</Badge>}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
-                          <Badge variant={statusColors[getDisplayStatus(task)] as any}>
+                          <Badge variant={statusColors[getDisplayStatus(task)]}>
                             {getDisplayStatus(task)}
                           </Badge>
                         </TableCell>
@@ -993,23 +864,16 @@ export default function TasksPage() {
                           <div className="space-y-1">
                             <Badge
                               variant={
-                                followUpStatusColors[
-                                  task.taskCallStatus || "not_updated"
-                                ] as any
+                                followUpStatusColors[task.taskCallStatus || "not_updated"]
                               }
                             >
-                              {
-                                followUpStatusLabels[
-                                  task.taskCallStatus || "not_updated"
-                                ]
-                              }
+                              {followUpStatusLabels[task.taskCallStatus || "not_updated"]}
                             </Badge>
-                            {task.taskCallStatus === "follow_up" &&
-                              task.taskCallFollowUpDate && (
-                                <div className="text-xs text-gray-500">
-                                  {formatDate(task.taskCallFollowUpDate)}
-                                </div>
-                              )}
+                            {task.taskCallStatus === "follow_up" && task.taskCallFollowUpDate && (
+                              <div className="text-xs text-gray-500">
+                                {formatDate(task.taskCallFollowUpDate)}
+                              </div>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-sm">
@@ -1018,7 +882,7 @@ export default function TasksPage() {
                               <Link
                                 href={`/users/${task.assigneeId}`}
                                 className="font-medium text-blue-600 hover:text-blue-800 hover:underline capitalize"
-                                onClick={(e) => e.stopPropagation()}
+                                onClick={(event) => event.stopPropagation()}
                               >
                                 {resolvedHelperName}
                               </Link>
@@ -1027,12 +891,8 @@ export default function TasksPage() {
                                 {resolvedHelperName}
                               </span>
                             )
-                          ) : task.assigneeId && isBatchLoading ? (
-                            <span className="text-gray-500">Loading...</span>
                           ) : task.assigneeId ? (
-                            <span className="font-medium text-gray-700 capitalize">
-                              Account Deleted
-                            </span>
+                            <span className="font-medium text-gray-700 capitalize">Account Deleted</span>
                           ) : (
                             <span className="text-amber-600 font-medium italic hover:underline">
                               Assign Partner
@@ -1053,7 +913,7 @@ export default function TasksPage() {
                             <span>{formatCurrency(task.budget)}</span>
                             {task.isFreeCoupon && (
                               <div className="text-[11px] font-normal text-emerald-600">
-                                Free{task.couponCode ? ` (${task.couponCode})` : ' (Coupon)'}
+                                Free{task.couponCode ? ` (${task.couponCode})` : " (Coupon)"}
                               </div>
                             )}
                           </div>

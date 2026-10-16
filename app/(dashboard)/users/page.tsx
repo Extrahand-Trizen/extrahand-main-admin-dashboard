@@ -52,12 +52,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   listUsers,
-  getHyderabadSubAreas,
   banUser,
   unbanUser,
   suspendUser,
   unsuspendUser,
 } from "@/lib/api/users";
+import { getLocationAreas, getLocationCatalog } from "@/lib/api/locations";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { formatDate } from "@/lib/utils";
 import { CATEGORY_OPTIONS } from "@/lib/category-options";
@@ -182,6 +182,7 @@ export default function UsersPage() {
   const [aadhaarFilter, setAadhaarFilter] = useState<string>("all");
   const [certifiedFilter, setCertifiedFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [cityFilter, setCityFilter] = useState<string>("all");
   const [areaFilter, setAreaFilter] = useState<string>("all");
   const [createdFrom, setCreatedFrom] = useState<string>("");
   const [createdTo, setCreatedTo] = useState<string>("");
@@ -212,6 +213,7 @@ export default function UsersPage() {
         if (parsed.aadhaarFilter !== undefined) setAadhaarFilter(parsed.aadhaarFilter);
         if (parsed.certifiedFilter !== undefined) setCertifiedFilter(parsed.certifiedFilter);
         if (parsed.categoryFilter !== undefined) setCategoryFilter(parsed.categoryFilter);
+        if (parsed.cityFilter !== undefined) setCityFilter(parsed.cityFilter);
         if (parsed.areaFilter !== undefined) setAreaFilter(parsed.areaFilter);
         if (parsed.createdFrom !== undefined) setCreatedFrom(parsed.createdFrom);
         if (parsed.createdTo !== undefined) setCreatedTo(parsed.createdTo);
@@ -235,6 +237,7 @@ export default function UsersPage() {
         aadhaarFilter,
         certifiedFilter,
         categoryFilter,
+        cityFilter,
         areaFilter,
         createdFrom,
         createdTo,
@@ -244,8 +247,35 @@ export default function UsersPage() {
     } catch (e) {
       console.error("Error saving filters to sessionStorage", e);
     }
-  }, [search, statusFilter, roleFilter, aadhaarFilter, certifiedFilter, categoryFilter, areaFilter, createdFrom, createdTo, page, limit, isLoaded]);
+  }, [search, statusFilter, roleFilter, aadhaarFilter, certifiedFilter, categoryFilter, cityFilter, areaFilter, createdFrom, createdTo, page, limit, isLoaded]);
 
+  const {
+    data: locationCatalogData,
+    error: locationCatalogError,
+    isLoading: isLoadingCities,
+  } = useQuery({
+    queryKey: ["location-catalog"],
+    queryFn: getLocationCatalog,
+    enabled: hasPermission("user.list") && isLoaded,
+    retry: false,
+  });
+  const cities = locationCatalogData?.data?.cities ?? [];
+  const hyderabadLocation = cities.find(
+    (city) => city.name.trim().toLowerCase() === "hyderabad",
+  );
+  const hyderabadAreas = getLocationAreas(hyderabadLocation);
+  const selectedCityFilter =
+    locationCatalogData &&
+    cityFilter !== "all" &&
+    !cities.some((city) => city.name === cityFilter)
+      ? "all"
+      : cityFilter;
+
+  useEffect(() => {
+    if (locationCatalogError) {
+      toast.error(locationCatalogError.message || "Failed to load cities");
+    }
+  }, [locationCatalogError]);
 
   const { data, isLoading, error } = useQuery({
     queryKey: [
@@ -256,6 +286,7 @@ export default function UsersPage() {
       aadhaarFilter,
       certifiedFilter,
       categoryFilter,
+      selectedCityFilter,
       areaFilter,
       createdFrom,
       createdTo,
@@ -268,7 +299,12 @@ export default function UsersPage() {
         status: statusFilter !== "all" ? statusFilter : undefined,
         role: roleFilter !== "all" ? roleFilter : undefined,
         category: categoryFilter !== "all" ? categoryFilter : undefined,
-        area: areaFilter !== "all" ? areaFilter : undefined,
+        city: selectedCityFilter !== "all" ? selectedCityFilter : undefined,
+        area:
+          selectedCityFilter.trim().toLowerCase() === "hyderabad" &&
+          areaFilter !== "all"
+            ? areaFilter
+            : undefined,
         isAadhaarVerified:
           aadhaarFilter === "verified"
             ? true
@@ -290,16 +326,8 @@ export default function UsersPage() {
     retry: false,
   });
 
-  const { data: hyderabadSubAreasData } = useQuery({
-    queryKey: ["users-hyderabad-sub-areas"],
-    queryFn: getHyderabadSubAreas,
-    enabled: hasPermission("user.list"),
-    staleTime: 5 * 60 * 1000,
-    retry: false,
-  });
-
-  const hyderabadSubAreas = hyderabadSubAreasData?.data || [];
-
+  const isHyderabadSelected =
+    selectedCityFilter.trim().toLowerCase() === "hyderabad";
   const banMutation = useMutation({
     mutationFn: ({ userId, reason }: { userId: string; reason: string }) =>
       banUser(userId, reason),
@@ -574,27 +602,66 @@ export default function UsersPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="area">Hyderabad sub-area</Label>
+              <Label htmlFor="city">City</Label>
               <Select
-                value={areaFilter}
+                value={selectedCityFilter}
+                disabled={isLoadingCities || Boolean(locationCatalogError)}
                 onValueChange={(value) => {
-                  setAreaFilter(value);
+                  setCityFilter(value);
+                  setAreaFilter("all");
                   setPage(1);
                 }}
               >
-                <SelectTrigger id="area">
-                  <SelectValue placeholder="All sub-areas" />
+                <SelectTrigger id="city">
+                  <SelectValue
+                    placeholder={
+                      isLoadingCities
+                        ? "Loading cities..."
+                        : locationCatalogError
+                          ? "Cities unavailable"
+                          : "All cities"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Hyderabad sub-areas</SelectItem>
-                  {hyderabadSubAreas.map((area) => (
-                    <SelectItem key={area} value={area}>
-                      {area}
+                  <SelectItem value="all">All Cities</SelectItem>
+                  {cities.map((city) => (
+                    <SelectItem key={city.id} value={city.name}>
+                      {city.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {locationCatalogError && (
+                <p className="text-sm text-red-600">
+                  Failed to load cities: {locationCatalogError.message}
+                </p>
+              )}
             </div>
+            {isHyderabadSelected && (
+              <div className="space-y-2">
+                <Label htmlFor="area">Hyderabad work area</Label>
+                <Select
+                  value={areaFilter}
+                  onValueChange={(value) => {
+                    setAreaFilter(value);
+                    setPage(1);
+                  }}
+                >
+                  <SelectTrigger id="area">
+                    <SelectValue placeholder="All sub-areas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Hyderabad areas</SelectItem>
+                    {hyderabadAreas.map((area) => (
+                      <SelectItem key={area.id} value={area.name}>
+                        {area.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="createdFrom">Created from</Label>
               <Input
@@ -631,6 +698,7 @@ export default function UsersPage() {
                   setAadhaarFilter("all");
                   setCertifiedFilter("all");
                   setCategoryFilter("all");
+                  setCityFilter("all");
                   setAreaFilter("all");
                   setCreatedFrom("");
                   setCreatedTo("");

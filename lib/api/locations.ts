@@ -10,6 +10,24 @@ export type ManagedLocation = {
   areas?: ManagedLocation[];
 };
 
+export function getLocationAreas(city?: ManagedLocation): ManagedLocation[] {
+  const locations = city?.areas?.length
+    ? city.areas
+    : city?.zones
+        ?.filter((zone) => zone.enabled !== false)
+        .flatMap((zone) => zone.areas ?? []) ?? [];
+  const seen = new Set<string>();
+
+  return locations.filter((area) => {
+    const normalizedName = area.name.trim().toLowerCase();
+    if (area.enabled === false || !normalizedName || seen.has(normalizedName)) {
+      return false;
+    }
+    seen.add(normalizedName);
+    return true;
+  }).sort((first, second) => first.name.localeCompare(second.name));
+}
+
 type LocationResponse = { success: boolean; data: { cities: ManagedLocation[] } };
 
 export async function getLocationCatalog(): Promise<LocationResponse> {

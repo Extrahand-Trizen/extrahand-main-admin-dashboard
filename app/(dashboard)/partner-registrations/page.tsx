@@ -31,6 +31,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getUser, listUsers, updateUser } from "@/lib/api/users";
+import { getLocationAreas, getLocationCatalog } from "@/lib/api/locations";
 import { formatDate } from "@/lib/utils";
 import { User } from "@/types";
 import Link from "next/link";
@@ -131,7 +132,7 @@ export default function PartnerRegistrationsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [cityFilter, setCityFilter] = useState("");
+  const [cityFilter, setCityFilter] = useState("all");
   const [workAreaFilter, setWorkAreaFilter] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
@@ -145,6 +146,32 @@ export default function PartnerRegistrationsPage() {
 
   const { hasPermission } = usePermissions();
   const queryClient = useQueryClient();
+
+  const { data: locationCatalogData, error: locationCatalogError } = useQuery({
+    queryKey: ["location-catalog"],
+    queryFn: getLocationCatalog,
+    enabled: hasPermission("user.list") && isLoaded,
+    retry: false,
+  });
+  const cities = locationCatalogData?.data?.cities ?? [];
+  const selectedCityFilter =
+    locationCatalogData &&
+    cityFilter !== "all" &&
+    !cities.some((city) => city.name === cityFilter)
+      ? "all"
+      : cityFilter;
+  const isHyderabadSelected =
+    selectedCityFilter.trim().toLowerCase() === "hyderabad";
+  const hyderabadLocation = cities.find(
+    (city) => city.name.trim().toLowerCase() === "hyderabad",
+  );
+  const hyderabadAreas = getLocationAreas(hyderabadLocation);
+
+  useEffect(() => {
+    if (locationCatalogError) {
+      toast.error(locationCatalogError.message || "Failed to load cities");
+    }
+  }, [locationCatalogError]);
 
   const approveMutation = useMutation({
     mutationFn: () => {
@@ -186,7 +213,7 @@ export default function PartnerRegistrationsPage() {
       search,
       statusFilter,
       categoryFilter,
-      cityFilter,
+      selectedCityFilter,
       workAreaFilter,
       page,
       limit,
@@ -197,7 +224,7 @@ export default function PartnerRegistrationsPage() {
         role: "partner",
         status: statusFilter !== "all" ? statusFilter : undefined,
         category: categoryFilter !== "all" ? categoryFilter : undefined,
-        city: cityFilter || undefined,
+        city: selectedCityFilter !== "all" ? selectedCityFilter : undefined,
         workArea: workAreaFilter || undefined,
         page,
         limit,
@@ -352,29 +379,52 @@ export default function PartnerRegistrationsPage() {
 
             <div className="space-y-2">
               <Label htmlFor="city">City</Label>
-              <Input
-                id="city"
-                placeholder="City"
-                value={cityFilter}
-                onChange={(e) => {
-                  setCityFilter(e.target.value);
+              <Select
+                value={selectedCityFilter}
+                onValueChange={(value) => {
+                  setCityFilter(value);
+                  setWorkAreaFilter("");
                   setPage(1);
                 }}
-              />
+              >
+                <SelectTrigger id="city">
+                  <SelectValue placeholder="All Cities" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Cities</SelectItem>
+                  {cities.map((city) => (
+                    <SelectItem key={city.id} value={city.name}>
+                      {city.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="workArea">Work area</Label>
-              <Input
-                id="workArea"
-                placeholder="Work area"
-                value={workAreaFilter}
-                onChange={(e) => {
-                  setWorkAreaFilter(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
+            {isHyderabadSelected && (
+              <div className="space-y-2">
+                <Label htmlFor="workArea">Work area</Label>
+                <Select
+                  value={workAreaFilter || "all"}
+                  onValueChange={(value) => {
+                    setWorkAreaFilter(value === "all" ? "" : value);
+                    setPage(1);
+                  }}
+                >
+                  <SelectTrigger id="workArea">
+                    <SelectValue placeholder="All Hyderabad areas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Hyderabad areas</SelectItem>
+                    {hyderabadAreas.map((area) => (
+                      <SelectItem key={area.id} value={area.name}>
+                        {area.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>&nbsp;</Label>
@@ -385,7 +435,7 @@ export default function PartnerRegistrationsPage() {
                   setSearch("");
                   setStatusFilter("all");
                   setCategoryFilter("all");
-                  setCityFilter("");
+                  setCityFilter("all");
                   setWorkAreaFilter("");
                   setPage(1);
                 }}
