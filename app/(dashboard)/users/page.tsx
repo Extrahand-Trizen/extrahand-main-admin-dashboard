@@ -156,7 +156,9 @@ const getUserAreaLabel = (user: User) => {
     homeLocationAddressDetails?.area?.trim();
   const city =
     locationAddressDetails?.city?.trim() ||
-    homeLocationAddressDetails?.city?.trim();
+    homeLocationAddressDetails?.city?.trim() ||
+    (user.location as { city?: string } | undefined)?.city?.trim() ||
+    (user as any).homeLocation?.city?.trim();
   const areaFromAddress = deriveAreaFromAddress(address, city);
 
   const normalizedCity = city?.toLowerCase();
@@ -427,9 +429,21 @@ export default function UsersPage() {
   };
 
   const { data: registeredCountData } = useQuery({
-    queryKey: ["users-registered-count", createdFrom, createdTo],
+    queryKey: [
+      "users-registered-count",
+      selectedCityFilter,
+      areaFilter,
+      createdFrom,
+      createdTo,
+    ],
     queryFn: () =>
       listUsers({
+        city: selectedCityFilter !== "all" ? selectedCityFilter : undefined,
+        area:
+          selectedCityFilter.trim().toLowerCase() === "hyderabad" &&
+          areaFilter !== "all"
+            ? areaFilter
+            : undefined,
         createdFrom: createdFrom || undefined,
         createdTo: createdTo || undefined,
         page: 1,
@@ -440,11 +454,23 @@ export default function UsersPage() {
   });
 
   const { data: verifiedCountData } = useQuery({
-    queryKey: ["users-verified-count", createdFrom, createdTo],
+    queryKey: [
+      "users-verified-count",
+      selectedCityFilter,
+      areaFilter,
+      createdFrom,
+      createdTo,
+    ],
     queryFn: () =>
       listUsers({
         isAadhaarVerified: true,
         role: "helper",
+        city: selectedCityFilter !== "all" ? selectedCityFilter : undefined,
+        area:
+          selectedCityFilter.trim().toLowerCase() === "hyderabad" &&
+          areaFilter !== "all"
+            ? areaFilter
+            : undefined,
         createdFrom: createdFrom || undefined,
         createdTo: createdTo || undefined,
         page: 1,

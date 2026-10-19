@@ -37,6 +37,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   getTask,
+  updateTask,
   deleteTask,
   requestTaskDelete,
   getTaskApplications,
@@ -52,7 +53,7 @@ import {
 } from "@/lib/api/task-calls";
 import { getUser } from "@/lib/api/users";
 import { listPaymentPayouts, listPaymentTransactions, listPaymentRefunds, processRefund } from "@/lib/api/payments";
-import { PaymentTransaction, PaymentRefund } from "@/types";
+import { PaymentTransaction, PaymentRefund, Task } from "@/types";
 import AssignHelperModal from "@/components/assign-helper-modal";
 import { TaskProgressCard } from "@/components/task-progress-card";
 import { BookNowDispatchLogCard } from "@/components/book-now-dispatch-log-card";
@@ -140,6 +141,16 @@ const taskCallStatusClasses: Record<TaskCallStatus, string> = {
   follow_up: "bg-blue-600 text-white border-blue-700",
   completed: "bg-indigo-600 text-white border-indigo-700 shadow-sm",
 };
+
+const taskStatuses: { value: Task["status"]; label: string }[] = [
+  { value: "open", label: "Open" },
+  { value: "assigned", label: "Assigned" },
+  { value: "started", label: "Started" },
+  { value: "in_progress", label: "In Progress" },
+  { value: "review", label: "Review" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
+];
 
 const isOperationsRole = (role?: string | null) =>
   ["operations_admin", "operation_admin", "operations"].includes(role || "");
@@ -283,6 +294,28 @@ export default function TaskDetailsPage() {
     },
     onError: (error: any) => {
       toast.error(error.message || "Failed to update application status");
+    },
+  });
+
+  const updateTaskStatusMutation = useMutation({
+    mutationFn: (status: Task["status"]) => updateTask(taskId, { status }),
+    onSuccess: (result) => {
+      if (result?.data) {
+        queryClient.setQueryData(["task", taskId], (current: typeof taskData) => ({
+          ...current,
+          ...result,
+          data: {
+            ...current?.data,
+            ...result.data,
+          },
+        }));
+      }
+      queryClient.invalidateQueries({ queryKey: ["task", taskId] });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      toast.success("Works status updated");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to update works status");
     },
   });
 
@@ -634,7 +667,10 @@ export default function TaskDetailsPage() {
   const statusColors: Record<string, string> = {
     open: "success",
     overdue: "destructive",
+    assigned: "warning",
+    started: "warning",
     in_progress: "warning",
+    review: "default",
     completed: "default",
     cancelled: "destructive",
   };
@@ -821,9 +857,40 @@ export default function TaskDetailsPage() {
                     Status
                   </Label>
                   <div className="mt-1">
-                    <Badge variant={statusColors[getDisplayStatus(task)] as any}>
-                      {getDisplayStatus(task)}
-                    </Badge>
+                    {isSuperAdmin ? (
+                      <Select
+                        value={task.status}
+                        onValueChange={(status) => {
+                          const selectedStatus = taskStatuses.find(
+                            (option) => option.value === status,
+                          )?.value;
+                          if (selectedStatus) {
+                            updateTaskStatusMutation.mutate(selectedStatus);
+                          }
+                        }}
+                        disabled={updateTaskStatusMutation.isPending}
+                      >
+                        <SelectTrigger
+                          aria-label="Update works status"
+                          className="h-auto w-fit border-0 bg-transparent p-0 shadow-none focus:ring-0"
+                        >
+                          <Badge variant={statusColors[getDisplayStatus(task)] as any}>
+                            <SelectValue />
+                          </Badge>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {taskStatuses.map(({ value, label }) => (
+                            <SelectItem key={value} value={value}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Badge variant={statusColors[getDisplayStatus(task)] as any}>
+                        {getDisplayStatus(task)}
+                      </Badge>
+                    )}
                   </div>
                 </div>
                 <div>
