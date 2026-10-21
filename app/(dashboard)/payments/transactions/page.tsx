@@ -56,6 +56,16 @@ function dateInputEnd(date: string): string | undefined {
   return new Date(`${date}T23:59:59.999`).toISOString();
 }
 
+function calculateProfit(amountPaid: string | null, payoutAmount?: string | null): string | null {
+  if (amountPaid == null || payoutAmount == null) return null;
+
+  const totalPaid = Number(amountPaid);
+  const payout = Number(payoutAmount);
+  if (!Number.isFinite(totalPaid) || !Number.isFinite(payout)) return null;
+
+  return (totalPaid - payout).toFixed(2);
+}
+
 export default function PaymentTransactionsPage() {
   const { hasPermission, isSuperAdmin } = usePermissions();
   const [q, setQ] = useState("");
@@ -348,7 +358,9 @@ export default function PaymentTransactionsPage() {
                     <th className="px-3 py-2 text-left">Customer Name</th>
                     <th className="px-3 py-2 text-left">Helper Name</th>
                     <th className="px-3 py-2 text-left">Amount</th>
+                    <th className="px-3 py-2 text-left">Actual Work Amount</th>
                     <th className="px-3 py-2 text-left">Payout Amount</th>
+                    <th className="px-3 py-2 text-left">Profit</th>
                     <th className="px-3 py-2 text-left">Payment Status</th>
                     <th className="px-3 py-2 text-left">Hold Status</th>
                     <th className="px-3 py-2 text-left">Transaction ID</th>
@@ -362,13 +374,15 @@ export default function PaymentTransactionsPage() {
                 <tbody>
                   {rows.length === 0 ? (
                     <tr>
-                      <td colSpan={(isSuperAdmin || hasPermission("payment.delete")) ? 12 : 11} className="px-3 py-8 text-center text-gray-500">
+                      <td colSpan={(isSuperAdmin || hasPermission("payment.delete")) ? 14 : 13} className="px-3 py-8 text-center text-gray-500">
                         No transactions found
                       </td>
                     </tr>
                   ) : (
-                    enrichedRows.map((row) => (
-                      <tr key={row.escrowId} className="border-t">
+                    enrichedRows.map((row) => {
+                      const profit = calculateProfit(row.amountInRupees, row.payoutAmount);
+                      return (
+                        <tr key={row.escrowId} className="border-t">
                         <td className="px-3 py-2 text-sm text-gray-700">
                           {row.createdAt ? formatDateTime(row.createdAt) : "—"}
                         </td>
@@ -398,8 +412,16 @@ export default function PaymentTransactionsPage() {
                           )}
                         </td>
                         <td className="px-3 py-2 font-medium">₹{row.amountInRupees ?? "0.00"}</td>
+                        <td className="px-3 py-2 font-medium">
+                          {row.taskAmount != null ? `₹${row.taskAmount}` : <span className="text-gray-400 text-xs">—</span>}
+                        </td>
                         <td className="px-3 py-2 font-medium text-gray-900">
                           {row.payoutAmount ? `₹${row.payoutAmount}` : <span className="text-gray-400 text-xs">—</span>}
+                        </td>
+                        <td className="px-3 py-2 font-medium">
+                          {profit != null
+                            ? `₹${profit}`
+                            : <span className="text-gray-400 text-xs">—</span>}
                         </td>
                         <td className="px-3 py-2">{row.paymentStatus || "unknown"}</td>
                         <td className="px-3 py-2">{row.status}</td>
@@ -449,8 +471,9 @@ export default function PaymentTransactionsPage() {
                             </Button>
                           </td>
                         )}
-                      </tr>
-                    ))
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

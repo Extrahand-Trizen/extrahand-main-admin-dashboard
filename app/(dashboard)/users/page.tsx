@@ -14,6 +14,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Download,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,18 +52,20 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  listAllUsers,
   listUsers,
+  getHyderabadSubAreas,
   banUser,
   unbanUser,
   suspendUser,
   unsuspendUser,
 } from "@/lib/api/users";
-import { getLocationAreas, getLocationCatalog } from "@/lib/api/locations";
+import { getLocationCatalog } from "@/lib/api/locations";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { formatDate } from "@/lib/utils";
 import { CATEGORY_OPTIONS } from "@/lib/category-options";
 import { toast } from "sonner";
-import { User } from "@/types";
+import { User, UserFilters } from "@/types";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableSkeleton } from "@/components/LoadingSkeleton";
@@ -173,6 +176,52 @@ const getUserAreaLabel = (user: User) => {
   return '—';
 };
 
+const getUserAddress = (user: User) => {
+  const address = user.location?.address || user.homeLocation?.address;
+  if (address) return address;
+
+  const details =
+    user.location?.addressDetails || user.homeLocation?.addressDetails;
+  return [
+    details?.doorNo,
+    details?.area,
+    details?.city,
+    details?.state,
+    details?.pinCode,
+    details?.country,
+  ]
+    .filter(Boolean)
+    .join(", ");
+};
+
+const escapeCsvCell = (value: unknown) => {
+  const text = value == null ? "" : String(value);
+  const safeText = /^[\t\r ]*[=+\-@]/.test(text) ? `'${text}` : text;
+  return `"${safeText.replace(/"/g, '""')}"`;
+};
+
+const formatRegistrationDate = (date: string) => {
+  const parsedDate = new Date(date);
+  if (Number.isNaN(parsedDate.getTime())) return `\t${date}`;
+
+  const months = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
+  const day = String(parsedDate.getUTCDate()).padStart(2, "0");
+  const month = months[parsedDate.getUTCMonth()];
+  const year = String(parsedDate.getUTCFullYear()).slice(-2);
+  return `\t${day}-${month}-${year}`;
+};
+
+const getPartnerApplicationStatus = (status?: string) => {
+  if (status === "pending_review" || status === "under_review") {
+    return "Under review";
+  }
+  if (!status) return "";
+  return status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ");
+};
+
 export default function UsersPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -188,6 +237,7 @@ export default function UsersPage() {
   const [areaFilter, setAreaFilter] = useState<string>("all");
   const [createdFrom, setCreatedFrom] = useState<string>("");
   const [createdTo, setCreatedTo] = useState<string>("");
+  const [isExporting, setIsExporting] = useState(false);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -262,22 +312,65 @@ export default function UsersPage() {
     retry: false,
   });
   const cities = locationCatalogData?.data?.cities ?? [];
-  const hyderabadLocation = cities.find(
-    (city) => city.name.trim().toLowerCase() === "hyderabad",
-  );
-  const hyderabadAreas = getLocationAreas(hyderabadLocation);
   const selectedCityFilter =
     locationCatalogData &&
     cityFilter !== "all" &&
     !cities.some((city) => city.name === cityFilter)
       ? "all"
       : cityFilter;
+  const isHyderabadSelected =
+    selectedCityFilter.trim().toLowerCase() === "hyderabad";
+  const activeUserFilters: UserFilters = {
+    search: search || undefined,
+    status: statusFilter !== "all" ? statusFilter : undefined,
+    role: roleFilter !== "all" ? roleFilter : undefined,
+    category: categoryFilter !== "all" ? categoryFilter : undefined,
+    city: selectedCityFilter !== "all" ? selectedCityFilter : undefined,
+    area:
+      selectedCityFilter.trim().toLowerCase() === "hyderabad" &&
+      areaFilter !== "all"
+        ? areaFilter
+        : undefined,
+    isAadhaarVerified:
+      aadhaarFilter === "verified"
+        ? true
+        : aadhaarFilter === "not_verified"
+          ? false
+          : undefined,
+    isCertified:
+      certifiedFilter === "certified"
+        ? true
+        : certifiedFilter === "not_certified"
+          ? false
+          : undefined,
+    createdFrom: createdFrom || undefined,
+    createdTo: createdTo || undefined,
+  };
 
   useEffect(() => {
     if (locationCatalogError) {
       toast.error(locationCatalogError.message || "Failed to load cities");
     }
   }, [locationCatalogError]);
+
+  const {
+    data: hyderabadAreasData,
+    error: hyderabadAreasError,
+    isLoading: isLoadingHyderabadAreas,
+  } = useQuery({
+    queryKey: ["hyderabad-user-areas"],
+    queryFn: getHyderabadSubAreas,
+    enabled: hasPermission("user.list") && isLoaded && isHyderabadSelected,
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (hyderabadAreasError) {
+      toast.error(hyderabadAreasError.message || "Failed to load Hyderabad areas");
+    }
+  }, [hyderabadAreasError]);
+
+  const hyderabadAreas = hyderabadAreasData?.data ?? [];
 
   const { data, isLoading, error } = useQuery({
     queryKey: [
@@ -297,30 +390,7 @@ export default function UsersPage() {
     ],
     queryFn: () =>
       listUsers({
-        search: search || undefined,
-        status: statusFilter !== "all" ? statusFilter : undefined,
-        role: roleFilter !== "all" ? roleFilter : undefined,
-        category: categoryFilter !== "all" ? categoryFilter : undefined,
-        city: selectedCityFilter !== "all" ? selectedCityFilter : undefined,
-        area:
-          selectedCityFilter.trim().toLowerCase() === "hyderabad" &&
-          areaFilter !== "all"
-            ? areaFilter
-            : undefined,
-        isAadhaarVerified:
-          aadhaarFilter === "verified"
-            ? true
-            : aadhaarFilter === "not_verified"
-              ? false
-              : undefined,
-        isCertified:
-          certifiedFilter === "certified"
-            ? true
-            : certifiedFilter === "not_certified"
-              ? false
-              : undefined,
-        createdFrom: createdFrom || undefined,
-        createdTo: createdTo || undefined,
+        ...activeUserFilters,
         page,
         limit,
       }),
@@ -328,8 +398,6 @@ export default function UsersPage() {
     retry: false,
   });
 
-  const isHyderabadSelected =
-    selectedCityFilter.trim().toLowerCase() === "hyderabad";
   const banMutation = useMutation({
     mutationFn: ({ userId, reason }: { userId: string; reason: string }) =>
       banUser(userId, reason),
@@ -482,6 +550,70 @@ export default function UsersPage() {
 
   const registeredInRange = registeredCountData?.pagination?.total ?? 0;
   const verifiedInRange = verifiedCountData?.pagination?.total ?? 0;
+
+  const handleExportUsers = async () => {
+    setIsExporting(true);
+    try {
+      const allUsers = await listAllUsers(activeUserFilters);
+      const headers = [
+        "Name",
+        "Mobile Number",
+        "Email",
+        "Roles",
+        "Primary Skill Category",
+        "Category",
+        "Address",
+        "Account Status",
+        "Registration Date",
+        "Aadhaar Verified",
+        "Partner Application Status",
+      ];
+      const rows = allUsers.map((user) => [
+        user.name,
+        user.phone,
+        user.email,
+        getRoleLabel(user),
+        user.skills?.primaryCategory?.replace(/_/g, " "),
+        Array.from(
+          new Set(
+            (user.skills?.list ?? [])
+              .map((skill) => skill.category?.trim())
+              .filter((category): category is string => Boolean(category)),
+          ),
+        )
+          .map((category) => category.replace(/_/g, " "))
+          .join("; "),
+        getUserAddress(user),
+        user.status || (user.isActive === false ? "inactive" : "active"),
+        formatRegistrationDate(user.createdAt),
+        user.isAadhaarVerified ? "Yes" : "No",
+        getPartnerApplicationStatus(user.partnerProfile?.status),
+      ]);
+      const csv = [headers, ...rows]
+        .map((row) => row.map(escapeCsvCell).join(","))
+        .join("\r\n");
+      const blob = new Blob(["\uFEFF", csv], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `users-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+      toast.success(`Exported ${allUsers.length.toLocaleString()} users`);
+    } catch (exportError) {
+      const message =
+        exportError instanceof Error
+          ? exportError.message
+          : "Failed to export users";
+      toast.error(message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   if (!hasPermission("user.list")) {
     return (
@@ -669,23 +801,37 @@ export default function UsersPage() {
                 <Label htmlFor="area">Hyderabad work area</Label>
                 <Select
                   value={areaFilter}
+                  disabled={isLoadingHyderabadAreas || Boolean(hyderabadAreasError)}
                   onValueChange={(value) => {
                     setAreaFilter(value);
                     setPage(1);
                   }}
                 >
                   <SelectTrigger id="area">
-                    <SelectValue placeholder="All sub-areas" />
+                    <SelectValue
+                      placeholder={
+                        isLoadingHyderabadAreas
+                          ? "Loading areas..."
+                          : hyderabadAreasError
+                            ? "Areas unavailable"
+                            : "All sub-areas"
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Hyderabad areas</SelectItem>
                     {hyderabadAreas.map((area) => (
-                      <SelectItem key={area.id} value={area.name}>
-                        {area.name}
+                      <SelectItem key={area} value={area}>
+                        {area}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {hyderabadAreasError && (
+                  <p className="text-sm text-red-600">
+                    Failed to load Hyderabad areas: {hyderabadAreasError.message}
+                  </p>
+                )}
               </div>
             )}
             <div className="space-y-2">
@@ -767,9 +913,20 @@ export default function UsersPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">Users List</CardTitle>
-            <Badge variant="secondary">
-              {pagination.total} {pagination.total === 1 ? "user" : "users"}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">
+                {pagination.total} {pagination.total === 1 ? "user" : "users"}
+              </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportUsers}
+                disabled={isExporting || isLoading || pagination.total === 0}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {isExporting ? "Exporting..." : "Export CSV"}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

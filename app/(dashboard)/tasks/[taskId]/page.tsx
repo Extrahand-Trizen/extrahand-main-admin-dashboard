@@ -24,6 +24,7 @@ import {
   MessageSquare,
   Search,
   Mail,
+  Wallet,
 } from "lucide-react";
 import {
   Card,
@@ -53,7 +54,7 @@ import {
 } from "@/lib/api/task-calls";
 import { getUser } from "@/lib/api/users";
 import { listPaymentPayouts, listPaymentTransactions, listPaymentRefunds, processRefund } from "@/lib/api/payments";
-import { PaymentTransaction, PaymentRefund, Task } from "@/types";
+import { PaymentPayout, PaymentTransaction, PaymentRefund, Task } from "@/types";
 import AssignHelperModal from "@/components/assign-helper-modal";
 import { TaskProgressCard } from "@/components/task-progress-card";
 import { BookNowDispatchLogCard } from "@/components/book-now-dispatch-log-card";
@@ -208,6 +209,12 @@ export default function TaskDetailsPage() {
     enabled: isValidTaskId && hasPermission("task.view"),
     refetchOnMount: true,
     staleTime: 0,
+    refetchInterval: (query) => {
+      const currentTask = query.state.data as Task | undefined;
+      return currentTask?.bookingSource === "book_now" && currentTask.status === "open"
+        ? 15_000
+        : false;
+    },
   });
 
   const { data: applicationsData, isLoading: applicationsLoading } = useQuery({
@@ -526,6 +533,28 @@ export default function TaskDetailsPage() {
       (t.escrowId && String(t.escrowId) === String(taskId)) ||
       (t.id && String(t.id) === String((task as any)?.transactionId || (task as any)?.paymentTransactionId))
   );
+  const payout = payouts.find((item) => {
+    const linkedTaskId =
+      item.links?.taskId ||
+      (item as PaymentPayout & { escrow?: { taskId?: string } }).escrow?.taskId;
+    return String(item.taskId || linkedTaskId || "") === String(taskId);
+  });
+  const totalAmountPaid = transaction?.amountInRupees;
+  const actualWorkCost = transaction?.taskAmount;
+  const partnerPayout =
+    transaction?.payoutAmount ?? payout?.netAmount ?? payout?.amount;
+  const paidAmountNumber =
+    totalAmountPaid != null ? Number(totalAmountPaid) : Number.NaN;
+  const partnerPayoutNumber =
+    partnerPayout != null ? Number(partnerPayout) : Number.NaN;
+  const platformProfit =
+    Number.isFinite(paidAmountNumber) && Number.isFinite(partnerPayoutNumber)
+      ? paidAmountNumber - partnerPayoutNumber
+      : null;
+  const formatFinancialAmount = (amount: string | number | null | undefined) =>
+    amount != null && Number.isFinite(Number(amount))
+      ? formatCurrency(amount)
+      : "—";
   const refund = refundsData?.data?.find(
     (r: PaymentRefund) =>
       (r.taskId && String(r.taskId) === String(taskId)) ||
@@ -999,6 +1028,54 @@ export default function TaskDetailsPage() {
               </div>
             </CardContent>
           </Card>
+
+          {isSuperAdmin && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                    <Wallet className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle>Financial Breakdown</CardTitle>
+                    <CardDescription>Key amounts for this work</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs font-semibold text-gray-700">Total amount paid</p>
+                    <p className="mt-1 text-xs text-gray-500">By customer</p>
+                    <p className="mt-3 text-lg font-bold text-emerald-700">
+                      {formatFinancialAmount(totalAmountPaid)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs font-semibold text-gray-700">Actual work cost</p>
+                    <p className="mt-1 text-xs text-gray-500">Cost to complete the service</p>
+                    <p className="mt-3 text-lg font-bold text-gray-900">
+                      {formatFinancialAmount(actualWorkCost)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs font-semibold text-gray-700">Partner payout</p>
+                    <p className="mt-1 text-xs text-gray-500">Amount payable to partner</p>
+                    <p className="mt-3 text-lg font-bold text-gray-900">
+                      {formatFinancialAmount(partnerPayout)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-emerald-100 bg-emerald-50/70 p-3">
+                    <p className="text-xs font-semibold text-gray-700">Platform profit</p>
+                    <p className="mt-1 text-xs text-gray-500">Revenue minus partner payout</p>
+                    <p className="mt-3 text-lg font-bold text-emerald-700">
+                      {platformProfit == null ? "—" : formatCurrency(platformProfit)}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <TaskProgressCard
             task={taskWithPayoutStatus as any}

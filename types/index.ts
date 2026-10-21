@@ -221,6 +221,7 @@ export interface Task {
   title: string;
   description: string;
   category: string;
+  categorySlug?: string;
   status:
     | 'open'
     | 'assigned'
@@ -278,7 +279,34 @@ export interface Task {
   escrowStatus?: string | null;
   payoutStatus?: string | null;
   dispatchLogs?: DispatchAreaLog[];
+  dispatchProgress?: DispatchProgress;
   preferredHelperGender?: 'any' | 'male' | 'female' | null;
+}
+
+export interface DispatchProgress {
+  currentStage: 'preferred' | 'area_rule' | 'all' | 'assigned' | 'closed';
+  startedAt: string;
+  acceptanceWindowMinutes: number;
+  stages: Array<{
+    stage: 'preferred' | 'area_rule' | 'all';
+    status: 'pending' | 'in_progress' | 'completed' | 'skipped';
+    eligibleCount: number;
+    notifiedCount: number;
+    acceptedCount: number;
+    rejectedCount: number;
+    timedOutCount: number;
+    startedAt?: string;
+    expiresAt?: string;
+    completedAt?: string;
+  }>;
+  assignedPartnerName?: string;
+  assignedPartnerUid?: string;
+  assignedAt?: string;
+  supportEscalation: {
+    status: 'pending' | 'escalated' | 'stopped';
+    dueAt: string;
+    escalatedAt?: string;
+  };
 }
 
 export interface DispatchCandidateLog {
@@ -292,6 +320,8 @@ export interface DispatchCandidateLog {
   distanceKm?: number | null;
   notifiedAt?: string | null;
   respondedAt?: string | null;
+  dispatchStage?: 'preferred' | 'area_rule' | 'all';
+  responseStatus?: 'pending' | 'accepted' | 'rejected' | 'timed_out' | 'closed';
   gender?: string | null;
   genderCheckResult?: 'passed' | 'failed' | null;
 }
@@ -304,6 +334,8 @@ export interface DispatchAreaLog {
   eligibleCount: number;
   notifiedCount: number;
   acceptedCount?: number;
+  rejectedCount?: number;
+  timedOutCount?: number;
   assignedCount?: number;
   candidates: DispatchCandidateLog[];
 }
@@ -345,6 +377,7 @@ export interface PaymentTransaction {
   status: string;
   paymentStatus: string | null;
   amountInRupees: string | null;
+  taskAmount?: string | null;
   payoutAmount?: string | null;
   createdAt: string;
   teamTest?: boolean;

@@ -32,6 +32,64 @@ export async function listUsers(filters?: UserFilters): Promise<ApiResponse<User
   return apiRequest<ApiResponse<User[]>>(`/api/v1/users${query ? `?${query}` : ''}`);
 }
 
+export async function listAllUsers(filters?: UserFilters): Promise<User[]> {
+  const limit = 50;
+  const firstPage = await listUsers({ ...filters, page: 1, limit });
+  if (!firstPage.success) {
+    throw new Error(firstPage.error || 'Failed to load users for export.');
+  }
+  if (!Array.isArray(firstPage.data) || !firstPage.pagination) {
+    throw new Error('The users API returned an invalid export response.');
+  }
+
+  const users = [...firstPage.data];
+  const pagination = firstPage.pagination;
+
+  if (pagination.pages <= 1) {
+    if (users.length !== pagination.total) {
+      throw new Error(
+        `The users API returned ${users.length} of ${pagination.total} matching users.`,
+      );
+    }
+    return users;
+  }
+
+  if (pagination.pages > 100) {
+    throw new Error(
+      'The filtered result exceeds the maximum number of pages available for export.',
+    );
+  }
+
+  const batchSize = 10;
+  for (let startPage = 2; startPage <= pagination.pages; startPage += batchSize) {
+    const pageNumbers = Array.from(
+      { length: Math.min(batchSize, pagination.pages - startPage + 1) },
+      (_, index) => startPage + index,
+    );
+    const pageResponses = await Promise.all(
+      pageNumbers.map((page) => listUsers({ ...filters, page, limit })),
+    );
+    for (const response of pageResponses) {
+      if (
+        !response.success ||
+        !Array.isArray(response.data) ||
+        response.pagination?.total !== pagination.total
+      ) {
+        throw new Error('The users API returned an inconsistent export response.');
+      }
+      users.push(...response.data);
+    }
+  }
+
+  if (users.length !== pagination.total) {
+    throw new Error(
+      `The users API returned ${users.length} of ${pagination.total} matching users.`,
+    );
+  }
+
+  return users;
+}
+
 export async function getHyderabadSubAreas(): Promise<ApiResponse<string[]>> {
   return apiRequest<ApiResponse<string[]>>('/api/v1/users/areas/hyderabad');
 }
