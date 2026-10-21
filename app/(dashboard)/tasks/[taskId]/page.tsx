@@ -541,20 +541,84 @@ export default function TaskDetailsPage() {
   });
   const totalAmountPaid = transaction?.amountInRupees;
   const actualWorkCost = transaction?.taskAmount;
+  const customerTaxAmount = transaction?.customerTaxAmount;
+  const recordedPartnerPayout =
+    transaction?.payoutAmount ?? payout?.netAmount;
+  const platformCommission =
+    payout?.platformCommission ?? transaction?.platformCommission;
+  const gstOnCommission =
+    payout?.gstOnCommission ?? transaction?.gstOnCommission;
+  const payoutTds = payout?.tds ?? transaction?.tds;
+  const platformFeePercentage =
+    payout?.platformFeePercentage ?? transaction?.platformFeePercentage;
+  const commissionGstPercentage =
+    payout?.commissionGstPercentage ?? transaction?.commissionGstPercentage;
+  const payoutCalculationBase = actualWorkCost ?? payout?.amount;
+  const payoutCalculationBaseNumber =
+    payoutCalculationBase != null ? Number(payoutCalculationBase) : Number.NaN;
+  const roundCurrency = (amount: number) => Math.round((amount + Number.EPSILON) * 100) / 100;
+  const calculatedPlatformCommission =
+    Number.isFinite(payoutCalculationBaseNumber) &&
+    platformFeePercentage != null &&
+    Number.isFinite(platformFeePercentage)
+      ? roundCurrency(payoutCalculationBaseNumber * (platformFeePercentage / 100))
+      : null;
+  const platformCommissionAmount =
+    platformCommission != null && Number.isFinite(Number(platformCommission))
+      ? Number(platformCommission)
+      : calculatedPlatformCommission;
+  const calculatedGstOnCommission =
+    platformCommissionAmount != null &&
+    commissionGstPercentage != null &&
+    Number.isFinite(commissionGstPercentage)
+      ? roundCurrency(platformCommissionAmount * (commissionGstPercentage / 100))
+      : null;
+  const gstOnCommissionAmount =
+    gstOnCommission != null && Number.isFinite(Number(gstOnCommission))
+      ? Number(gstOnCommission)
+      : calculatedGstOnCommission;
+  const payoutTdsAmount =
+    payoutTds != null && Number.isFinite(Number(payoutTds))
+      ? Number(payoutTds)
+      : 0;
+  const calculatedTotalDeduction =
+    platformCommissionAmount != null && gstOnCommissionAmount != null
+      ? roundCurrency(platformCommissionAmount + gstOnCommissionAmount + payoutTdsAmount)
+      : null;
+  const payoutGrossAmount = payout?.amount ?? actualWorkCost;
+  const payoutNetAmount = payout?.netAmount ?? recordedPartnerPayout;
+  const payoutDeductionTotal =
+    payoutGrossAmount != null &&
+    payoutNetAmount != null &&
+    Number.isFinite(Number(payoutGrossAmount)) &&
+    Number.isFinite(Number(payoutNetAmount))
+      ? Number(payoutGrossAmount) - Number(payoutNetAmount)
+      : calculatedTotalDeduction;
+  const calculatedPartnerPayout =
+    Number.isFinite(payoutCalculationBaseNumber) && payoutDeductionTotal != null
+      ? roundCurrency(payoutCalculationBaseNumber - payoutDeductionTotal)
+      : null;
   const partnerPayout =
-    transaction?.payoutAmount ?? payout?.netAmount ?? payout?.amount;
+    recordedPartnerPayout ?? calculatedPartnerPayout;
   const paidAmountNumber =
     totalAmountPaid != null ? Number(totalAmountPaid) : Number.NaN;
   const partnerPayoutNumber =
     partnerPayout != null ? Number(partnerPayout) : Number.NaN;
   const platformProfit =
     Number.isFinite(paidAmountNumber) && Number.isFinite(partnerPayoutNumber)
-      ? paidAmountNumber - partnerPayoutNumber
+      ? Math.round((paidAmountNumber - partnerPayoutNumber + Number.EPSILON) * 100) / 100
       : null;
-  const formatFinancialAmount = (amount: string | number | null | undefined) =>
-    amount != null && Number.isFinite(Number(amount))
-      ? formatCurrency(amount)
+  const formatFinancialAmount = (amount: string | number | null | undefined) => {
+    const numericAmount = amount == null ? Number.NaN : Number(amount);
+    return Number.isFinite(numericAmount)
+      ? new Intl.NumberFormat("en-IN", {
+          style: "currency",
+          currency: "INR",
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }).format(numericAmount)
       : "—";
+  };
   const refund = refundsData?.data?.find(
     (r: PaymentRefund) =>
       (r.taskId && String(r.taskId) === String(taskId)) ||
@@ -1044,34 +1108,120 @@ export default function TaskDetailsPage() {
               </CardHeader>
               <CardContent>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  <div className="rounded-lg border p-3">
+                  <div className="rounded-xl border border-gray-200 bg-white p-4">
                     <p className="text-xs font-semibold text-gray-700">Total amount paid</p>
                     <p className="mt-1 text-xs text-gray-500">By customer</p>
                     <p className="mt-3 text-lg font-bold text-emerald-700">
                       {formatFinancialAmount(totalAmountPaid)}
                     </p>
                   </div>
-                  <div className="rounded-lg border p-3">
+                  <div className="rounded-xl border border-gray-200 bg-white p-4">
+                    <p className="text-xs font-semibold text-gray-700">Customer tax (GST)</p>
+                    <p className="mt-1 text-xs text-gray-500">Included in customer payment</p>
+                    <p className="mt-3 text-lg font-bold text-gray-900">
+                      {formatFinancialAmount(customerTaxAmount)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-gray-200 bg-white p-4">
                     <p className="text-xs font-semibold text-gray-700">Actual work cost</p>
                     <p className="mt-1 text-xs text-gray-500">Cost to complete the service</p>
                     <p className="mt-3 text-lg font-bold text-gray-900">
                       {formatFinancialAmount(actualWorkCost)}
                     </p>
                   </div>
-                  <div className="rounded-lg border p-3">
-                    <p className="text-xs font-semibold text-gray-700">Partner payout</p>
-                    <p className="mt-1 text-xs text-gray-500">Amount payable to partner</p>
-                    <p className="mt-3 text-lg font-bold text-gray-900">
-                      {formatFinancialAmount(partnerPayout)}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-emerald-100 bg-emerald-50/70 p-3">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
                     <p className="text-xs font-semibold text-gray-700">Platform profit</p>
-                    <p className="mt-1 text-xs text-gray-500">Revenue minus partner payout</p>
-                    <p className="mt-3 text-lg font-bold text-emerald-700">
-                      {platformProfit == null ? "—" : formatCurrency(platformProfit)}
+                    <p className="mt-1 text-xs text-gray-500">
+                      Customer payment minus partner payout
                     </p>
+                    <p className="mt-3 text-lg font-bold text-emerald-700">
+                      {formatFinancialAmount(platformProfit)}
+                    </p>
+                    {platformProfit != null && (
+                      <p className="mt-3 border-t border-emerald-100 pt-2 text-xs text-gray-700">
+                        {formatFinancialAmount(paidAmountNumber)} −{" "}
+                        {formatFinancialAmount(partnerPayoutNumber)} ={" "}
+                        <strong className="text-emerald-800">
+                          {formatFinancialAmount(platformProfit)}
+                        </strong>
+                      </p>
+                    )}
                   </div>
+                </div>
+                <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50/80 p-4 sm:p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">Partner payout calculation</p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Work cost less platform commission, GST, and applicable TDS
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-white px-3 py-2 text-right shadow-sm ring-1 ring-gray-200">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                        Partner payout
+                      </p>
+                      <p className="text-lg font-bold text-gray-900">
+                        {formatFinancialAmount(partnerPayout)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="rounded-lg border border-gray-200 bg-white p-3">
+                      <p className="text-xs font-medium text-gray-500">Platform commission</p>
+                      <p className="mt-1 text-sm font-semibold text-gray-900">
+                        {payoutCalculationBaseNumber >= 0 &&
+                        platformFeePercentage != null &&
+                        Number.isFinite(platformFeePercentage) &&
+                        platformCommissionAmount != null
+                          ? `${formatFinancialAmount(payoutCalculationBaseNumber)} × ${platformFeePercentage}% = ${formatFinancialAmount(platformCommissionAmount)}`
+                          : formatFinancialAmount(platformCommissionAmount)}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-gray-200 bg-white p-3">
+                      <p className="text-xs font-medium text-gray-500">GST on commission</p>
+                      <p className="mt-1 text-sm font-semibold text-gray-900">
+                        {platformCommissionAmount != null &&
+                        commissionGstPercentage != null &&
+                        Number.isFinite(commissionGstPercentage) &&
+                        gstOnCommissionAmount != null
+                          ? `${formatFinancialAmount(platformCommissionAmount)} × ${commissionGstPercentage}% = ${formatFinancialAmount(gstOnCommissionAmount)}`
+                          : formatFinancialAmount(gstOnCommissionAmount)}
+                      </p>
+                    </div>
+                    {Number(payoutTds) > 0 && (
+                      <div className="rounded-lg border border-gray-200 bg-white p-3">
+                        <p className="text-xs font-medium text-gray-500">TDS</p>
+                        <p className="mt-1 text-sm font-semibold text-gray-900">
+                          {formatFinancialAmount(Number(payoutTds))}
+                        </p>
+                      </div>
+                    )}
+                    <div className="rounded-lg border border-gray-200 bg-white p-3">
+                      <p className="text-xs font-medium text-gray-500">Total deduction</p>
+                      <p className="mt-1 text-sm font-semibold text-gray-900">
+                        {formatFinancialAmount(payoutDeductionTotal)}
+                      </p>
+                    </div>
+                  </div>
+                  {payoutCalculationBaseNumber >= 0 &&
+                    payoutDeductionTotal != null &&
+                    partnerPayout != null && (
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5 text-sm">
+                        <span className="font-medium text-blue-900">Final payout</span>
+                        <span className="font-semibold text-blue-900">
+                          {formatFinancialAmount(payoutCalculationBaseNumber)} −{" "}
+                          {formatFinancialAmount(payoutDeductionTotal)} ={" "}
+                          {formatFinancialAmount(Number(partnerPayout))}
+                        </span>
+                      </div>
+                    )}
+                  {platformCommissionAmount == null &&
+                    gstOnCommissionAmount == null &&
+                    payoutDeductionTotal == null && (
+                      <p className="mt-3 text-xs text-gray-500">
+                        Deduction details are not available for this payout.
+                      </p>
+                    )}
                 </div>
               </CardContent>
             </Card>

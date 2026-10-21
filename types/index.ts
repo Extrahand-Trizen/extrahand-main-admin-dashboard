@@ -378,7 +378,13 @@ export interface PaymentTransaction {
   paymentStatus: string | null;
   amountInRupees: string | null;
   taskAmount?: string | null;
+  customerTaxAmount?: string | null;
   payoutAmount?: string | null;
+  platformCommission?: string | null;
+  gstOnCommission?: string | null;
+  tds?: string | null;
+  platformFeePercentage?: number | null;
+  commissionGstPercentage?: number | null;
   createdAt: string;
   teamTest?: boolean;
   teamTestTransferred?: boolean;
@@ -400,6 +406,11 @@ export interface PaymentPayout {
   CustomerUid?: string;
   amount: string;
   netAmount: string;
+  platformCommission?: string | null;
+  gstOnCommission?: string | null;
+  tds?: string | null;
+  platformFeePercentage?: number | null;
+  commissionGstPercentage?: number | null;
   status: string;
   source?: string;
   type?: string;
