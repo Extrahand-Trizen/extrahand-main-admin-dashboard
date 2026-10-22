@@ -224,6 +224,12 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
 
       {isOpen && (
         <CardContent className="p-4 pt-3 space-y-5">
+          {isTeamPosted ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+              Team-posted work: only team partners whose phone numbers are in the Exclusions list will receive notifications. Other qualified partners remain visible in the logs but will not be notified.
+            </div>
+          ) : null}
+
           {isHourlyTask && (
             <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium border ${
               hasStrictGenderCheck
@@ -324,7 +330,7 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <h3 className="text-sm font-semibold text-gray-900">{stage.label}</h3>
                   <div className="flex flex-wrap items-center gap-2">
-                    {stage.key !== "preferred" && !(isTeamPosted && stage.key === "all") ? (
+                    {stage.key !== "preferred" ? (
                       <Button
                         type="button"
                         variant="outline"
@@ -349,8 +355,8 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                   </div>
                 </div>
                 <p className="text-xs text-gray-500">
-                  {stage.key === "all" && isTeamPosted
-                    ? "Eligible partners are shown for visibility only. Team-posted work sends notifications to hired and area-rule partners only."
+                  {isTeamPosted
+                    ? "For team-posted work, notifications go only to eligible partners whose phone numbers are in the Exclusions list. Other qualified partners remain visible here without being notified."
                     : stage.description}
                 </p>
                 {areaRows.length ? (

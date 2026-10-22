@@ -247,10 +247,10 @@ export default function AdminSettingsPage() {
             <section className="space-y-3 border-t pt-5">
               <div>
                 <Label>Exclusions</Label>
-                <p className="text-sm text-gray-500">Works from these customer phone numbers will not trigger an email.</p>
+                <p className="text-sm text-gray-500">These customer numbers suppress task-posted emails and identify team-posted work. For team-posted Book Now work, only eligible partner accounts with a matching phone number receive notifications; other qualified partners remain visible in dispatch logs only.</p>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row">
-                <Input value={phoneInput} onChange={(event) => setPhoneInput(event.target.value)} placeholder="Customer phone number" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addPhone(); } }} />
+                <Input value={phoneInput} onChange={(event) => setPhoneInput(event.target.value)} placeholder="Customer or test-partner phone number" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addPhone(); } }} />
                 <Button type="button" variant="outline" onClick={addPhone} disabled={!phoneInput.trim()}><Plus />Add exclusion</Button>
               </div>
               <div className="space-y-2">
