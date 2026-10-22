@@ -257,6 +257,8 @@ export interface Task {
   assignedToName?: string | null;
   partnerId?: string | null;
   partnerUid?: string | null;
+  postedBy?: 'customer' | 'team';
+  isTeamPosted?: boolean;
   scheduledDate?: string;
   dateOption?: string;
   timeSlot?: string;

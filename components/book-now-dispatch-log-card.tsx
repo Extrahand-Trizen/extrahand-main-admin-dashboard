@@ -163,6 +163,7 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
   const queryClient = useQueryClient();
   const dispatchLogs = task.dispatchLogs || [];
   const progress = task.dispatchProgress;
+  const isTeamPosted = task.isTeamPosted === true || task.postedBy === "team";
   const isAssigned = Boolean(
     task.assigneeId ||
       task.assigneeUid ||
@@ -323,7 +324,7 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <h3 className="text-sm font-semibold text-gray-900">{stage.label}</h3>
                   <div className="flex flex-wrap items-center gap-2">
-                    {stage.key !== "preferred" ? (
+                    {stage.key !== "preferred" && !(isTeamPosted && stage.key === "all") ? (
                       <Button
                         type="button"
                         variant="outline"
@@ -347,7 +348,11 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                     </span>
                   </div>
                 </div>
-                <p className="text-xs text-gray-500">{stage.description}</p>
+                <p className="text-xs text-gray-500">
+                  {stage.key === "all" && isTeamPosted
+                    ? "Eligible partners are shown for visibility only. Team-posted work sends notifications to hired and area-rule partners only."
+                    : stage.description}
+                </p>
                 {areaRows.length ? (
                   areaRows.map(({ area, candidates }) => (
                     <AreaCandidates key={`${stage.key}-${area.area}`} area={area} candidates={candidates} />
