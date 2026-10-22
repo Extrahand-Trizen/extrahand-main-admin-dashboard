@@ -284,3 +284,16 @@ export async function unassignHelper(
     body: JSON.stringify({ escrowId }),
   });
 }
+
+export async function notifyBookNowDispatchStage(
+  taskId: string,
+  stage: 'area_rule' | 'all',
+): Promise<ApiResponse<{ stage: 'area_rule' | 'all'; notifiedCount: number }>> {
+  return apiRequest<ApiResponse<{ stage: 'area_rule' | 'all'; notifiedCount: number }>>(
+    `/api/v1/tasks/${taskId}/dispatch/notify-stage`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ stage }),
+    },
+  );
+}

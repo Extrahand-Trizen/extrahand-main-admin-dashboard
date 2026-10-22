@@ -1,9 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
-import { ChevronDown, ChevronUp, ListFilter, ShieldCheck, ShieldX } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown, ChevronUp, ListFilter, Send, ShieldCheck, ShieldX } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { notifyBookNowDispatchStage } from "@/lib/api/tasks";
 import { Task, DispatchAreaLog, DispatchCandidateLog } from "@/types";
+import { toast } from "sonner";
 
 interface BookNowDispatchLogCardProps {
   task: Task;
@@ -20,12 +24,12 @@ const STAGES = [
   {
     key: "area_rule",
     label: "Area-rule partners",
-    description: "Offered the work only if the preferred-partner stage ends without an assignment.",
+    description: "Offered after the preferred-partner stage, or immediately when requested by an admin.",
   },
   {
     key: "all",
     label: "Other eligible partners",
-    description: "Offered the work only if the preferred and area-rule stages end without an assignment.",
+    description: "Offered after earlier stages, or immediately when requested by an admin.",
   },
 ] as const;
 
@@ -50,7 +54,7 @@ function responseLabel(candidate: DispatchCandidateLog): string {
     case "timed_out":
       return "Timed Out";
     case "closed":
-      return "Closed - assigned to another partner";
+      return "Closed - offer stage ended";
     default:
       return "Pending";
   }
@@ -156,9 +160,39 @@ function AreaCandidates({
 
 export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
   const [isOpen, setIsOpen] = useState(true);
+  const queryClient = useQueryClient();
   const dispatchLogs = task.dispatchLogs || [];
   const progress = task.dispatchProgress;
-  const isAssigned = Boolean(task.assigneeId || task.assigneeName || task.assignedHelperName);
+  const isAssigned = Boolean(
+    task.assigneeId ||
+      task.assigneeUid ||
+      task.partnerId ||
+      task.partnerUid ||
+      task.assigneeName ||
+      task.assignedHelperName,
+  );
+  const canNotifyImmediately =
+    task.bookingSource === "book_now" &&
+    task.status === "open" &&
+    !isAssigned &&
+    progress?.currentStage !== "assigned";
+  const notifyStageMutation = useMutation({
+    mutationFn: (stage: "area_rule" | "all") =>
+      notifyBookNowDispatchStage(task.taskId, stage),
+    onSuccess: async (response) => {
+      await queryClient.invalidateQueries({ queryKey: ["task", task.taskId] });
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      const notifiedCount = response.data?.notifiedCount ?? 0;
+      if (notifiedCount > 0) {
+        toast.success(`Notification sent to ${notifiedCount} eligible partner${notifiedCount === 1 ? "" : "s"}.`);
+      } else {
+        toast.warning("The offer stage started, but no notifications were handed off successfully. Pending offers will be retried.");
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to notify eligible partners.");
+    },
+  });
   const preferredGender = task.preferredHelperGender;
   const isHourlyTask = task.categorySlug === "hourly-helper" ||
     task.categorySlug === "hourly-based" ||
@@ -288,10 +322,30 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
               <section key={stage.key} className="space-y-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <h3 className="text-sm font-semibold text-gray-900">{stage.label}</h3>
-                  <span className="text-xs text-gray-500">
-                    {stageStatusLabel(stageProgress?.status)}
-                    {stageProgress?.startedAt ? ` · Started ${formatDateTime(stageProgress.startedAt)}` : ""}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {stage.key !== "preferred" ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 gap-1.5 px-2 text-xs"
+                        disabled={!canNotifyImmediately || notifyStageMutation.isPending}
+                        title={
+                          canNotifyImmediately
+                            ? `Notify ${stage.label.toLowerCase()} now without waiting for the current offer window`
+                            : "Notifications are unavailable for assigned or closed work"
+                        }
+                        onClick={() => notifyStageMutation.mutate(stage.key)}
+                      >
+                        <Send className="h-3 w-3" />
+                        Notify immediately
+                      </Button>
+                    ) : null}
+                    <span className="text-xs text-gray-500">
+                      {stageStatusLabel(stageProgress?.status)}
+                      {stageProgress?.startedAt ? ` · Started ${formatDateTime(stageProgress.startedAt)}` : ""}
+                    </span>
+                  </div>
                 </div>
                 <p className="text-xs text-gray-500">{stage.description}</p>
                 {areaRows.length ? (

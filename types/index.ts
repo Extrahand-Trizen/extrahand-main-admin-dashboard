@@ -251,9 +251,12 @@ export interface Task {
   updatedAt: string;
   assignedTo?: { userId: string; name: string; email?: string } | null;
   assigneeId?: string;
+  assigneeUid?: string | null;
   assigneeName?: string | null;
   assignedHelperName?: string | null;
   assignedToName?: string | null;
+  partnerId?: string | null;
+  partnerUid?: string | null;
   scheduledDate?: string;
   dateOption?: string;
   timeSlot?: string;
