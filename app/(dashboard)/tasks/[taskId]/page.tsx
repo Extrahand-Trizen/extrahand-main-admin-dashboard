@@ -557,6 +557,27 @@ export default function TaskDetailsPage() {
   const payoutCalculationBaseNumber =
     payoutCalculationBase != null ? Number(payoutCalculationBase) : Number.NaN;
   const roundCurrency = (amount: number) => Math.round((amount + Number.EPSILON) * 100) / 100;
+  const payoutMetadata = payout?.metadata;
+  const payoutAmountBreakdown =
+    payoutMetadata?.amountBreakdown &&
+    typeof payoutMetadata.amountBreakdown === "object" &&
+    !Array.isArray(payoutMetadata.amountBreakdown)
+      ? (payoutMetadata.amountBreakdown as Record<string, unknown>)
+      : {};
+  const readPayoutAdjustment = (value: unknown) => {
+    if (typeof value !== "string" && typeof value !== "number") {
+      return 0;
+    }
+
+    const amount = Number(value);
+    return Number.isFinite(amount) ? amount : 0;
+  };
+  const payoutPenaltyDeducted = readPayoutAdjustment(
+    payoutMetadata?.penaltyDeducted ?? payoutAmountBreakdown.penaltyDeducted
+  );
+  const payoutExtraCoinsBonus = readPayoutAdjustment(
+    payoutMetadata?.extraCoinsBonus ?? payoutAmountBreakdown.extraCoinsBonus
+  );
   const calculatedPlatformCommission =
     Number.isFinite(payoutCalculationBaseNumber) &&
     platformFeePercentage != null &&
@@ -564,9 +585,10 @@ export default function TaskDetailsPage() {
       ? roundCurrency(payoutCalculationBaseNumber * (platformFeePercentage / 100))
       : null;
   const platformCommissionAmount =
-    platformCommission != null && Number.isFinite(Number(platformCommission))
+    calculatedPlatformCommission ??
+    (platformCommission != null && Number.isFinite(Number(platformCommission))
       ? Number(platformCommission)
-      : calculatedPlatformCommission;
+      : null);
   const calculatedGstOnCommission =
     platformCommissionAmount != null &&
     commissionGstPercentage != null &&
@@ -574,32 +596,45 @@ export default function TaskDetailsPage() {
       ? roundCurrency(platformCommissionAmount * (commissionGstPercentage / 100))
       : null;
   const gstOnCommissionAmount =
-    gstOnCommission != null && Number.isFinite(Number(gstOnCommission))
+    calculatedGstOnCommission ??
+    (gstOnCommission != null && Number.isFinite(Number(gstOnCommission))
       ? Number(gstOnCommission)
-      : calculatedGstOnCommission;
+      : null);
   const payoutTdsAmount =
     payoutTds != null && Number.isFinite(Number(payoutTds))
       ? Number(payoutTds)
       : 0;
   const calculatedTotalDeduction =
-    platformCommissionAmount != null && gstOnCommissionAmount != null
-      ? roundCurrency(platformCommissionAmount + gstOnCommissionAmount + payoutTdsAmount)
+    platformCommissionAmount != null
+      ? roundCurrency(
+          platformCommissionAmount +
+            (gstOnCommissionAmount ?? 0) +
+            payoutTdsAmount
+        )
       : null;
   const payoutGrossAmount = payout?.amount ?? actualWorkCost;
   const payoutNetAmount = payout?.netAmount ?? recordedPartnerPayout;
-  const payoutDeductionTotal =
+  const payoutDeductionTotalBeforeAdjustments =
     payoutGrossAmount != null &&
     payoutNetAmount != null &&
     Number.isFinite(Number(payoutGrossAmount)) &&
     Number.isFinite(Number(payoutNetAmount))
       ? Number(payoutGrossAmount) - Number(payoutNetAmount)
       : calculatedTotalDeduction;
+  const payoutDeductionTotal =
+    calculatedTotalDeduction != null
+      ? roundCurrency(calculatedTotalDeduction + payoutPenaltyDeducted)
+      : payoutDeductionTotalBeforeAdjustments;
   const calculatedPartnerPayout =
     Number.isFinite(payoutCalculationBaseNumber) && payoutDeductionTotal != null
-      ? roundCurrency(payoutCalculationBaseNumber - payoutDeductionTotal)
+      ? roundCurrency(
+          payoutCalculationBaseNumber -
+            payoutDeductionTotal +
+            payoutExtraCoinsBonus
+        )
       : null;
   const partnerPayout =
-    recordedPartnerPayout ?? calculatedPartnerPayout;
+    calculatedPartnerPayout ?? recordedPartnerPayout;
   const paidAmountNumber =
     totalAmountPaid != null ? Number(totalAmountPaid) : Number.NaN;
   const partnerPayoutNumber =
@@ -1093,7 +1128,7 @@ export default function TaskDetailsPage() {
             </CardContent>
           </Card>
 
-          {isSuperAdmin && (
+          {(isSuperAdmin || isOperationsRole(user?.role)) && (
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-3">
@@ -1153,7 +1188,7 @@ export default function TaskDetailsPage() {
                     <div>
                       <p className="text-sm font-semibold text-gray-900">Partner payout calculation</p>
                       <p className="mt-1 text-xs text-gray-500">
-                        Work cost less platform commission, GST, and applicable TDS
+                        Work cost less fees and penalties, plus any coin redemption
                       </p>
                     </div>
                     <div className="rounded-lg bg-white px-3 py-2 text-right shadow-sm ring-1 ring-gray-200">
@@ -1196,6 +1231,22 @@ export default function TaskDetailsPage() {
                         </p>
                       </div>
                     )}
+                    {payoutPenaltyDeducted > 0 && (
+                      <div className="rounded-lg border border-gray-200 bg-white p-3">
+                        <p className="text-xs font-medium text-gray-500">Penalty deduction</p>
+                        <p className="mt-1 text-sm font-semibold text-gray-900">
+                          {formatFinancialAmount(payoutPenaltyDeducted)}
+                        </p>
+                      </div>
+                    )}
+                    {payoutExtraCoinsBonus > 0 && (
+                      <div className="rounded-lg border border-gray-200 bg-white p-3">
+                        <p className="text-xs font-medium text-gray-500">Extra coins bonus</p>
+                        <p className="mt-1 text-sm font-semibold text-emerald-700">
+                          +{formatFinancialAmount(payoutExtraCoinsBonus)}
+                        </p>
+                      </div>
+                    )}
                     <div className="rounded-lg border border-gray-200 bg-white p-3">
                       <p className="text-xs font-medium text-gray-500">Total deduction</p>
                       <p className="mt-1 text-sm font-semibold text-gray-900">
@@ -1210,7 +1261,10 @@ export default function TaskDetailsPage() {
                         <span className="font-medium text-blue-900">Final payout</span>
                         <span className="font-semibold text-blue-900">
                           {formatFinancialAmount(payoutCalculationBaseNumber)} −{" "}
-                          {formatFinancialAmount(payoutDeductionTotal)} ={" "}
+                          {formatFinancialAmount(payoutDeductionTotal)}
+                          {payoutExtraCoinsBonus > 0 &&
+                            ` + ${formatFinancialAmount(payoutExtraCoinsBonus)}`}
+                          {" = "}
                           {formatFinancialAmount(Number(partnerPayout))}
                         </span>
                       </div>

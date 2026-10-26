@@ -49,8 +49,10 @@ const RECIPIENT_PREVIEW_LIMIT = 50;
 export default function NotificationHistoryPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isSuperAdmin, loading: authLoading } = useAuth();
-  const canLoad = isSuperAdmin && !authLoading;
+  const { isSuperAdmin, user, loading: authLoading } = useAuth();
+  const isOperationsAdmin = ["operations_admin", "operation_admin", "operations"].includes(user?.role || "");
+  const canAccessNotifications = isSuperAdmin || isOperationsAdmin;
+  const canLoad = canAccessNotifications && !authLoading;
 
   const [historyApp, setHistoryApp] = useState<BroadcastApp | "all">("all");
   const [page, setPage] = useState(0);
@@ -89,12 +91,12 @@ export default function NotificationHistoryPage() {
     },
   });
 
-  if (!authLoading && !isSuperAdmin) {
+  if (!authLoading && !canAccessNotifications) {
     router.replace("/dashboard");
     return null;
   }
 
-  if (authLoading || !isSuperAdmin) {
+  if (authLoading || !canAccessNotifications) {
     return <div className="p-8 text-sm text-gray-500">Checking access...</div>;
   }
 

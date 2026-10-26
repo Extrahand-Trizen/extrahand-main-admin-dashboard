@@ -43,6 +43,8 @@ export default function RecycleBinPage() {
   const [limit] = useState(20);
   const [search, setSearch] = useState("");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [emptyRecycleBinDialogOpen, setEmptyRecycleBinDialogOpen] = useState(false);
+  const [emptyRecycleBinConfirmation, setEmptyRecycleBinConfirmation] = useState("");
   const [permanentDeleteDialog, setPermanentDeleteDialog] = useState<{
     open: boolean;
     reason: string;
@@ -90,6 +92,80 @@ export default function RecycleBinPage() {
     },
   });
 
+  const emptyRecycleBinMutation = useMutation({
+    mutationFn: async () => {
+      const deletedTasks: Task[] = [];
+      let currentPage = 1;
+      let totalPages = 1;
+      const pageLimit = 100;
+
+      do {
+        const response = await listDeletedTasks({
+          page: currentPage,
+          limit: pageLimit,
+        });
+        if (!response.success || !Array.isArray(response.data) || !response.pagination) {
+          throw new Error(response.error || "Failed to load all deleted works");
+        }
+        deletedTasks.push(...response.data);
+        totalPages = response.pagination.pages;
+        currentPage += 1;
+      } while (currentPage <= totalPages);
+
+      const taskIds = Array.from(
+        new Set(
+          deletedTasks
+            .map((task) =>
+              getTaskIdentifier(task as Partial<Task> & { _id?: string; id?: string }),
+            )
+            .filter(Boolean),
+        ),
+      );
+      if (
+        deletedTasks.some(
+          (task) =>
+            !getTaskIdentifier(task as Partial<Task> & { _id?: string; id?: string }),
+        )
+      ) {
+        throw new Error("Some deleted works are missing identifiers. Nothing was deleted.");
+      }
+
+      let deletedCount = 0;
+      const failures: string[] = [];
+      for (const taskId of taskIds) {
+        try {
+          await permanentlyDeleteTask(taskId, "Recycle bin emptied by Super Admin");
+          deletedCount += 1;
+        } catch (deleteError) {
+          failures.push(
+            deleteError instanceof Error ? deleteError.message : String(deleteError),
+          );
+        }
+      }
+
+      return { total: taskIds.length, deletedCount, failures };
+    },
+    onSuccess: ({ total, deletedCount, failures }) => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      setEmptyRecycleBinDialogOpen(false);
+      setEmptyRecycleBinConfirmation("");
+      setPage(1);
+      setSearch("");
+      if (failures.length > 0) {
+        toast.error(
+          `Permanently deleted ${deletedCount} of ${total} works. ${failures.length} could not be deleted. ${failures[0]}`,
+        );
+      } else if (total === 0) {
+        toast.info("The recycle bin is already empty.");
+      } else {
+        toast.success(`Recycle bin emptied. ${deletedCount} works permanently deleted.`);
+      }
+    },
+    onError: (mutationError: Error) => {
+      toast.error(mutationError.message || "Failed to empty recycle bin");
+    },
+  });
+
   if (!isSuperAdmin) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -116,7 +192,24 @@ export default function RecycleBinPage() {
             <p className="mt-1 text-sm text-gray-600">Deleted works (restorable)</p>
           </div>
         </div>
-        <Badge variant="secondary">{pagination.total} deleted</Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary">{pagination.total} deleted</Badge>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              setEmptyRecycleBinConfirmation("");
+              setEmptyRecycleBinDialogOpen(true);
+            }}
+            disabled={
+              emptyRecycleBinMutation.isPending ||
+              restoreMutation.isPending ||
+              permanentDeleteMutation.isPending
+            }
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            {emptyRecycleBinMutation.isPending ? "Emptying..." : "Empty Recycle Bin"}
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -157,6 +250,7 @@ export default function RecycleBinPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Works</TableHead>
+                    <TableHead>Customer</TableHead>
                     <TableHead className="hidden md:table-cell">Status</TableHead>
                     <TableHead className="hidden md:table-cell">Deleted At</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -167,11 +261,35 @@ export default function RecycleBinPage() {
                     const taskIdentifier = getTaskIdentifier(
                       task as Partial<Task> & { _id?: string; id?: string },
                     );
+                    const taskWithPoster = task as Task & {
+                      CustomerId?: string;
+                      userName?: string;
+                      requesterName?: string;
+                    };
+                    const customerId = task.customerId || taskWithPoster.CustomerId;
+                    const customerName =
+                      task.customerName ||
+                      taskWithPoster.userName ||
+                      taskWithPoster.requesterName ||
+                      customerId ||
+                      "Unknown";
                     return (
                       <TableRow key={taskIdentifier || `${task.title}-${task.createdAt}`}>
                         <TableCell>
                           <div className="font-medium text-gray-900">{task.title}</div>
                           <div className="text-xs text-gray-500">{taskIdentifier}</div>
+                        </TableCell>
+                        <TableCell>
+                          {customerId ? (
+                            <Link
+                              href={`/users/${customerId}`}
+                              className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              {customerName}
+                            </Link>
+                          ) : (
+                            <span className="text-gray-500">{customerName}</span>
+                          )}
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
                           <Badge variant="outline">{task.status}</Badge>
@@ -191,7 +309,11 @@ export default function RecycleBinPage() {
                                 }
                                 restoreMutation.mutate(taskIdentifier);
                               }}
-                              disabled={restoreMutation.isPending}
+                              disabled={
+                                restoreMutation.isPending ||
+                                permanentDeleteMutation.isPending ||
+                                emptyRecycleBinMutation.isPending
+                              }
                             >
                               <RotateCcw className="mr-2 h-4 w-4" />
                               Restore
@@ -207,7 +329,11 @@ export default function RecycleBinPage() {
                                 setSelectedTask(task as Task);
                                 setPermanentDeleteDialog({ open: true, reason: "" });
                               }}
-                              disabled={permanentDeleteMutation.isPending}
+                              disabled={
+                                permanentDeleteMutation.isPending ||
+                                restoreMutation.isPending ||
+                                emptyRecycleBinMutation.isPending
+                              }
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
                               Delete
@@ -223,6 +349,57 @@ export default function RecycleBinPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={emptyRecycleBinDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && !emptyRecycleBinMutation.isPending) {
+            setEmptyRecycleBinDialogOpen(false);
+            setEmptyRecycleBinConfirmation("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Empty Recycle Bin Permanently?</DialogTitle>
+            <DialogDescription>
+              This permanently deletes every work in the recycle bin, including works not shown by the current search. This action cannot be undone. Type EMPTY to confirm.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="empty-recycle-bin-confirmation">Confirmation *</Label>
+            <Input
+              id="empty-recycle-bin-confirmation"
+              value={emptyRecycleBinConfirmation}
+              onChange={(event) => setEmptyRecycleBinConfirmation(event.target.value)}
+              placeholder="Type EMPTY"
+              autoComplete="off"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEmptyRecycleBinDialogOpen(false);
+                setEmptyRecycleBinConfirmation("");
+              }}
+              disabled={emptyRecycleBinMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => emptyRecycleBinMutation.mutate()}
+              disabled={
+                emptyRecycleBinConfirmation !== "EMPTY" ||
+                emptyRecycleBinMutation.isPending
+              }
+            >
+              {emptyRecycleBinMutation.isPending ? "Deleting..." : "Delete All Permanently"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={permanentDeleteDialog.open}
@@ -297,4 +474,3 @@ export default function RecycleBinPage() {
     </div>
   );
 }
-

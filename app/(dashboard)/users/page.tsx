@@ -95,7 +95,9 @@ const getNormalizedRoleLabel = (role?: string) => {
   return null;
 };
 
-const getRoleLabel = (user: Pick<User, "role" | "roles">) => {
+const getRoleLabel = (
+  user: Pick<User, "role" | "roles" | "partnerProfile">,
+) => {
   const roleLabels = (user.roles || [])
     .map((role) => getNormalizedRoleLabel(role))
     .filter(
@@ -103,12 +105,23 @@ const getRoleLabel = (user: Pick<User, "role" | "roles">) => {
         role !== null,
     );
 
-  if (roleLabels.length > 0) {
-    return Array.from(new Set(roleLabels)).join(", ");
+  if (roleLabels.length === 0) {
+    const single = getNormalizedRoleLabel(user.role);
+    if (single) roleLabels.push(single);
   }
 
-  const single = getNormalizedRoleLabel(user.role);
-  if (single) return single;
+  const uniqueRoleLabels = Array.from(new Set(roleLabels));
+  const partnerProfile = user.partnerProfile;
+
+  if (
+    uniqueRoleLabels.some((role) => role.includes("Helper")) &&
+    partnerProfile?.status?.toLowerCase() === "approved" &&
+    !uniqueRoleLabels.includes("Partner")
+  ) {
+    uniqueRoleLabels.push("Partner");
+  }
+
+  if (uniqueRoleLabels.length > 0) return uniqueRoleLabels.join(", ");
   if (user.role && String(user.role).toLowerCase() === "unknown") return "—";
   return "N/A";
 };
@@ -252,6 +265,7 @@ export default function UsersPage() {
   });
 
   const [isLoaded, setIsLoaded] = useState(false);
+  const normalizedRoleFilter = roleFilter === "helper" ? "all" : roleFilter;
 
   // Load saved filters on mount
   useEffect(() => {
@@ -261,7 +275,10 @@ export default function UsersPage() {
         const parsed = JSON.parse(saved);
         if (parsed.search !== undefined) setSearch(parsed.search);
         if (parsed.statusFilter !== undefined) setStatusFilter(parsed.statusFilter);
-        if (parsed.roleFilter !== undefined) setRoleFilter(parsed.roleFilter);
+        if (parsed.roleFilter !== undefined) {
+          const fallbackRole = parsed.roleFilter === "helper" ? "all" : parsed.roleFilter;
+          setRoleFilter(fallbackRole);
+        }
         if (parsed.aadhaarFilter !== undefined) setAadhaarFilter(parsed.aadhaarFilter);
         if (parsed.certifiedFilter !== undefined) setCertifiedFilter(parsed.certifiedFilter);
         if (parsed.categoryFilter !== undefined) setCategoryFilter(parsed.categoryFilter);
@@ -323,7 +340,7 @@ export default function UsersPage() {
   const activeUserFilters: UserFilters = {
     search: search || undefined,
     status: statusFilter !== "all" ? statusFilter : undefined,
-    role: roleFilter !== "all" ? roleFilter : undefined,
+    role: normalizedRoleFilter !== "all" ? normalizedRoleFilter : undefined,
     category: categoryFilter !== "all" ? categoryFilter : undefined,
     city: selectedCityFilter !== "all" ? selectedCityFilter : undefined,
     area:
@@ -377,7 +394,7 @@ export default function UsersPage() {
       "users",
       search,
       statusFilter,
-      roleFilter,
+      normalizedRoleFilter,
       aadhaarFilter,
       certifiedFilter,
       categoryFilter,
@@ -693,7 +710,6 @@ export default function UsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value="helper">Helper</SelectItem>
                   <SelectItem value="customer">Customer</SelectItem>
                   <SelectItem value="partner">Partner</SelectItem>
                 </SelectContent>
