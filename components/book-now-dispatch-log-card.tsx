@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, ListFilter, Send, ShieldCheck, ShieldX } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -44,8 +44,7 @@ function stageStatusLabel(status?: string): string {
   return status.replace("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function responseLabel(candidate: DispatchCandidateLog): string {
-  if (!candidate.notifiedAt) return "Not notified";
+function responseLabel(candidate: DispatchCandidateLog, offerActive: boolean): string {
   switch (candidate.responseStatus) {
     case "accepted":
       return "Accepted";
@@ -55,12 +54,14 @@ function responseLabel(candidate: DispatchCandidateLog): string {
       return "Timed Out";
     case "closed":
       return "Closed - offer stage ended";
+    case "pending":
+      return offerActive ? "Offer active in app" : "Offer pending";
     default:
-      return "Pending";
+      return offerActive ? "Offer active in app" : "Not offered yet";
   }
 }
 
-function responseClass(candidate: DispatchCandidateLog): string {
+function responseClass(candidate: DispatchCandidateLog, offerActive: boolean): string {
   switch (candidate.responseStatus) {
     case "accepted":
       return "bg-emerald-50 text-emerald-700";
@@ -71,7 +72,9 @@ function responseClass(candidate: DispatchCandidateLog): string {
     case "closed":
       return "bg-gray-100 text-gray-600";
     default:
-      return "bg-blue-50 text-blue-700";
+      return offerActive
+        ? "bg-blue-50 text-blue-700"
+        : "bg-gray-100 text-gray-600";
   }
 }
 
@@ -82,9 +85,11 @@ function stageCandidates(area: DispatchAreaLog, stage: string): DispatchCandidat
 function AreaCandidates({
   area,
   candidates,
+  activeOfferUids,
 }: {
   area: DispatchAreaLog;
   candidates: DispatchCandidateLog[];
+  activeOfferUids: Set<string>;
 }) {
   const counts = {
     eligible: candidates.filter((candidate) => candidate.status !== "ineligible").length,
@@ -113,6 +118,9 @@ function AreaCandidates({
           const reason = candidate.reasons?.filter(Boolean).join(", ") || candidate.details;
           const genderFailed = candidate.genderCheckResult === "failed";
           const genderPassed = candidate.genderCheckResult === "passed";
+          const offerActive = Boolean(
+            candidate.partnerUid && activeOfferUids.has(candidate.partnerUid),
+          );
 
           return (
             <div key={`${candidate.partnerUid || candidate.partnerId || candidate.name}-${index}`} className="rounded-md border border-gray-100 p-2.5">
@@ -136,14 +144,28 @@ function AreaCandidates({
                     {genderPassed ? <ShieldCheck className="h-2.5 w-2.5" /> : null}
                   </span>
                 )}
-                <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${responseClass(candidate)}`}>
-                  {responseLabel(candidate)}
+                <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${responseClass(candidate, offerActive)}`}>
+                  {responseLabel(candidate, offerActive)}
+                </span>
+                <span
+                  className={`rounded px-2 py-0.5 text-[11px] font-medium ${
+                    candidate.notifiedAt
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-amber-50 text-amber-700"
+                  }`}
+                  title={
+                    candidate.notifiedAt
+                      ? "The notification service confirmed a device send."
+                      : "No successful push send has been recorded."
+                  }
+                >
+                  {candidate.notifiedAt ? "Push sent" : "Push not confirmed"}
                 </span>
               </div>
               <div className="mt-1 text-xs text-gray-600">
                 <span>{candidate.distanceKm == null ? "Distance unavailable" : `${candidate.distanceKm.toFixed(1)} km from work location`}</span>
                 {candidate.shiftTiming ? <span> · Shift: {candidate.shiftTiming}</span> : null}
-                <span> · Notified: {formatDateTime(candidate.notifiedAt)}</span>
+                <span> · Push sent: {formatDateTime(candidate.notifiedAt)}</span>
                 {candidate.respondedAt ? <span> · Responded: {formatDateTime(candidate.respondedAt)}</span> : null}
               </div>
               {reason ? <p className="mt-1 text-xs text-gray-600">{reason}</p> : null}
@@ -152,7 +174,7 @@ function AreaCandidates({
         })}
       </div>
       <p className="mt-2 text-xs text-gray-500">
-        {counts.eligible} eligible · {counts.notified} notified · {counts.accepted} accepted · {counts.rejected} rejected · {counts.timedOut} timed out
+        {counts.eligible} eligible · {counts.notified} push sent · {counts.accepted} accepted · {counts.rejected} rejected · {counts.timedOut} timed out
       </p>
     </div>
   );
@@ -160,9 +182,26 @@ function AreaCandidates({
 
 export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
   const [isOpen, setIsOpen] = useState(true);
+  const [currentTime, setCurrentTime] = useState<number | null>(null);
   const queryClient = useQueryClient();
   const dispatchLogs = task.dispatchLogs || [];
   const progress = task.dispatchProgress;
+  useEffect(() => {
+    const updateCurrentTime = () => setCurrentTime(Date.now());
+    updateCurrentTime();
+    const interval = window.setInterval(updateCurrentTime, 10_000);
+    return () => window.clearInterval(interval);
+  }, []);
+  const activeOfferUids = new Set(
+    task.status === "open" &&
+      task.assignmentOffer &&
+      task.assignmentOffer.stage !== "closed" &&
+      currentTime !== null &&
+      (!task.assignmentOffer.expiresAt ||
+        new Date(task.assignmentOffer.expiresAt).getTime() > currentTime)
+      ? task.assignmentOffer.recipientUids || []
+      : [],
+  );
   const isTeamPosted = task.isTeamPosted === true || task.postedBy === "team";
   const isAssigned = Boolean(
     task.assigneeId ||
@@ -251,6 +290,9 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
 
           {progress ? (
             <section className="rounded-lg border border-gray-200 p-3 space-y-3">
+              <p className="text-xs text-gray-600">
+                An active offer can appear in the partner app even if a push notification was not sent. “Push sent” is recorded only when the notification service confirms a device send.
+              </p>
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">Dispatch progress</p>
@@ -270,7 +312,7 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                       {stage.stage === "preferred" ? "Preferred / hired" : stage.stage === "area_rule" ? "Same-area partners" : "Remaining eligible"}
                     </p>
                     <p className="text-[11px] text-gray-600">
-                      {stageStatusLabel(stage.status)} · {stage.eligibleCount} eligible · {stage.notifiedCount} notified
+                      {stageStatusLabel(stage.status)} · {stage.eligibleCount} eligible · {stage.notifiedCount} push sent
                     </p>
                     {stage.stage !== "all" ? (
                       <p className="text-[11px] text-gray-500">
@@ -361,7 +403,12 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                 </p>
                 {areaRows.length ? (
                   areaRows.map(({ area, candidates }) => (
-                    <AreaCandidates key={`${stage.key}-${area.area}`} area={area} candidates={candidates} />
+                  <AreaCandidates
+                    key={`${stage.key}-${area.area}`}
+                    area={area}
+                    candidates={candidates}
+                    activeOfferUids={activeOfferUids}
+                  />
                   ))
                 ) : (
                   <p className="text-xs text-gray-500">

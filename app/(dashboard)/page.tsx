@@ -68,7 +68,7 @@ export default function DashboardPage() {
       permission: 'user.list',
     },
     {
-      title: 'Open Tasks',
+      title: 'Open Works',
       value: stats.openTasks,
       subtitle: `${stats.totalTasks} total tasks`,
       icon: Briefcase,

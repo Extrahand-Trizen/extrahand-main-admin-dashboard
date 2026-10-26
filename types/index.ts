@@ -285,6 +285,11 @@ export interface Task {
   payoutStatus?: string | null;
   dispatchLogs?: DispatchAreaLog[];
   dispatchProgress?: DispatchProgress;
+  assignmentOffer?: {
+    stage: 'preferred' | 'area_rule' | 'all' | 'closed';
+    recipientUids?: string[];
+    expiresAt?: string | null;
+  } | null;
   preferredHelperGender?: 'any' | 'male' | 'female' | null;
 }
 
