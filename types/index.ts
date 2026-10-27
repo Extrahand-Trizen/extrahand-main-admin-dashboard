@@ -128,6 +128,7 @@ export interface User {
   partnerProfile?: {
     status?: string;
     categories?: string[];
+    skills?: Record<string, string[]>;
     workAreas?: string[];
     businessName?: string;
     selfie?: string;
@@ -239,6 +240,7 @@ export interface Task {
   taskCallFollowUpDate?: string | null;
   taskCallUpdatedAt?: string | null;
   customerId: string;
+  customerName?: string;
   budget: number;
   /** Budget type from original task: 'hourly' | 'fixed'. Populated by normalizeTask in admin server. */
   budgetType?: 'hourly' | 'fixed';
@@ -296,7 +298,7 @@ export interface Task {
 export interface DispatchProgress {
   currentStage: 'preferred' | 'area_rule' | 'all' | 'assigned' | 'closed';
   startedAt: string;
-  acceptanceWindowMinutes: number;
+  acceptanceWindowMinutes?: number;
   stages: Array<{
     stage: 'preferred' | 'area_rule' | 'all';
     status: 'pending' | 'in_progress' | 'completed' | 'skipped';
@@ -424,6 +426,7 @@ export interface PaymentPayout {
   status: string;
   source?: string;
   type?: string;
+  metadata?: Record<string, unknown> | null;
   createdAt: string;
   teamTest?: boolean;
   links?: {
@@ -585,6 +588,7 @@ export interface AnalyticsOverview {
   tasks: {
     total: number;
     open: number;
+    overdue: number;
     inProgress: number;
     completed: number;
   };

@@ -28,6 +28,7 @@ import {
   updateLocationZone,
 } from '@/lib/api/locations';
 import { usePermissions } from '@/lib/hooks/usePermissions';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 type LocationLevel = 'city' | 'zone' | 'area';
 type EditorState = { level: LocationLevel; location?: ManagedLocation } | null;
@@ -122,6 +123,9 @@ function RowActions({
 
 export default function LocationManagementPage() {
   const { hasPermission } = usePermissions();
+  const { user } = useAuth();
+  const isOperationsAdmin = ['operations_admin', 'operation_admin', 'operations'].includes(user?.role || '');
+  const canAccessLocations = !isOperationsAdmin;
   const canManageLocations = hasPermission('user.update');
   const [cities, setCities] = useState<ManagedLocation[]>([]);
   const [selectedCityId, setSelectedCityId] = useState('');
@@ -151,7 +155,9 @@ export default function LocationManagementPage() {
     }
   }, [selectedCityId]);
 
-  useEffect(() => { void loadCatalog(); }, [loadCatalog]);
+  useEffect(() => {
+    if (canAccessLocations) void loadCatalog();
+  }, [canAccessLocations, loadCatalog]);
 
   const city = cities.find((entry) => entry.id === selectedCityId) || null;
   const zone = city?.zones?.find((entry) => entry.id === selectedZoneId) || null;
@@ -225,6 +231,14 @@ export default function LocationManagementPage() {
   };
 
   const openEditor = (level: LocationLevel, location?: ManagedLocation) => setEditor({ level, location });
+
+  if (!canAccessLocations) {
+    return (
+      <div className="p-6 text-sm text-gray-500">
+        You don't have permission to access Location Management.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-4 sm:p-6">

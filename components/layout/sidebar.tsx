@@ -35,6 +35,8 @@ const navigation: Array<{
   icon: React.ComponentType<{ className?: string }>;
   permission?: string;
   superAdminOnly?: boolean;
+  operationsAdminOrSuperAdmin?: boolean;
+  excludeOperationsAdmin?: boolean;
 }> = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   {
@@ -54,6 +56,7 @@ const navigation: Array<{
     href: '/locations',
     icon: MapPin,
     permission: 'user.list',
+    excludeOperationsAdmin: true,
   },
   {
     name: 'Works',
@@ -95,7 +98,7 @@ const navigation: Array<{
     name: 'Notifications',
     href: '/notifications',
     icon: BellRing,
-    superAdminOnly: true,
+    operationsAdminOrSuperAdmin: true,
   },
 ];
 
@@ -158,6 +161,8 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
   // Filter navigation items based on permissions
   const filteredNavigation = navigation.filter((item) => {
     if (item.superAdminOnly && !isSuperAdmin) return false;
+    if (item.operationsAdminOrSuperAdmin && !isSuperAdmin && !isOperationsAdminRole) return false;
+    if (item.excludeOperationsAdmin && isOperationsAdminRole) return false;
     if (isPaymentsOnlyRole && item.href === '/dashboard') return false;
     if (!item.permission) return true;
     return hasPermission(item.permission);
@@ -581,7 +586,7 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
             </>
           )}
 
-          {hasPermission('payment.list') && (
+          {hasPermission('payment.list') && !isOperationsAdminRole && (
             <div className="space-y-1">
               <button
                 onClick={() => setPaymentsSectionOpen(!paymentsSectionOpen)}

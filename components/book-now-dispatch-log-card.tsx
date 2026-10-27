@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, ListFilter, Send, ShieldCheck, ShieldX } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -19,17 +19,17 @@ const STAGES = [
   {
     key: "preferred",
     label: "Preferred / hired partners",
-    description: "This group gets the first opportunity to accept the work.",
+    description: "Preferred partners get the first offer. It remains active when later groups are invited.",
   },
   {
     key: "area_rule",
     label: "Area-rule partners",
-    description: "Offered after the preferred-partner stage, or immediately when requested by an admin.",
+    description: "Area-rule partners are invited 30 minutes later; preferred-partner offers remain active.",
   },
   {
     key: "all",
     label: "Other eligible partners",
-    description: "Offered after earlier stages, or immediately when requested by an admin.",
+    description: "Other eligible partners are invited 30 minutes later; all prior offers remain active.",
   },
 ] as const;
 
@@ -45,6 +45,9 @@ function stageStatusLabel(status?: string): string {
 }
 
 function responseLabel(candidate: DispatchCandidateLog, offerActive: boolean): string {
+  if (offerActive && candidate.responseStatus === "timed_out") {
+    return "Offer active in app";
+  }
   switch (candidate.responseStatus) {
     case "accepted":
       return "Accepted";
@@ -62,6 +65,9 @@ function responseLabel(candidate: DispatchCandidateLog, offerActive: boolean): s
 }
 
 function responseClass(candidate: DispatchCandidateLog, offerActive: boolean): string {
+  if (offerActive && candidate.responseStatus === "timed_out") {
+    return "bg-blue-50 text-blue-700";
+  }
   switch (candidate.responseStatus) {
     case "accepted":
       return "bg-emerald-50 text-emerald-700";
@@ -96,7 +102,11 @@ function AreaCandidates({
     notified: candidates.filter((candidate) => Boolean(candidate.notifiedAt)).length,
     accepted: candidates.filter((candidate) => candidate.responseStatus === "accepted").length,
     rejected: candidates.filter((candidate) => candidate.responseStatus === "rejected").length,
-    timedOut: candidates.filter((candidate) => candidate.responseStatus === "timed_out").length,
+    timedOut: candidates.filter(
+      (candidate) =>
+        candidate.responseStatus === "timed_out" &&
+        !activeOfferUids.has(candidate.partnerUid || ""),
+    ).length,
   };
 
   return (
@@ -182,23 +192,13 @@ function AreaCandidates({
 
 export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
   const [isOpen, setIsOpen] = useState(true);
-  const [currentTime, setCurrentTime] = useState<number | null>(null);
   const queryClient = useQueryClient();
   const dispatchLogs = task.dispatchLogs || [];
   const progress = task.dispatchProgress;
-  useEffect(() => {
-    const updateCurrentTime = () => setCurrentTime(Date.now());
-    updateCurrentTime();
-    const interval = window.setInterval(updateCurrentTime, 10_000);
-    return () => window.clearInterval(interval);
-  }, []);
   const activeOfferUids = new Set(
     task.status === "open" &&
       task.assignmentOffer &&
-      task.assignmentOffer.stage !== "closed" &&
-      currentTime !== null &&
-      (!task.assignmentOffer.expiresAt ||
-        new Date(task.assignmentOffer.expiresAt).getTime() > currentTime)
+      task.assignmentOffer.stage !== "closed"
       ? task.assignmentOffer.recipientUids || []
       : [],
   );
@@ -291,7 +291,7 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
           {progress ? (
             <section className="rounded-lg border border-gray-200 p-3 space-y-3">
               <p className="text-xs text-gray-600">
-                An active offer can appear in the partner app even if a push notification was not sent. “Push sent” is recorded only when the notification service confirms a device send.
+                Offers are sent in stages 30 minutes apart. Each sent offer remains available until someone accepts, the work is cancelled, or its scheduled start time arrives. “Push sent” is recorded only when the notification service confirms a device send.
               </p>
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
@@ -301,9 +301,6 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                     {currentStage ? ` · ${stageStatusLabel(currentStage.status)}` : ""}
                   </p>
                 </div>
-                <span className="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700">
-                  {progress.acceptanceWindowMinutes}-minute acceptance window
-                </span>
               </div>
               <div className="grid gap-2 sm:grid-cols-3">
                 {progress.stages.map((stage) => (
@@ -319,17 +316,9 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                         {stage.acceptedCount} accepted · {stage.rejectedCount} rejected · {stage.timedOutCount} timed out
                       </p>
                     ) : null}
-                    {stage.expiresAt ? (
-                      <p className="text-[11px] text-gray-500">Window ends {formatDateTime(stage.expiresAt)}</p>
-                    ) : null}
                   </div>
                 ))}
               </div>
-              {progress.currentStage !== "assigned" && progress.currentStage !== "closed" && currentStage?.status === "in_progress" ? (
-                <p className="text-xs text-gray-600">
-                  Acceptance deadline: {formatDateTime(currentStage.expiresAt)}
-                </p>
-              ) : null}
               {isAssigned || progress.currentStage === "assigned" ? (
                 <p className="rounded-md bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">
                   Assigned to {progress.assignedPartnerName || task.assignedHelperName || task.assigneeName || "partner"}{progress.assignedAt ? ` at ${formatDateTime(progress.assignedAt)}` : ""}. Further dispatch stopped.
@@ -381,7 +370,7 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                         disabled={!canNotifyImmediately || notifyStageMutation.isPending}
                         title={
                           canNotifyImmediately
-                            ? `Notify ${stage.label.toLowerCase()} now without waiting for the current offer window`
+                            ? `Send a push notification now to eligible ${stage.label.toLowerCase()}`
                             : "Notifications are unavailable for assigned or closed work"
                         }
                         onClick={() => notifyStageMutation.mutate(stage.key)}

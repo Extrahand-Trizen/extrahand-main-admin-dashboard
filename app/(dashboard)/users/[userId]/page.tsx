@@ -122,6 +122,9 @@ const getSafeNumber = (value: unknown): number => {
   return Number.isFinite(numericValue) ? numericValue : 0;
 };
 
+const formatSkillLabel = (value: string): string =>
+  value.replace(/[_-]+/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+
 export default function UserDetailsPage() {
   const params = useParams();
   const router = useRouter();
@@ -171,6 +174,14 @@ export default function UserDetailsPage() {
   });
 
   const user = data?.data;
+  const partnerSkillGroups = Object.entries(user?.partnerProfile?.skills || {})
+    .map(([category, skills]) => ({
+      category: formatSkillLabel(category),
+      skills: Array.isArray(skills)
+        ? skills.filter((skill): skill is string => typeof skill === "string" && skill.trim().length > 0)
+        : [],
+    }))
+    .filter((group) => group.skills.length > 0);
 
   const isPartnerUser =
     user?.role === "Partner" ||
@@ -827,7 +838,7 @@ export default function UserDetailsPage() {
         <TabsContent value="profile" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-2">
             {/* Skills */}
-            {user.skills && (
+            {(user.skills || partnerSkillGroups.length > 0) && (
               <Card>
                 <CardHeader>
                   <CardTitle>Skills & Expertise</CardTitle>
@@ -836,7 +847,33 @@ export default function UserDetailsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {user.skills.primaryCategory && (
+                  {partnerSkillGroups.length > 0 && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                        Partner Skills
+                      </Label>
+                      <div className="space-y-3">
+                        {partnerSkillGroups.map((group) => (
+                          <div
+                            key={group.category}
+                            className="p-3 rounded-lg border border-gray-200 bg-gray-50"
+                          >
+                            <p className="font-medium text-sm text-gray-900 mb-2">
+                              {group.category}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {group.skills.map((skill) => (
+                                <Badge key={skill} variant="outline">
+                                  {formatSkillLabel(skill)}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {user.skills?.primaryCategory && (
                     <div>
                       <Label className="text-sm font-medium text-gray-700">
                         Primary Category
@@ -846,7 +883,7 @@ export default function UserDetailsPage() {
                       </p>
                     </div>
                   )}
-                  {user.skills.list && user.skills.list.length > 0 && (
+                  {user.skills?.list && user.skills.list.length > 0 && (
                     <div>
                       <Label className="text-sm font-medium text-gray-700 mb-2 block">
                         Skills List
@@ -912,7 +949,7 @@ export default function UserDetailsPage() {
                       </div>
                     </div>
                   )}
-                  {user.skills.updatedAt && (
+                  {user.skills?.updatedAt && (
                     <p className="text-xs text-gray-500">
                       Last updated: {formatDate(user.skills.updatedAt)}
                     </p>

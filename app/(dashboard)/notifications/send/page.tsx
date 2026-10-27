@@ -54,8 +54,10 @@ function toLocalInputValue(date: Date): string {
 export default function SendNotificationPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isSuperAdmin, loading: authLoading } = useAuth();
-  const canLoad = isSuperAdmin && !authLoading;
+  const { isSuperAdmin, user, loading: authLoading } = useAuth();
+  const isOperationsAdmin = ["operations_admin", "operation_admin", "operations"].includes(user?.role || "");
+  const canAccessNotifications = isSuperAdmin || isOperationsAdmin;
+  const canLoad = canAccessNotifications && !authLoading;
 
   // Send form
   const [sendApp, setSendApp] = useState<BroadcastApp | null>(null);
@@ -221,12 +223,12 @@ export default function SendNotificationPage() {
     });
   };
 
-  if (!authLoading && !isSuperAdmin) {
+  if (!authLoading && !canAccessNotifications) {
     router.replace("/dashboard");
     return null;
   }
 
-  if (authLoading || !isSuperAdmin) {
+  if (authLoading || !canAccessNotifications) {
     return <div className="p-8 text-sm text-gray-500">Checking access...</div>;
   }
 

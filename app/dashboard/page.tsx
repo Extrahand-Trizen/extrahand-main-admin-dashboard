@@ -20,6 +20,7 @@ interface DashboardStats {
   activeUsers: number;
   totalTasks: number;
   openTasks: number;
+  overdueTasks: number;
 }
 
 export default function DashboardPage() {
@@ -74,6 +75,7 @@ export default function DashboardPage() {
       (tasksError
         ? 0
         : (tasksData?.data?.filter((t: any) => t.status === "open")?.length ?? 0)),
+    overdueTasks: analyticsOverviewData?.data?.tasks?.overdue ?? 0,
   };
 
   const isLoading = usersLoading || tasksLoading;
@@ -96,18 +98,18 @@ export default function DashboardPage() {
       icon: Briefcase,
       color: 'text-blue-600',
       bg: 'bg-blue-50',
-      href: '/tasks',
+      href: '/tasks?status=open',
       permission: 'task.list',
     },
     {
-      title: 'Disputes',
-      value: 0,
-      subtitle: 'Coming soon',
+      title: 'Overdue Works',
+      value: stats.overdueTasks,
+      subtitle: 'Past scheduled date',
       icon: AlertTriangle,
       color: 'text-red-600',
       bg: 'bg-red-50',
-      href: '#',
-      permission: null,
+      href: '/tasks?status=overdue',
+      permission: 'task.list',
     },
     {
       title: 'Helpers Aadhaar Verified',

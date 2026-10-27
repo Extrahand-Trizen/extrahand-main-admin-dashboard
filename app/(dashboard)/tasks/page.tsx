@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Search,
   MoreVertical,
@@ -159,15 +159,21 @@ function getSavedFilters() {
 
 export default function TasksPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { hasPermission, isSuperAdmin } = usePermissions();
 
   const savedFilters = useMemo(() => getSavedFilters(), []);
+  const requestedStatus = searchParams.get("status");
+  const initialStatusFilter =
+    requestedStatus &&
+    ["all", "open", "overdue", "in_progress", "completed", "cancelled"].includes(requestedStatus)
+      ? requestedStatus
+      : savedFilters?.statusFilter ?? "open";
 
   const [searchInput, setSearchInput] = useState<string>(savedFilters?.search ?? "");
   const [debouncedSearch, setDebouncedSearch] = useState<string>(savedFilters?.search ?? "");
-  const [workTypeFilter, setWorkTypeFilter] = useState<string>(savedFilters?.workTypeFilter ?? "all");
-  const [statusFilter, setStatusFilter] = useState<string>(savedFilters?.statusFilter ?? "open");
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter);
   const [categoryFilter, setCategoryFilter] = useState<string>(savedFilters?.categoryFilter ?? "all");
   const [followUpFilter, setFollowUpFilter] = useState<string>(savedFilters?.followUpFilter ?? "all");
   const [paymentTypeFilter, setPaymentTypeFilter] = useState<string>(savedFilters?.paymentTypeFilter ?? "all");
@@ -182,6 +188,13 @@ export default function TasksPage() {
   const [page, setPage] = useState<number>(savedFilters?.page ?? 1);
   const [limit, setLimit] = useState<number>(savedFilters?.limit ?? 20);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [deleteAllTeamDialog, setDeleteAllTeamDialog] = useState<{
+    open: boolean;
+    reason: string;
+  }>({
+    open: false,
+    reason: "",
+  });
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
     reason: string;
@@ -211,7 +224,6 @@ export default function TasksPage() {
     try {
       sessionStorage.setItem("tasks_filters", JSON.stringify({
         search: debouncedSearch,
-        workTypeFilter,
         statusFilter,
         categoryFilter,
         followUpFilter,
@@ -228,12 +240,11 @@ export default function TasksPage() {
     } catch (e) {
       console.error("Error saving filters to sessionStorage", e);
     }
-  }, [debouncedSearch, workTypeFilter, statusFilter, categoryFilter, followUpFilter, paymentTypeFilter, assignedToFilter, postedByFilter, workDateFilter, customDateFrom, customDateTo, scheduledTimeSortOrder, page, limit]);
+  }, [debouncedSearch, statusFilter, categoryFilter, followUpFilter, paymentTypeFilter, assignedToFilter, postedByFilter, workDateFilter, customDateFrom, customDateTo, scheduledTimeSortOrder, page, limit]);
 
   const handleClearFilters = () => {
     setSearchInput("");
     setDebouncedSearch("");
-    setWorkTypeFilter("all");
     setStatusFilter("all");
     setCategoryFilter("all");
     setFollowUpFilter("all");
@@ -254,7 +265,6 @@ export default function TasksPage() {
 
   const hasActiveFilters = Boolean(
     searchInput ||
-    workTypeFilter !== "all" ||
     statusFilter !== "all" ||
     categoryFilter !== "all" ||
     followUpFilter !== "all" ||
@@ -283,7 +293,6 @@ export default function TasksPage() {
     queryKey: [
       "tasks",
       debouncedSearch,
-      workTypeFilter,
       statusFilter,
       categoryFilter,
       followUpFilter,
@@ -300,7 +309,6 @@ export default function TasksPage() {
     queryFn: () =>
       listTasks({
         search: debouncedSearch || undefined,
-        bookingSource: workTypeFilter,
         status: statusFilter !== "all" ? statusFilter : undefined,
         category: categoryFilter !== "all" ? categoryFilter : undefined,
         followUpStatus:
@@ -331,6 +339,78 @@ export default function TasksPage() {
     },
     onError: (error: any) => {
       toast.error(error.message || "Failed to delete works");
+    },
+  });
+
+  const deleteAllTeamMutation = useMutation({
+    mutationFn: async (reason: string) => {
+      const filters = {
+        search: debouncedSearch || undefined,
+        status: statusFilter !== "all" ? statusFilter : undefined,
+        category: categoryFilter !== "all" ? categoryFilter : undefined,
+        followUpStatus: followUpFilter !== "all" ? followUpFilter : undefined,
+        paymentType: paymentTypeFilter !== "all" ? paymentTypeFilter : undefined,
+        assignedTo: assignedToFilter !== "all" ? assignedToFilter : undefined,
+        postedBy: "team" as const,
+        scheduledDateFrom: workDateRange.from,
+        scheduledDateTo: workDateRange.to,
+        sortBy: "scheduledDate",
+        sortOrder: scheduledTimeSortOrder,
+        limit: 50,
+      };
+      const teamTasks: Task[] = [];
+      let currentPage = 1;
+      let totalPages = 1;
+
+      do {
+        const response = await listTasks({ ...filters, page: currentPage });
+        if (!response.success || !Array.isArray(response.data) || !response.pagination) {
+          throw new Error(response.error || "Failed to load all team works");
+        }
+        teamTasks.push(...response.data.filter((task) => task.postedBy === "team"));
+        totalPages = response.pagination.pages;
+        currentPage += 1;
+      } while (currentPage <= totalPages);
+
+      const tasksWithIds = teamTasks.map((task) => ({
+        taskId: getTaskIdentifier(task as Partial<Task> & { _id?: string; id?: string }),
+      }));
+      if (tasksWithIds.some(({ taskId }) => !taskId)) {
+        throw new Error("A team work is missing its identifier. No works were deleted.");
+      }
+
+      let deletedCount = 0;
+      const failures: string[] = [];
+      for (const { taskId } of tasksWithIds) {
+        try {
+          await deleteTask(taskId, reason);
+          deletedCount += 1;
+        } catch (error) {
+          failures.push(error instanceof Error ? error.message : String(error));
+        }
+      }
+
+      return {
+        total: tasksWithIds.length,
+        deletedCount,
+        failures,
+      };
+    },
+    onSuccess: ({ total, deletedCount, failures }) => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      setDeleteAllTeamDialog({ open: false, reason: "" });
+      if (failures.length > 0) {
+        toast.error(
+          `Deleted ${deletedCount} of ${total} team works. ${failures.length} could not be deleted. ${failures[0]}`,
+        );
+      } else if (total === 0) {
+        toast.info("No team works matched the selected filters.");
+      } else {
+        toast.success(`Deleted all ${deletedCount} team works successfully.`);
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to delete team works");
     },
   });
 
@@ -533,25 +613,6 @@ export default function TasksPage() {
                   className="pl-10"
                 />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="workType">Work Type</Label>
-              <Select
-                value={workTypeFilter}
-                onValueChange={(value) => {
-                  setWorkTypeFilter(value);
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger id="workType">
-                  <SelectValue placeholder="All Types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="posted_task">Posted Task</SelectItem>
-                  <SelectItem value="book_now">Book Now</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
@@ -775,9 +836,22 @@ export default function TasksPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">Works List</CardTitle>
-            <Badge variant="secondary">
-              {paymentTypeFilter !== 'all' || workDateFilter !== 'all' ? clientFilteredTasks.length : pagination.total} works
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">
+                {paymentTypeFilter !== 'all' || workDateFilter !== 'all' ? clientFilteredTasks.length : pagination.total} works
+              </Badge>
+              {postedByFilter === "team" && isSuperAdmin && hasPermission("task.delete") && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setDeleteAllTeamDialog({ open: true, reason: "" })}
+                  disabled={deleteAllTeamMutation.isPending || pagination.total === 0}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete All Team Works
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -1060,6 +1134,52 @@ export default function TasksPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={deleteAllTeamDialog.open}
+        onOpenChange={(open) => {
+          if (!open && !deleteAllTeamMutation.isPending) {
+            setDeleteAllTeamDialog({ open: false, reason: "" });
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete All Team Works</DialogTitle>
+            <DialogDescription>
+              This will delete all team-posted works matching the current filters, not customer-posted works. This cannot be undone. Enter a reason for the audit log.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="delete-all-team-reason">Reason *</Label>
+            <Textarea
+              id="delete-all-team-reason"
+              placeholder="Enter the reason for deleting these team works..."
+              value={deleteAllTeamDialog.reason}
+              onChange={(event) =>
+                setDeleteAllTeamDialog({ ...deleteAllTeamDialog, reason: event.target.value })
+              }
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteAllTeamDialog({ open: false, reason: "" })}
+              disabled={deleteAllTeamMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteAllTeamMutation.mutate(deleteAllTeamDialog.reason.trim())}
+              disabled={!deleteAllTeamDialog.reason.trim() || deleteAllTeamMutation.isPending}
+            >
+              {deleteAllTeamMutation.isPending ? "Deleting..." : "Delete All Team Works"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog
