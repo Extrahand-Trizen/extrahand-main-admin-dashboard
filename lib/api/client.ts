@@ -114,13 +114,16 @@ export async function apiRequest<T>(
     throw new Error('Not authenticated. Please login.');
   }
 
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+  const requestHeaders: Record<string, string> = {
+    'Authorization': `Bearer ${token}`,
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+    ...(options.headers as Record<string, string>),
+  };
+
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      ...options.headers,
-    },
+    headers: requestHeaders,
   });
 
   if (response.status === 401) {
@@ -136,13 +139,15 @@ export async function apiRequest<T>(
     }
 
     // Retry original request with refreshed token.
+    const retryHeaders: Record<string, string> = {
+      'Authorization': `Bearer ${refreshedAccessToken}`,
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+      ...(options.headers as Record<string, string>),
+    };
+
     const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${refreshedAccessToken}`,
-        ...options.headers,
-      },
+      headers: retryHeaders,
     });
 
     // Retry can fail for many reasons (permissions/service errors) and should not force logout.
