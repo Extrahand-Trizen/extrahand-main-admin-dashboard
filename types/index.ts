@@ -298,7 +298,7 @@ export interface Task {
 export interface DispatchProgress {
   currentStage: 'preferred' | 'area_rule' | 'all' | 'assigned' | 'closed';
   startedAt: string;
-  acceptanceWindowMinutes: number;
+  acceptanceWindowMinutes?: number;
   stages: Array<{
     stage: 'preferred' | 'area_rule' | 'all';
     status: 'pending' | 'in_progress' | 'completed' | 'skipped';
