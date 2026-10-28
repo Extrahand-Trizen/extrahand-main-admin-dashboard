@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { CreditCard, IndianRupee, RefreshCcw, TrendingUp, AlertTriangle } from "lucide-react";
+import { CreditCard, IndianRupee, ReceiptText, TrendingUp, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPaymentsOverview } from "@/lib/api/payments";
 import { usePermissions } from "@/lib/hooks/usePermissions";
@@ -25,12 +25,11 @@ export default function PaymentsOverviewPage() {
 
   const metrics = data?.data?.metrics;
   const alerts = data?.data?.alerts || [];
-  const successRate = metrics ? Math.round((metrics.successRate || 0) * 100) : 0;
   const statCards = [
     {
       title: "Total Pay-ins",
       value: `₹${metrics?.totalPayins ?? "0.00"}`,
-      subtitle: `${metrics?.capturedCount ?? 0} captured`,
+      subtitle: "Total pay-in amount",
       icon: CreditCard,
       color: "text-blue-600",
       bg: "bg-blue-50",
@@ -38,26 +37,26 @@ export default function PaymentsOverviewPage() {
     {
       title: "Total Payouts",
       value: `₹${metrics?.totalPayouts ?? "0.00"}`,
-      subtitle: "Released to performers",
+      subtitle: "Total payout amount",
       icon: IndianRupee,
       color: "text-emerald-600",
       bg: "bg-emerald-50",
     },
     {
-      title: "Total Refunds",
-      value: `₹${metrics?.totalRefunds ?? "0.00"}`,
-      subtitle: "Refunded to Customers",
-      icon: RefreshCcw,
-      color: "text-orange-600",
-      bg: "bg-orange-50",
-    },
-    {
-      title: "Payment Success Rate",
-      value: `${successRate}%`,
-      subtitle: `${metrics?.failedCount ?? 0} failed`,
+      title: "Revenue",
+      value: `₹${metrics?.revenue ?? "0.00"}`,
+      subtitle: "Total profits",
       icon: TrendingUp,
       color: "text-purple-600",
       bg: "bg-purple-50",
+    },
+    {
+      title: "Taxes",
+      value: `₹${metrics?.totalTax ?? "0.00"}`,
+      subtitle: "Total tax",
+      icon: ReceiptText,
+      color: "text-orange-600",
+      bg: "bg-orange-50",
     },
   ];
 

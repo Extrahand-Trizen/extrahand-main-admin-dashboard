@@ -56,14 +56,52 @@ function dateInputEnd(date: string): string | undefined {
   return new Date(`${date}T23:59:59.999`).toISOString();
 }
 
-function calculateProfit(amountPaid: string | null, payoutAmount?: string | null): string | null {
-  if (amountPaid == null || payoutAmount == null) return null;
+function getPlatformCommission(row: {
+  taskAmount?: string | null;
+  platformCommission?: string | null;
+  platformFeePercentage?: number | null;
+}): string | null {
+  const taskAmount = row.taskAmount == null ? Number.NaN : Number(row.taskAmount);
+  if (
+    Number.isFinite(taskAmount) &&
+    row.platformFeePercentage != null &&
+    Number.isFinite(row.platformFeePercentage)
+  ) {
+    return (Math.round((taskAmount * (row.platformFeePercentage / 100) + Number.EPSILON) * 100) / 100).toFixed(2);
+  }
 
-  const totalPaid = Number(amountPaid);
-  const payout = Number(payoutAmount);
-  if (!Number.isFinite(totalPaid) || !Number.isFinite(payout)) return null;
+  if (row.platformCommission == null || !Number.isFinite(Number(row.platformCommission))) {
+    return null;
+  }
 
-  return (totalPaid - payout).toFixed(2);
+  return Number(row.platformCommission).toFixed(2);
+}
+
+function getPartnerTax(row: {
+  gstOnCommission?: string | null;
+  commissionGstPercentage?: number | null;
+  taskAmount?: string | null;
+  platformCommission?: string | null;
+  platformFeePercentage?: number | null;
+}): string | null {
+  if (row.gstOnCommission != null && Number.isFinite(Number(row.gstOnCommission))) {
+    return Number(row.gstOnCommission).toFixed(2);
+  }
+
+  const commission = getPlatformCommission(row);
+  if (
+    commission == null ||
+    row.commissionGstPercentage == null ||
+    !Number.isFinite(row.commissionGstPercentage)
+  ) {
+    return null;
+  }
+
+  return (
+    Math.round(
+      (Number(commission) * (row.commissionGstPercentage / 100) + Number.EPSILON) * 100
+    ) / 100
+  ).toFixed(2);
 }
 
 export default function PaymentTransactionsPage() {
@@ -361,6 +399,9 @@ export default function PaymentTransactionsPage() {
                     <th className="px-3 py-2 text-left">Actual Work Amount</th>
                     <th className="px-3 py-2 text-left">Payout Amount</th>
                     <th className="px-3 py-2 text-left">Profit</th>
+                    <th className="px-3 py-2 text-left">Customer Tax</th>
+                    <th className="px-3 py-2 text-left">Partner Tax</th>
+                    <th className="px-3 py-2 text-left">Total Tax</th>
                     <th className="px-3 py-2 text-left">Payment Status</th>
                     <th className="px-3 py-2 text-left">Hold Status</th>
                     <th className="px-3 py-2 text-left">Transaction ID</th>
@@ -374,14 +415,27 @@ export default function PaymentTransactionsPage() {
                 <tbody>
                   {rows.length === 0 ? (
                     <tr>
-                      <td colSpan={(isSuperAdmin || hasPermission("payment.delete")) ? 14 : 13} className="px-3 py-8 text-center text-gray-500">
+                      <td colSpan={(isSuperAdmin || hasPermission("payment.delete")) ? 17 : 16} className="px-3 py-8 text-center text-gray-500">
                         No transactions found
                       </td>
                     </tr>
                   ) : (
-                    enrichedRows.map((row) => {
-                      const profit = calculateProfit(row.amountInRupees, row.payoutAmount);
-                      return (
+                  enrichedRows.map((row) => {
+                    const platformCommission = getPlatformCommission(row);
+                    const customerTax =
+                      row.customerTaxAmount != null && Number.isFinite(Number(row.customerTaxAmount))
+                        ? Number(row.customerTaxAmount).toFixed(2)
+                        : null;
+                    const partnerTax = getPartnerTax(row);
+                    const totalTax =
+                      customerTax != null && partnerTax != null
+                        ? (
+                            Math.round(
+                              (Number(customerTax) + Number(partnerTax) + Number.EPSILON) * 100
+                            ) / 100
+                          ).toFixed(2)
+                        : null;
+                    return (
                         <tr key={row.escrowId} className="border-t">
                         <td className="px-3 py-2 text-sm text-gray-700">
                           {row.createdAt ? formatDateTime(row.createdAt) : "—"}
@@ -419,8 +473,23 @@ export default function PaymentTransactionsPage() {
                           {row.payoutAmount ? `₹${row.payoutAmount}` : <span className="text-gray-400 text-xs">—</span>}
                         </td>
                         <td className="px-3 py-2 font-medium">
-                          {profit != null
-                            ? `₹${profit}`
+                          {platformCommission != null
+                            ? `₹${platformCommission}`
+                            : <span className="text-gray-400 text-xs">—</span>}
+                        </td>
+                        <td className="px-3 py-2 font-medium">
+                          {customerTax != null
+                            ? `₹${customerTax}`
+                            : <span className="text-gray-400 text-xs">—</span>}
+                        </td>
+                        <td className="px-3 py-2 font-medium">
+                          {partnerTax != null
+                            ? `₹${partnerTax}`
+                            : <span className="text-gray-400 text-xs">—</span>}
+                        </td>
+                        <td className="px-3 py-2 font-medium">
+                          {totalTax != null
+                            ? `₹${totalTax}`
                             : <span className="text-gray-400 text-xs">—</span>}
                         </td>
                         <td className="px-3 py-2">{row.paymentStatus || "unknown"}</td>

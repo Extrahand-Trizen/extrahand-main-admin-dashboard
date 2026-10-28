@@ -365,11 +365,9 @@ export interface TaskApplication {
 export interface PaymentOverview {
   metrics: {
     totalPayins: string | null;
-    totalRefunds: string | null;
     totalPayouts: string | null;
-    capturedCount: number;
-    failedCount: number;
-    successRate: number;
+    revenue: string | null;
+    totalTax: string | null;
   };
   alerts: Array<{
     type: string;

@@ -635,14 +635,7 @@ export default function TaskDetailsPage() {
       : null;
   const partnerPayout =
     calculatedPartnerPayout ?? recordedPartnerPayout;
-  const paidAmountNumber =
-    totalAmountPaid != null ? Number(totalAmountPaid) : Number.NaN;
-  const partnerPayoutNumber =
-    partnerPayout != null ? Number(partnerPayout) : Number.NaN;
-  const platformProfit =
-    Number.isFinite(paidAmountNumber) && Number.isFinite(partnerPayoutNumber)
-      ? Math.round((paidAmountNumber - partnerPayoutNumber + Number.EPSILON) * 100) / 100
-      : null;
+  const platformProfit = platformCommissionAmount;
   const formatFinancialAmount = (amount: string | number | null | undefined) => {
     const numericAmount = amount == null ? Number.NaN : Number(amount);
     return Number.isFinite(numericAmount)
@@ -1167,20 +1160,11 @@ export default function TaskDetailsPage() {
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
                     <p className="text-xs font-semibold text-gray-700">Platform profit</p>
                     <p className="mt-1 text-xs text-gray-500">
-                      Customer payment minus partner payout
+                      Platform commission
                     </p>
                     <p className="mt-3 text-lg font-bold text-emerald-700">
                       {formatFinancialAmount(platformProfit)}
                     </p>
-                    {platformProfit != null && (
-                      <p className="mt-3 border-t border-emerald-100 pt-2 text-xs text-gray-700">
-                        {formatFinancialAmount(paidAmountNumber)} −{" "}
-                        {formatFinancialAmount(partnerPayoutNumber)} ={" "}
-                        <strong className="text-emerald-800">
-                          {formatFinancialAmount(platformProfit)}
-                        </strong>
-                      </p>
-                    )}
                   </div>
                 </div>
                 <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50/80 p-4 sm:p-5">
