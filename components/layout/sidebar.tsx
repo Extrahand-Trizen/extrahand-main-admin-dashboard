@@ -21,6 +21,8 @@ import {
   MapPinned,
   MapPin,
   BellRing,
+  Tag,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -78,6 +80,18 @@ const navigation: Array<{
     name: 'Location Pricing',
     href: '/location-pricing',
     icon: MapPinned,
+    superAdminOnly: true,
+  },
+  {
+    name: 'Category Pricing & Minimums',
+    href: '/category-minimums',
+    icon: Tag,
+    superAdminOnly: true,
+  },
+  {
+    name: 'Banner Management',
+    href: '/banners',
+    icon: ImageIcon,
     superAdminOnly: true,
   },
   {

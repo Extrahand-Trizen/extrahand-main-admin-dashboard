@@ -55,11 +55,13 @@ export type PricingSubcategory = {
   name: string;
   categoryId: string;
   sectionId?: string;
+  minOrderValue?: number;
 };
 
 export type PricingCategory = {
   id: string;
   name: string;
+  minOrderValue?: number;
   subcategories: PricingSubcategory[];
 };
 
@@ -135,6 +137,13 @@ export function listHourlySkus() {
 
 export function listPricingCategories() {
   return apiRequest<ApiEnvelope<PricingCategory[]>>('/api/v1/location-pricing/categories');
+}
+
+export function updateCategoryMinOrderValue(categoryId: string, minOrderValue: number) {
+  return apiRequest<ApiEnvelope<any>>('/api/v1/location-pricing/categories/' + encodeURIComponent(categoryId) + '/min-order-value', {
+    method: 'PATCH',
+    body: JSON.stringify({ minOrderValue }),
+  });
 }
 
 export function listPricingSkus(categoryId: string, sectionId?: string) {
