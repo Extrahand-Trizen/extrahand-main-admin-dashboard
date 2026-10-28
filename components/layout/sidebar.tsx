@@ -135,6 +135,9 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
   const [partnerSectionOpen, setPartnerSectionOpen] = useState(
     pathname?.startsWith('/partner-registrations')
   );
+  const [usersSectionOpen, setUsersSectionOpen] = useState(
+    pathname?.startsWith('/users')
+  );
 
   const handleLinkClick = () => {
     if (onClose) {
@@ -204,7 +207,61 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
               pathname === item.href || pathname?.startsWith(item.href + '/');
             return (
               <Fragment key={item.name}>
-                {item.href === '/partner-registrations' ? (
+              {item.href === '/users' ? (
+                <div className="space-y-1">
+                  <div className="flex items-center">
+                    <Link
+                      href="/users"
+                      onClick={handleLinkClick}
+                      className={cn(
+                        'flex flex-1 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                        pathname === '/users' || pathname?.startsWith('/users/')
+                          ? 'bg-yellow-50 text-yellow-700'
+                          : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
+                      )}
+                    >
+                      <item.icon
+                        className={cn(
+                          'h-5 w-5',
+                          pathname === '/users' || pathname?.startsWith('/users/')
+                            ? 'text-yellow-600'
+                            : 'text-gray-400'
+                        )}
+                      />
+                      {item.name}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => setUsersSectionOpen((open) => !open)}
+                      aria-label={`${usersSectionOpen ? 'Collapse' : 'Expand'} Users submenu`}
+                      aria-expanded={usersSectionOpen}
+                      className="rounded-md p-2 text-gray-400 hover:bg-yellow-50/50 hover:text-yellow-600"
+                    >
+                      {usersSectionOpen ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                  {usersSectionOpen && (
+                    <div className="ml-6 space-y-1 border-l border-gray-200 pl-2">
+                      <Link
+                        href="/users/customer-activity"
+                        onClick={handleLinkClick}
+                        className={cn(
+                          'block rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                          pathname === '/users/customer-activity'
+                            ? 'bg-yellow-50 text-yellow-700'
+                            : 'text-gray-700 hover:bg-yellow-50/50 hover:text-yellow-700'
+                        )}
+                      >
+                        Customer Activity
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              ) : item.href === '/partner-registrations' ? (
                   <div className="space-y-1">
                     <button
                       onClick={() => setPartnerSectionOpen(!partnerSectionOpen)}

@@ -639,6 +639,8 @@ export interface TaskFilters {
   paymentType?: string; // 'paid' | 'free_coupon' | 'all'
   scheduledDateFrom?: string;
   scheduledDateTo?: string;
+  createdFrom?: string;
+  createdTo?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   page?: number;
