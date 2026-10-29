@@ -37,7 +37,7 @@ import { TableSkeleton } from "@/components/LoadingSkeleton";
 type TransactionType = "all" | "real" | "team";
 type HoldStatus = "all" | "held" | "cancelled";
 type Environment = "production" | "development";
-type DatePreset = "today" | "last7Days" | "last30Days";
+type DatePreset = "today" | "last7Days" | "last30Days" | "allTime";
 
 function toDateInputValue(date: Date): string {
   const year = date.getFullYear();
@@ -113,10 +113,17 @@ export default function PaymentTransactionsPage() {
   const [transactionType, setTransactionType] = useState<TransactionType>("all");
   const [holdStatus, setHoldStatus] = useState<HoldStatus>("all");
   const [environment, setEnvironment] = useState<Environment>("production");
-  const PAGE_SIZE = 10;
+  const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
 
   const applyDatePreset = (preset: DatePreset) => {
+    if (preset === "allTime") {
+      setFromDate("");
+      setToDate("");
+      setPage(1);
+      return;
+    }
+
     const today = new Date();
     let start: Date;
     const end = today;
@@ -147,6 +154,7 @@ export default function PaymentTransactionsPage() {
   }, [q]);
 
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string } | null>(null);
+  const [bulkDeleteTarget, setBulkDeleteTarget] = useState<{ ids: string[] } | null>(null);
   const [confirmDeleteText, setConfirmDeleteText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [bankAccountsDialog, setBankAccountsDialog] = useState<{
@@ -186,7 +194,7 @@ export default function PaymentTransactionsPage() {
   };
 
   const { data, refetch, isLoading, isFetching, isPlaceholderData } = useQuery({
-    queryKey: ["payment-transactions", searchQuery, transactionType, holdStatus, environment, fromDate, toDate, page],
+    queryKey: ["payment-transactions", searchQuery, transactionType, holdStatus, environment, fromDate, toDate, page, pageSize],
     queryFn: () =>
       listPaymentTransactions({
         q: searchQuery || undefined,
@@ -195,8 +203,8 @@ export default function PaymentTransactionsPage() {
         environment,
         startDate: queryStartDate,
         endDate: queryEndDate,
-        limit: PAGE_SIZE,
-        offset: (page - 1) * PAGE_SIZE,
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
       }),
     enabled: hasPermission("payment.list"),
       placeholderData: (previousData) => previousData,
@@ -204,6 +212,8 @@ export default function PaymentTransactionsPage() {
   });
 
   const rows = data?.data || [];
+  const visibleTransactionIds = [...new Set(rows.map((row) => String(row.escrowId)))];
+  const isSearchPending = q.trim() !== searchQuery;
 
   // Lazy enrichment — loads after the table renders with fallback IDs
   const { data: enrichmentMap } = useQuery({
@@ -260,6 +270,42 @@ export default function PaymentTransactionsPage() {
       await refetch();
     } catch (error: any) {
       toast.error(error?.message || "Failed to delete transaction");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleBulkDeleteTransactions = async () => {
+    if (!bulkDeleteTarget) return;
+    if (confirmDeleteText !== "delete") {
+      toast.error("Please type 'delete' to confirm.");
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const results = await Promise.allSettled(
+        bulkDeleteTarget.ids.map((id) => deletePaymentTransaction(id))
+      );
+      const deletedCount = results.filter((result) => result.status === "fulfilled").length;
+      const failures = results.filter((result) => result.status === "rejected");
+
+      if (deletedCount > 0) {
+        toast.success(`${deletedCount} visible transaction${deletedCount === 1 ? "" : "s"} deleted`);
+      }
+      if (failures.length > 0) {
+        const firstErrorMessage =
+          failures[0].reason instanceof Error ? failures[0].reason.message : undefined;
+        toast.error(
+          `Failed to delete ${failures.length} transaction${failures.length === 1 ? "" : "s"}${firstErrorMessage ? `: ${firstErrorMessage}` : ""}`
+        );
+      }
+
+      setBulkDeleteTarget(null);
+      setConfirmDeleteText("");
+      await refetch();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to refresh transactions after deletion");
     } finally {
       setIsDeleting(false);
     }
@@ -327,49 +373,64 @@ export default function PaymentTransactionsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="w-full sm:w-52">
-              <label htmlFor="payment-from-date" className="mb-1 block text-sm font-medium text-gray-700">From Date</label>
-              <Input
-                id="payment-from-date"
-                type="date"
-                value={fromDate}
-                max={toDate || undefined}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setFromDate(value);
-                  if (toDate && value > toDate) setToDate(value);
-                  setPage(1);
-                }}
-              />
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="w-full sm:w-52">
+                <label htmlFor="payment-from-date" className="mb-1 block text-sm font-medium text-gray-700">From Date</label>
+                <Input
+                  id="payment-from-date"
+                  type="date"
+                  value={fromDate}
+                  max={toDate || undefined}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setFromDate(value);
+                    if (toDate && value > toDate) setToDate(value);
+                    setPage(1);
+                  }}
+                />
+              </div>
+              <div className="w-full sm:w-52">
+                <label htmlFor="payment-to-date" className="mb-1 block text-sm font-medium text-gray-700">To Date</label>
+                <Input
+                  id="payment-to-date"
+                  type="date"
+                  value={toDate}
+                  min={fromDate || undefined}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setToDate(value);
+                    if (fromDate && value < fromDate) setFromDate(value);
+                    setPage(1);
+                  }}
+                />
+              </div>
+              <Button variant="outline" onClick={() => applyDatePreset("today")}>Today</Button>
+              <Button variant="outline" onClick={() => applyDatePreset("last7Days")}>Last 7 days</Button>
+              <Button variant="outline" onClick={() => applyDatePreset("last30Days")}>Last 30 days</Button>
+              <Button variant="outline" onClick={() => applyDatePreset("allTime")}>All time</Button>
+              <Button variant="outline" onClick={() => {
+                setQ("");
+                setFromDate("");
+                setToDate("");
+                setTransactionType("all");
+                setHoldStatus("all");
+                setEnvironment("production");
+                setPage(1);
+              }}>Reset</Button>
             </div>
-            <div className="w-full sm:w-52">
-              <label htmlFor="payment-to-date" className="mb-1 block text-sm font-medium text-gray-700">To Date</label>
-              <Input
-                id="payment-to-date"
-                type="date"
-                value={toDate}
-                min={fromDate || undefined}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setToDate(value);
-                  if (fromDate && value < fromDate) setFromDate(value);
-                  setPage(1);
+            {(isSuperAdmin || hasPermission("payment.delete")) && (
+              <Button
+                variant="destructive"
+                disabled={visibleTransactionIds.length === 0 || isFetching || isSearchPending || isDeleting}
+                onClick={() => {
+                  setConfirmDeleteText("");
+                  setBulkDeleteTarget({ ids: visibleTransactionIds });
                 }}
-              />
-            </div>
-            <Button variant="outline" onClick={() => applyDatePreset("today")}>Today</Button>
-            <Button variant="outline" onClick={() => applyDatePreset("last7Days")}>Last 7 days</Button>
-            <Button variant="outline" onClick={() => applyDatePreset("last30Days")}>Last 30 days</Button>
-            <Button variant="outline" onClick={() => {
-              setQ("");
-              setFromDate("");
-              setToDate("");
-              setTransactionType("all");
-              setHoldStatus("all");
-              setEnvironment("production");
-              setPage(1);
-            }}>Reset</Button>
+              >
+                Delete visible ({visibleTransactionIds.length})
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -549,13 +610,30 @@ export default function PaymentTransactionsPage() {
             </div>
           )}
         </CardContent>
-        <div className="px-4 py-3 flex items-center justify-between">
+        <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-3">
           <div className="text-sm text-gray-500">
-            {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, data?.pagination?.total ?? data?.total ?? rows.length)} of {data?.pagination?.total ?? data?.total ?? rows.length}
+            {((page - 1) * pageSize) + 1}–{Math.min(page * pageSize, data?.pagination?.total ?? data?.total ?? rows.length)} of {data?.pagination?.total ?? data?.total ?? rows.length}
           </div>
           <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">Rows per page</span>
+            <Select
+              value={String(pageSize)}
+              onValueChange={(value) => {
+                setPageSize(Number(value));
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="20">20</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+              </SelectContent>
+            </Select>
             <Button variant="outline" disabled={page === 1 || isFetching} onClick={() => setPage(Math.max(1, page - 1))}>Previous</Button>
-            <Button variant="outline" disabled={(page * PAGE_SIZE) >= (data?.pagination?.total ?? data?.total ?? rows.length) || isFetching} onClick={() => setPage(page + 1)}>Next</Button>
+            <Button variant="outline" disabled={(page * pageSize) >= (data?.pagination?.total ?? data?.total ?? rows.length) || isFetching} onClick={() => setPage(page + 1)}>Next</Button>
           </div>
         </div>
       </Card>
@@ -674,6 +752,60 @@ export default function PaymentTransactionsPage() {
               onClick={handleDeleteTransaction}
             >
               {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!bulkDeleteTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setBulkDeleteTarget(null);
+            setConfirmDeleteText("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Confirm Permanent Deletion</DialogTitle>
+            <DialogDescription className="space-y-3 pt-2">
+              <span className="block font-semibold text-gray-900">
+                Permanently delete {bulkDeleteTarget?.ids.length ?? 0} transaction
+                {(bulkDeleteTarget?.ids.length ?? 0) === 1 ? "" : "s"} currently visible on this page?
+              </span>
+              <span className="block text-sm text-gray-500">
+                Only the rows on this page will be deleted. Other pages and records outside the current filters will not be affected.
+              </span>
+              <span className="block text-sm font-semibold text-gray-900">
+                Type <span className="underline select-none">delete</span> to proceed:
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              value={confirmDeleteText}
+              onChange={(e) => setConfirmDeleteText(e.target.value)}
+              placeholder="type delete"
+              className="font-mono text-center"
+            />
+          </div>
+          <DialogFooter className="sm:justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setBulkDeleteTarget(null);
+                setConfirmDeleteText("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={confirmDeleteText !== "delete" || isDeleting}
+              onClick={handleBulkDeleteTransactions}
+            >
+              {isDeleting ? "Deleting..." : `Delete ${bulkDeleteTarget?.ids.length ?? 0} transactions`}
             </Button>
           </DialogFooter>
         </DialogContent>

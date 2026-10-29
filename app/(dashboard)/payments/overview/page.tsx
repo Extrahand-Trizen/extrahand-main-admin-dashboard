@@ -1,19 +1,45 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CreditCard, IndianRupee, ReceiptText, TrendingUp, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { getPaymentsOverview } from "@/lib/api/payments";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 
+type Period = "today" | "last7Days" | "last30Days" | "allTime";
+type DateRange = { from?: string; to?: string };
+
+function getPeriodRange(period: Period): DateRange {
+  if (period === "allTime") return {};
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const daysBack = period === "last7Days" ? 6 : period === "last30Days" ? 29 : 0;
+  const from = new Date(today);
+  from.setDate(from.getDate() - daysBack);
+  const to = new Date(today);
+  to.setHours(23, 59, 59, 999);
+
+  return { from: from.toISOString(), to: to.toISOString() };
+}
+
 export default function PaymentsOverviewPage() {
   const { hasPermission } = usePermissions();
+  const [period, setPeriod] = useState<Period>("today");
+  const [dateRange, setDateRange] = useState<DateRange>(() => getPeriodRange("today"));
   const { data } = useQuery({
-    queryKey: ["payments-overview"],
-    queryFn: () => getPaymentsOverview(),
+    queryKey: ["payments-overview", period, dateRange.from, dateRange.to],
+    queryFn: () => getPaymentsOverview(dateRange),
     enabled: hasPermission("payment.view"),
     retry: false,
   });
+
+  const selectPeriod = (nextPeriod: Period) => {
+    setPeriod(nextPeriod);
+    setDateRange(getPeriodRange(nextPeriod));
+  };
 
   if (!hasPermission("payment.view")) {
     return (
@@ -65,6 +91,25 @@ export default function PaymentsOverviewPage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Payments Overview</h1>
         <p className="mt-2 text-sm text-gray-600">Financial health snapshot from payment systems</p>
+      </div>
+
+      <div className="flex flex-wrap justify-end gap-2">
+        {([
+          ["today", "Today"],
+          ["last7Days", "Last 7 days"],
+          ["last30Days", "Last 30 days"],
+          ["allTime", "All time"],
+        ] as const).map(([value, label]) => (
+          <Button
+            key={value}
+            type="button"
+            variant={period === value ? "default" : "outline"}
+            onClick={() => selectPeriod(value)}
+            aria-pressed={period === value}
+          >
+            {label}
+          </Button>
+        ))}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

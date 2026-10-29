@@ -1,11 +1,17 @@
 "use client";
 
 import React, { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, ChevronUp, ListFilter, Send, ShieldCheck, ShieldX } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown, ChevronUp, ListFilter, Send, ShieldCheck, ShieldX, MessageCircle } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { notifyBookNowDispatchStage } from "@/lib/api/tasks";
+import {
+  getWorkWhatsAppDispatchStatuses,
+  notifyBookNowDispatchStage,
+  resendWorkWhatsApp,
+  sendWorkWhatsAppToEligible,
+  WorkWhatsAppDispatchStatus,
+} from "@/lib/api/tasks";
 import { Task, DispatchAreaLog, DispatchCandidateLog } from "@/types";
 import { toast } from "sonner";
 
@@ -37,6 +43,25 @@ function formatDateTime(value?: string | null): string {
   if (!value) return "—";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString();
+}
+
+function taskLocationLabel(location?: unknown): string {
+  if (typeof location === "string" && location.trim()) return location.trim();
+  if (location && typeof location === "object") {
+    const value = location as unknown as {
+      city?: unknown;
+      address?: unknown;
+      addressDetails?: { area?: unknown; city?: unknown };
+    };
+    return String(
+      value.city ||
+      value.address ||
+      value.addressDetails?.area ||
+      value.addressDetails?.city ||
+      "your area",
+    );
+  }
+  return "your area";
 }
 
 function stageStatusLabel(status?: string): string {
@@ -88,14 +113,35 @@ function stageCandidates(area: DispatchAreaLog, stage: string): DispatchCandidat
   return (area.candidates || []).filter((candidate) => candidate.dispatchStage === stage);
 }
 
+function whatsappStatusLabel(status?: WorkWhatsAppDispatchStatus["status"]): string {
+  if (!status) return "Not sent";
+  return status === "sending" ? "Sending" : status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function whatsappStatusClass(status?: WorkWhatsAppDispatchStatus["status"]): string {
+  if (status === "queued") return "bg-blue-50 text-blue-700";
+  if (status === "sending") return "bg-amber-50 text-amber-700";
+  if (status === "failed") return "bg-red-50 text-red-700";
+  if (status === "suppressed" || status === "disabled") return "bg-gray-100 text-gray-600";
+  return "bg-gray-100 text-gray-600";
+}
+
 function AreaCandidates({
   area,
   candidates,
+  stage,
   activeOfferUids,
+  getWhatsAppStatus,
+  onResendWhatsApp,
+  resendPending,
 }: {
   area: DispatchAreaLog;
   candidates: DispatchCandidateLog[];
+  stage: "preferred" | "area_rule" | "all";
   activeOfferUids: Set<string>;
+  getWhatsAppStatus: (partnerUid?: string) => WorkWhatsAppDispatchStatus | undefined;
+  onResendWhatsApp: (candidate: DispatchCandidateLog, stage: "preferred" | "area_rule" | "all") => void;
+  resendPending: boolean;
 }) {
   const counts = {
     eligible: candidates.filter((candidate) => candidate.status !== "ineligible").length,
@@ -171,6 +217,22 @@ function AreaCandidates({
                 >
                   {candidate.notifiedAt ? "Push sent" : "Push not confirmed"}
                 </span>
+                <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${whatsappStatusClass(getWhatsAppStatus(candidate.partnerUid)?.status)}`}>
+                  WhatsApp {whatsappStatusLabel(getWhatsAppStatus(candidate.partnerUid)?.status)}
+                </span>
+                {candidate.partnerUid ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="ml-auto h-7 gap-1 px-2 text-[11px]"
+                    disabled={ineligible || resendPending}
+                    onClick={() => onResendWhatsApp(candidate, stage)}
+                  >
+                    <MessageCircle className="h-3 w-3 text-emerald-600" />
+                    Resend WhatsApp
+                  </Button>
+                ) : null}
               </div>
               <div className="mt-1 text-xs text-gray-600">
                 <span>{candidate.distanceKm == null ? "Distance unavailable" : `${candidate.distanceKm.toFixed(1)} km from work location`}</span>
@@ -194,6 +256,14 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
   const [isOpen, setIsOpen] = useState(true);
   const queryClient = useQueryClient();
   const dispatchLogs = task.dispatchLogs || [];
+  const { data: whatsappStatusResponse } = useQuery({
+    queryKey: ["task-whatsapp-dispatch-status", task.taskId],
+    queryFn: () => getWorkWhatsAppDispatchStatuses(task.taskId),
+    enabled: Boolean(task.taskId),
+  });
+  const whatsappStatuses = new Map(
+    (whatsappStatusResponse?.data || []).map((status) => [`${status.partnerUid}:${status.stage}`, status]),
+  );
   const progress = task.dispatchProgress;
   const activeOfferUids = new Set(
     task.status === "open" &&
@@ -232,6 +302,43 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
     onError: (error: Error) => {
       toast.error(error.message || "Failed to notify eligible partners.");
     },
+  });
+  const whatsappMutation = useMutation({
+    mutationFn: ({ stage, recipientUids }: { stage: "preferred" | "area_rule" | "all"; recipientUids: string[] }) =>
+      sendWorkWhatsAppToEligible(task.taskId, {
+        stage,
+        recipientUids,
+        title: task.title,
+        category: task.category || "work",
+        locationLabel: taskLocationLabel(task.location),
+      }),
+    onSuccess: async (response) => {
+      await queryClient.invalidateQueries({ queryKey: ["task-whatsapp-dispatch-status", task.taskId] });
+      const data = response.data;
+      if (data?.queuedCount) toast.success(`WhatsApp queued for ${data.queuedCount} eligible partner${data.queuedCount === 1 ? "" : "s"}.`);
+      else if (data?.disabledCount) toast.warning("WhatsApp notifications are disabled in Admin Settings.");
+      else toast.info("No new WhatsApp messages were queued; existing records or eligibility preferences prevented sending.");
+    },
+    onError: (error: Error) => toast.error(error.message || "Failed to send WhatsApp notifications."),
+  });
+  const resendMutation = useMutation({
+    mutationFn: ({ candidate, stage }: { candidate: DispatchCandidateLog; stage: "preferred" | "area_rule" | "all" }) =>
+      resendWorkWhatsApp(task.taskId, {
+        stage,
+        partnerUid: candidate.partnerUid || "",
+        title: task.title,
+        category: task.category || "work",
+        locationLabel: taskLocationLabel(task.location),
+      }),
+    onSuccess: async (response) => {
+      await queryClient.invalidateQueries({ queryKey: ["task-whatsapp-dispatch-status", task.taskId] });
+      const data = response.data;
+      if (data?.queuedCount) toast.success("WhatsApp resend queued.");
+      else if (data?.disabledCount) toast.warning("WhatsApp notifications are disabled in Admin Settings.");
+      else if (data?.suppressedCount) toast.warning("WhatsApp resend was suppressed by the partner preference or profile.");
+      else toast.error("WhatsApp resend failed.");
+    },
+    onError: (error: Error) => toast.error(error.message || "Failed to resend WhatsApp notification."),
   });
   const preferredGender = task.preferredHelperGender;
   const isHourlyTask = task.categorySlug === "hourly-helper" ||
@@ -355,6 +462,12 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                 }),
               }))
               .filter((row) => row.candidates.length > 0);
+            const eligibleUids = Array.from(new Set(
+              areaRows
+                .flatMap(({ candidates }) => candidates)
+                .filter((candidate) => candidate.status !== "ineligible" && candidate.partnerUid)
+                .map((candidate) => candidate.partnerUid as string),
+            ));
 
             return (
               <section key={stage.key} className="space-y-3">
@@ -379,6 +492,20 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                         Notify immediately
                       </Button>
                     ) : null}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1.5 border-emerald-200 px-2 text-xs text-emerald-700 hover:bg-emerald-50"
+                      disabled={whatsappMutation.isPending || !canNotifyImmediately || eligibleUids.length === 0}
+                      title="Send WhatsApp to all eligible partners in this dispatch stage"
+                      onClick={() => {
+                        whatsappMutation.mutate({ stage: stage.key, recipientUids: eligibleUids });
+                      }}
+                    >
+                      <MessageCircle className="h-3 w-3" />
+                      Send WhatsApp to all
+                    </Button>
                     <span className="text-xs text-gray-500">
                       {stageStatusLabel(stageProgress?.status)}
                       {stageProgress?.startedAt ? ` · Started ${formatDateTime(stageProgress.startedAt)}` : ""}
@@ -396,7 +523,13 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                     key={`${stage.key}-${area.area}`}
                     area={area}
                     candidates={candidates}
+                    stage={stage.key}
                     activeOfferUids={activeOfferUids}
+                    getWhatsAppStatus={(partnerUid) =>
+                      partnerUid ? whatsappStatuses.get(`${partnerUid}:${stage.key}`) : undefined}
+                    onResendWhatsApp={(candidate, candidateStage) =>
+                      resendMutation.mutate({ candidate, stage: candidateStage })}
+                    resendPending={resendMutation.isPending}
                   />
                   ))
                 ) : (

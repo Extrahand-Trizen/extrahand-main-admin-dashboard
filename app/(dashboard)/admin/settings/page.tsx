@@ -4,20 +4,23 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Shield, Settings, Wrench, Users, GripVertical, CheckCircle2, ArrowUp, ArrowDown } from "lucide-react";
+import { Shield, Settings, Wrench, Users, GripVertical, CheckCircle2, ArrowUp, ArrowDown, MessageCircle } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Mail, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   getTaskPostedEmailSettings,
   getRoundRobinTeamSettings,
+  getWhatsAppNotificationSettings,
   listUsers,
   RoundRobinMember,
   TaskPostedEmailSettings,
   updateRoundRobinTeamSettings,
   updateTaskPostedEmailSettings,
+  updateWhatsAppNotificationSettings,
 } from "@/lib/api/admin";
 
 export default function AdminSettingsPage() {
@@ -43,6 +46,10 @@ export default function AdminSettingsPage() {
     const roundRobinQuery = useQuery({
       queryKey: ["round-robin-team-settings"],
       queryFn: getRoundRobinTeamSettings,
+    });
+    const whatsappSettingsQuery = useQuery({
+      queryKey: ["whatsapp-notification-settings"],
+      queryFn: getWhatsAppNotificationSettings,
     });
 
     useEffect(() => {
@@ -75,6 +82,20 @@ export default function AdminSettingsPage() {
         toast.success("Work-posted email settings saved");
       },
       onError: (error: any) => toast.error(error?.message || "Failed to save settings"),
+    });
+
+    const whatsappSettingsMutation = useMutation({
+      mutationFn: updateWhatsAppNotificationSettings,
+      onSuccess: (data) => {
+        queryClient.setQueryData(["whatsapp-notification-settings"], data);
+        toast.success(
+          data.enabled
+            ? "Automatic WhatsApp notifications enabled"
+            : "Automatic WhatsApp notifications disabled",
+        );
+      },
+      onError: (error: any) =>
+        toast.error(error?.message || "Failed to update WhatsApp notifications"),
     });
 
     const adminUsers = adminsQuery.data?.users || [];
@@ -192,6 +213,48 @@ export default function AdminSettingsPage() {
               </div>
               <Badge variant="outline">Coming soon</Badge>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5 text-amber-600" />
+              WhatsApp Notifications
+            </CardTitle>
+            <CardDescription>
+              Automatically notify eligible partners as each work-dispatch stage opens.
+              Push notifications are not affected by this setting.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+              <div>
+                <p className="font-medium text-gray-900">
+                  {whatsappSettingsQuery.data?.enabled ? "Enabled" : "Disabled"}
+                </p>
+                <p className="mt-1 text-sm text-gray-500">
+                  {whatsappSettingsQuery.data?.enabled
+                    ? "Eligible partners receive a WhatsApp message when their dispatch stage begins."
+                    : "No new automatic WhatsApp messages will be sent."}
+                </p>
+              </div>
+              <Switch
+                checked={whatsappSettingsQuery.data?.enabled ?? false}
+                onCheckedChange={(enabled) => whatsappSettingsMutation.mutate(enabled)}
+                disabled={
+                  whatsappSettingsQuery.isLoading ||
+                  whatsappSettingsQuery.isError ||
+                  whatsappSettingsMutation.isPending
+                }
+                aria-label="Enable automatic WhatsApp notifications"
+              />
+            </div>
+            {whatsappSettingsQuery.isError && (
+              <p role="alert" className="mt-3 text-sm text-red-600">
+                Failed to load WhatsApp notification settings.
+              </p>
+            )}
           </CardContent>
         </Card>
 

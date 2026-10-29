@@ -10,8 +10,17 @@ import {
 
 type PaymentListResponse<T> = ApiResponse<T[]> & { total?: number };
 
-export async function getPaymentsOverview(): Promise<ApiResponse<PaymentOverview>> {
-  return apiRequest<ApiResponse<PaymentOverview>>('/api/v1/payments/overview');
+export async function getPaymentsOverview(filters?: {
+  from?: string;
+  to?: string;
+}): Promise<ApiResponse<PaymentOverview>> {
+  const params = new URLSearchParams();
+  if (filters?.from) params.append('from', filters.from);
+  if (filters?.to) params.append('to', filters.to);
+  const query = params.toString();
+  return apiRequest<ApiResponse<PaymentOverview>>(
+    `/api/v1/payments/overview${query ? `?${query}` : ''}`
+  );
 }
 
 export async function listPaymentTransactions(filters?: {

@@ -176,6 +176,31 @@ export const updateTaskPostedEmailSettings = async (
   return res?.data;
 };
 
+export interface WhatsAppNotificationSettings {
+  enabled: boolean;
+}
+
+export const getWhatsAppNotificationSettings = async (): Promise<WhatsAppNotificationSettings> => {
+  const res = await apiRequest<{
+    success: boolean;
+    data: WhatsAppNotificationSettings;
+  }>('/api/v1/admin/settings/whatsapp-notifications');
+  return res.data;
+};
+
+export const updateWhatsAppNotificationSettings = async (
+  enabled: boolean,
+): Promise<WhatsAppNotificationSettings> => {
+  const res = await apiRequest<{
+    success: boolean;
+    data: WhatsAppNotificationSettings;
+  }>('/api/v1/admin/settings/whatsapp-notifications', {
+    method: 'PUT',
+    body: JSON.stringify({ enabled }),
+  });
+  return res.data;
+};
+
 export interface RoundRobinMember {
   userId: string;
   name: string;

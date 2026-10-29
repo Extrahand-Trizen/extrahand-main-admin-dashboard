@@ -299,3 +299,64 @@ export async function notifyBookNowDispatchStage(
     },
   );
 }
+
+export interface WorkWhatsAppDispatchStatus {
+  partnerUid: string;
+  stage: 'preferred' | 'area_rule' | 'all';
+  status: 'sending' | 'queued' | 'failed' | 'disabled' | 'suppressed';
+  attemptCount: number;
+  lastError?: string;
+  updatedAt?: string;
+}
+
+export async function getWorkWhatsAppDispatchStatuses(
+  taskId: string,
+): Promise<ApiResponse<WorkWhatsAppDispatchStatus[]>> {
+  return apiRequest<ApiResponse<WorkWhatsAppDispatchStatus[]>>(
+    `/api/v1/notifications/work-whatsapp-dispatch/status?taskId=${encodeURIComponent(taskId)}`,
+  );
+}
+
+export async function sendWorkWhatsAppToEligible(
+  taskId: string,
+  payload: {
+    stage: 'preferred' | 'area_rule' | 'all';
+    recipientUids: string[];
+    title: string;
+    category: string;
+    locationLabel: string;
+  },
+): Promise<ApiResponse<{
+  queuedCount: number;
+  failedCount: number;
+  disabledCount: number;
+  suppressedCount: number;
+  duplicateCount: number;
+}>> {
+  return apiRequest(`/api/v1/notifications/work-whatsapp-dispatch/send`, {
+    method: 'POST',
+    body: JSON.stringify({ taskId, ...payload }),
+  });
+}
+
+export async function resendWorkWhatsApp(
+  taskId: string,
+  payload: {
+    stage: 'preferred' | 'area_rule' | 'all';
+    partnerUid: string;
+    title: string;
+    category: string;
+    locationLabel: string;
+  },
+): Promise<ApiResponse<{
+  queuedCount: number;
+  failedCount: number;
+  disabledCount: number;
+  suppressedCount: number;
+  duplicateCount: number;
+}>> {
+  return apiRequest(`/api/v1/notifications/work-whatsapp-dispatch/resend`, {
+    method: 'POST',
+    body: JSON.stringify({ taskId, ...payload }),
+  });
+}
