@@ -58,7 +58,12 @@ async function refreshAccessToken(): Promise<string | null> {
 
       return data.data.accessToken as string;
     } catch (error) {
-      console.error('Token refresh failed:', error);
+      // Network unreachable (server down, CORS, DNS failure) — don't crash
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        console.warn('Token refresh skipped: backend unreachable', API_BASE_URL);
+      } else {
+        console.error('Token refresh failed:', error);
+      }
       return null;
     } finally {
       refreshInFlight = null;
@@ -124,7 +129,16 @@ export async function apiRequest<T>(
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers: requestHeaders,
+  }).catch((networkErr: unknown) => {
+    // Backend unreachable (server down, CORS, DNS) — fail gracefully for reads
+    if (!isMutation) {
+      console.warn(`[api] Network error on ${endpoint}:`, (networkErr as Error)?.message);
+      return null;
+    }
+    throw networkErr;
   });
+
+  if (!response) return null as T;
 
   if (response.status === 401) {
     // Token expired, try to refresh once

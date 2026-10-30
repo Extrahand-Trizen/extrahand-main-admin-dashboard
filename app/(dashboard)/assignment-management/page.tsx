@@ -12,6 +12,7 @@ import { listUsers } from "@/lib/api/users";
 import {
   addExcludedPhone,
   addPreferredPartner,
+  getEligibleAssignmentPartners,
   getAssignmentRules,
   PartnerSearchResult,
   removeExcludedPhone,
@@ -21,7 +22,6 @@ import {
   removeAreaRule,
   reorderAreaRulePartner,
   saveAreaRule,
-  searchAssignmentPartners,
 } from "@/lib/api/assignment-management";
 
 function partnerId(partner: PartnerSearchResult): string {
@@ -44,35 +44,29 @@ function normalizePhone(value: string | undefined): string {
   return (value || "").replace(/\D/g, "").slice(-10);
 }
 
-async function listAllApprovedPartners(): Promise<Awaited<ReturnType<typeof listUsers>>["data"]> {
-  const firstPage = await listUsers({ role: "partner", page: 1, limit: 50 });
-  const partners = [...firstPage.data];
-  const totalPages = firstPage.pagination?.pages || 1;
-
-  console.info("[AssignmentManagement] Approved partner page 1", {
-    received: firstPage.data.length,
-    total: firstPage.pagination?.total,
-    totalPages,
-  });
-
-  for (let page = 2; page <= totalPages; page += 1) {
-    const response = await listUsers({ role: "partner", page, limit: 50 });
-    partners.push(...response.data);
-    console.info(`[AssignmentManagement] Approved partner page ${page}`, {
-      received: response.data.length,
-    });
+async function listAllEligiblePartners(): Promise<PartnerSearchResult[]> {
+  const firstPage = await getEligibleAssignmentPartners();
+  if (!firstPage.success || !Array.isArray(firstPage.data) || !firstPage.pagination) {
+    throw new Error(firstPage.error || "Failed to load eligible partners");
   }
 
-  const approvedPartners = partners.filter((partner) => partner.partnerProfile?.status?.toLowerCase() === "approved");
-  console.info("[AssignmentManagement] Approved partners loaded", {
-    received: partners.length,
-    approved: approvedPartners.length,
-    workAreaSamples: approvedPartners.slice(0, 3).map((partner) => ({
-      name: partner.name,
-      areas: partner.partnerProfile?.workAreas || (partner as typeof partner & { workAreas?: string[] }).workAreas || [],
-    })),
-  });
-  return approvedPartners;
+  const partners = [...firstPage.data];
+  const totalPages = firstPage.pagination.pages;
+  if (totalPages > 100) {
+    throw new Error("The partner list exceeds the maximum number of pages supported.");
+  }
+  for (let page = 2; page <= totalPages; page += 1) {
+    const response = await getEligibleAssignmentPartners(undefined, page);
+    if (
+      !response.success ||
+      !Array.isArray(response.data) ||
+      response.pagination?.total !== firstPage.pagination.total
+    ) {
+      throw new Error(response.error || `Failed to load eligible partners on page ${page}`);
+    }
+    partners.push(...response.data);
+  }
+  return partners;
 }
 
 export function AssignmentManagementPage({
@@ -105,12 +99,12 @@ export function AssignmentManagementPage({
   });
   const partnerQuery = useQuery({
     queryKey: ["assignment-management-partners", partnerSearch],
-    queryFn: () => searchAssignmentPartners(partnerSearch),
+    queryFn: () => getEligibleAssignmentPartners(partnerSearch),
     enabled: partnerSearch.trim().length >= 2,
   });
   const areaPartnerQuery = useQuery({
     queryKey: ["assignment-management-area-partners", areaPartnerSearch],
-    queryFn: () => searchAssignmentPartners(areaPartnerSearch),
+    queryFn: () => getEligibleAssignmentPartners(areaPartnerSearch),
     enabled: areaPartnerSearchOpen && areaPartnerSearch.trim().length >= 2,
   });
   const customerQuery = useQuery({
@@ -120,7 +114,7 @@ export function AssignmentManagementPage({
   });
   const approvedPartnersQuery = useQuery({
     queryKey: ["assignment-management-approved-partners"],
-    queryFn: listAllApprovedPartners,
+    queryFn: listAllEligiblePartners,
   });
 
   const rules = rulesQuery.data?.data;
@@ -131,7 +125,7 @@ export function AssignmentManagementPage({
     name: partner.name || partner.fullName || "Partner",
     phone: partner.phone,
     categories: partner.partnerProfile?.categories || [],
-    areas: partner.partnerProfile?.workAreas || (partner as typeof partner & { workAreas?: string[] }).workAreas || [],
+    areas: partner.partnerProfile?.workAreas || partner.workAreas || [],
     priority: 0,
     active: true,
   }));
@@ -218,6 +212,9 @@ export function AssignmentManagementPage({
 
   const refreshRules = (data: { data?: unknown }) => {
     queryClient.setQueryData(["assignment-management-rules"], data);
+    void queryClient.invalidateQueries({ queryKey: ["assignment-management-approved-partners"] });
+    void queryClient.invalidateQueries({ queryKey: ["assignment-management-partners"] });
+    void queryClient.invalidateQueries({ queryKey: ["assignment-management-area-partners"] });
     setPartnerSearch("");
   };
 
