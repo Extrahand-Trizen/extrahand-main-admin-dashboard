@@ -46,6 +46,17 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+function uniqueActiveSkus(skus: PricingSku[]): PricingSku[] {
+  const seen = new Set<string>();
+  return skus.filter((sku) => {
+    if (!sku.isActive) return false;
+    const key = `${sku.name.trim().toLowerCase()}|${sku.defaultPrice}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function ConfigurePriceContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -76,14 +87,21 @@ function ConfigurePriceContent() {
 
   // Debounce search
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedLocationSearch(locationSearch), 300);
+    const timer = setTimeout(() => setDebouncedLocationSearch(locationSearch.trim()), 300);
     return () => clearTimeout(timer);
   }, [locationSearch]);
 
   // Queries
   const categoriesQuery = useQuery({
     queryKey: ['pricingCategories'],
-    queryFn: async () => (await listPricingCategories()).data,
+    queryFn: async () => {
+      const response = await listPricingCategories();
+      if (!response?.success || !Array.isArray(response.data)) {
+        throw new Error(response?.error || 'Could not load service categories.');
+      }
+      return response.data;
+    },
+    enabled: isSuperAdmin && !authLoading,
   });
 
   const categories = categoriesQuery.data || [];
@@ -118,7 +136,11 @@ function ConfigurePriceContent() {
   const googleQuery = useQuery({
     queryKey: ['locationSearch', debouncedLocationSearch],
     queryFn: async () => (await searchLocations(debouncedLocationSearch)).data,
-    enabled: Boolean(debouncedLocationSearch.trim().length >= 2),
+    enabled:
+      isSuperAdmin &&
+      !authLoading &&
+      targetScope === 'location' &&
+      debouncedLocationSearch.length >= 2,
   });
 
   const hourlyPricesQuery = useQuery({
@@ -144,8 +166,15 @@ function ConfigurePriceContent() {
     }
   }, [initialSkuId]);
 
-  const availableSkus: PricingSku[] = pricingScope === 'fixed' ? (skusQuery.data || []) : [];
+  const availableSkus: PricingSku[] = pricingScope === 'fixed'
+    ? uniqueActiveSkus(skusQuery.data || [])
+    : [];
   const availableHourlySkus: HourlySku[] = pricingScope === 'hourly' ? (hourlySkusQuery.data || []) : [];
+  const normalizedLocationSearch = locationSearch.trim();
+  const isSearchingLocations =
+    targetScope === 'location' &&
+    normalizedLocationSearch.length >= 2 &&
+    (normalizedLocationSearch !== debouncedLocationSearch || googleQuery.isFetching);
 
   const currentSku = pricingScope === 'fixed'
     ? availableSkus.find((s) => s._id === selectedSkuId)
@@ -205,11 +234,20 @@ function ConfigurePriceContent() {
   const ensureGoogleMutation = useMutation({
     mutationFn: (googleResult: GoogleLocationResult) => ensureGoogleLocation(googleResult),
     onSuccess: (res) => {
-      if (res.data) {
-        setSelectedLocation(res.data);
-        setLocationSearch('');
-        queryClient.invalidateQueries({ queryKey: ['locations'] });
+      if (!res?.data) {
+        setFeedback({ type: 'error', message: 'Could not select this location. Please try again.' });
+        return;
       }
+      setSelectedLocation(res.data);
+      setLocationSearch('');
+      setFeedback(null);
+      queryClient.invalidateQueries({ queryKey: ['locations'] });
+    },
+    onError: (error) => {
+      setFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Failed to select this location. Please try again.',
+      });
     },
   });
 
@@ -437,20 +475,51 @@ function ConfigurePriceContent() {
                     />
                   </div>
 
-                  {googleQuery.data && googleQuery.data.length > 0 && (
+                  {normalizedLocationSearch.length < 2 && normalizedLocationSearch.length > 0 && (
+                    <p className="text-[11px] text-gray-500">Enter at least 2 characters to search.</p>
+                  )}
+
+                  {isSearchingLocations && (
+                    <div className="flex items-center gap-2 text-xs text-gray-500 py-1">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-600" />
+                      Searching locations...
+                    </div>
+                  )}
+
+                  {!isSearchingLocations && googleQuery.isError && normalizedLocationSearch === debouncedLocationSearch && (
+                    <p className="text-[11px] text-red-600">
+                      Location search failed: {googleQuery.error instanceof Error ? googleQuery.error.message : 'Please try again.'}
+                    </p>
+                  )}
+
+                  {!isSearchingLocations && googleQuery.isSuccess && googleQuery.data.length === 0 &&
+                    normalizedLocationSearch === debouncedLocationSearch && (
+                      <p className="text-[11px] text-gray-500">No matching locations found.</p>
+                    )}
+
+                  {!isSearchingLocations && googleQuery.data && googleQuery.data.length > 0 &&
+                    normalizedLocationSearch === debouncedLocationSearch && (
                     <div className="border border-gray-200 rounded-md bg-white shadow-md max-h-40 overflow-y-auto divide-y divide-gray-100">
                       {googleQuery.data.map((item) => (
                         <button
                           key={item.placeId}
                           type="button"
-                          className="w-full text-left p-2 hover:bg-amber-50 text-xs transition-colors flex items-center justify-between"
-                          onClick={() => ensureGoogleMutation.mutate(item)}
+                          disabled={ensureGoogleMutation.isPending}
+                          className="w-full text-left p-2 hover:bg-amber-50 text-xs transition-colors flex items-center justify-between disabled:opacity-60"
+                          onClick={() => {
+                            setFeedback(null);
+                            ensureGoogleMutation.mutate(item);
+                          }}
                         >
                           <div>
                             <p className="font-semibold text-gray-900 text-xs">{item.name}</p>
                             <p className="text-[10px] text-gray-500">{item.address}</p>
                           </div>
-                          <Badge variant="secondary" className="text-[9px] px-1 py-0">Select</Badge>
+                          {ensureGoogleMutation.isPending ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-600" />
+                          ) : (
+                            <Badge variant="secondary" className="text-[9px] px-1 py-0">Select</Badge>
+                          )}
                         </button>
                       ))}
                     </div>
@@ -536,6 +605,7 @@ function ConfigurePriceContent() {
                     <p className="text-[10px] text-gray-400 mb-1">Primary service section</p>
                     <Select
                       value={selectedCategoryId}
+                      disabled={categoriesQuery.isLoading || categoriesQuery.isError || categories.length === 0}
                       onValueChange={(val) => {
                         setSelectedCategoryId(val);
                         setSelectedSubcategoryId('');
@@ -543,7 +613,17 @@ function ConfigurePriceContent() {
                       }}
                     >
                       <SelectTrigger className="h-9 text-xs bg-white">
-                        <SelectValue placeholder="Select Category..." />
+                        <SelectValue
+                          placeholder={
+                            categoriesQuery.isLoading
+                              ? 'Loading categories...'
+                              : categoriesQuery.isError
+                                ? 'Categories unavailable'
+                                : categories.length === 0
+                                  ? 'No categories available'
+                                  : 'Select Category...'
+                          }
+                        />
                       </SelectTrigger>
                       <SelectContent position="popper" className="max-h-56 overflow-y-auto z-[300] bg-white border border-gray-200 shadow-xl">
                         {categories.map((cat) => (
@@ -553,6 +633,28 @@ function ConfigurePriceContent() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {categoriesQuery.isLoading && (
+                      <p className="mt-1 flex items-center gap-1 text-[10px] text-gray-500">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Loading service categories...
+                      </p>
+                    )}
+                    {categoriesQuery.isError && (
+                      <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-red-600">
+                        <span>{categoriesQuery.error instanceof Error ? categoriesQuery.error.message : 'Could not load service categories.'}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 shrink-0 px-2 text-[10px] text-red-700 hover:bg-red-50"
+                          onClick={() => void categoriesQuery.refetch()}
+                        >
+                          Retry
+                        </Button>
+                      </div>
+                    )}
+                    {categoriesQuery.isSuccess && categories.length === 0 && (
+                      <p className="mt-1 text-[10px] text-gray-500">No active service categories are available.</p>
+                    )}
                   </div>
 
                   {/* Subcategory Field */}
