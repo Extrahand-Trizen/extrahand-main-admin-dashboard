@@ -54,7 +54,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { listTasks, deleteTask, requestTaskDelete } from "@/lib/api/tasks";
 import { usePermissions } from "@/lib/hooks/usePermissions";
-import { formatDate, formatCurrency } from "@/lib/utils";
+import { formatDate, formatCurrency, isTaskOverdue } from "@/lib/utils";
 import { CATEGORY_OPTIONS } from "@/lib/category-options";
 import { toast } from "sonner";
 import { Task } from "@/types";
@@ -110,12 +110,7 @@ const statusColors: Record<string, "success" | "destructive" | "warning" | "defa
 };
 
 const getDisplayStatus = (task: Task) => {
-  if (task.status === "open" && task.scheduledDate && task.dateOption !== "flexible") {
-    if (new Date(task.scheduledDate) < new Date()) {
-      return "overdue";
-    }
-  }
-  return task.status;
+  return isTaskOverdue(task) ? "overdue" : task.status;
 };
 
 const getScheduledTimeMinutes = (time: string | undefined | null) => {

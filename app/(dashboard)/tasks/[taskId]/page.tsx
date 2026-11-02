@@ -61,7 +61,7 @@ import { BookNowDispatchLogCard } from "@/components/book-now-dispatch-log-card"
 import { unassignHelper } from "@/lib/api/tasks";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { formatDate, formatCurrency, formatDateTime } from "@/lib/utils";
+import { formatDate, formatCurrency, formatDateTime, isTaskOverdue } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -797,12 +797,7 @@ export default function TaskDetailsPage() {
   };
 
   const getDisplayStatus = (t: any) => {
-    if (t?.status === "open" && t?.scheduledDate && t?.dateOption !== "flexible") {
-      if (new Date(t.scheduledDate) < new Date()) {
-        return "overdue";
-      }
-    }
-    return t?.status;
+    return isTaskOverdue(t) ? "overdue" : t?.status;
   };
 
   const applicationStatusColors: Record<string, string> = {
