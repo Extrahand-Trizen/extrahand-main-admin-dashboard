@@ -7,6 +7,7 @@ import {
   BannerPlacement,
   BannerActionType,
   BannerTone,
+  BannerCardStyle,
   CreateBannerPayload,
   listAdminBanners,
   createAdminBanner,
@@ -151,6 +152,7 @@ export default function BannerManagementPage() {
   const [formCtaLabel, setFormCtaLabel] = useState('Book Now');
   const [formBgColor, setFormBgColor] = useState('#F7F5F2');
   const [formTone, setFormTone] = useState<BannerTone>('light');
+  const [formCardStyle, setFormCardStyle] = useState<BannerCardStyle>('full');
   const [formIsActive, setFormIsActive] = useState(true);
 
   // Upload State
@@ -217,6 +219,7 @@ export default function BannerManagementPage() {
     setFormCtaLabel('Book Now');
     setFormBgColor('#F7F5F2');
     setFormTone('light');
+    setFormCardStyle('full');
     setFormIsActive(true);
     setUploadError(null);
   }
@@ -263,6 +266,7 @@ export default function BannerManagementPage() {
     setFormCtaLabel(banner.ctaLabel || '');
     setFormBgColor(banner.backgroundColor || '#F7F5F2');
     setFormTone(banner.tone || 'light');
+    setFormCardStyle(banner.cardStyle || 'full');
     setFormIsActive(banner.isActive);
     setUploadError(null);
     setDialogOpen(true);
@@ -312,6 +316,7 @@ export default function BannerManagementPage() {
       ctaLabel: formCtaLabel.trim(),
       backgroundColor: formBgColor,
       tone: formTone,
+      cardStyle: formCardStyle,
       isActive: formIsActive,
     };
 
@@ -465,13 +470,13 @@ export default function BannerManagementPage() {
                           </span>
                         )}
                         <span className="px-2 py-0.5 rounded-full bg-amber-100 text-[9px] font-semibold text-amber-800">
-                          {hasCopy ? 'Split Card (Image 3)' : 'Full Graphic (Image 2)'}
+                          {(banner.cardStyle ?? (hasCopy ? 'rounded' : 'full')) === 'rounded' ? '⬜ Rounded Card' : '◼ Full Graphic'}
                         </span>
                       </div>
 
                       {/* Content Layout */}
-                      {hasCopy ? (
-                        // Image 3 style: Split Card with Pure White Left Content
+                      {(banner.cardStyle ?? (hasCopy ? 'rounded' : 'full')) === 'rounded' ? (
+                        // Rounded style: Split Card with Pure White Left Content
                         <div className="w-full h-full bg-white rounded-xl border border-amber-200 overflow-hidden flex shadow-sm mt-5">
                           <div className="flex-[3] p-2.5 bg-white flex flex-col justify-center min-w-0">
                             {banner.tag ? (
@@ -980,6 +985,26 @@ export default function BannerManagementPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Card Style</Label>
+                <Select value={formCardStyle} onValueChange={(val) => setFormCardStyle(val as BannerCardStyle)}>
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="full" className="text-xs">
+                      ◼ Full — Edge-to-edge graphic
+                    </SelectItem>
+                    <SelectItem value="rounded" className="text-xs">
+                      ⬜ Rounded — Padded card with corners
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-gray-500">
+                  <strong>Full</strong> fills the screen edge-to-edge. <strong>Rounded</strong> shows a padded card with rounded corners (text left + image right).
+                </p>
+              </div>
             </div>
 
             {/* Active Toggle Switch */}
@@ -1027,10 +1052,10 @@ export default function BannerManagementPage() {
                   <Eye className="h-3.5 w-3.5" /> Live Mobile Banner Preview
                 </Label>
                 <span className="text-[10px] font-semibold text-gray-500">
-                  {formTag.trim() || formEyebrow.trim() || formTitle.trim() || formSubtitle.trim() || formCtaLabel.trim()
-                    ? 'Format: Split Card (Image 3)'
+                  {formCardStyle === 'rounded'
+                    ? 'Format: Rounded Card'
                     : formImageUrl
-                    ? 'Format: Full-Bleed Graphic (Image 2)'
+                    ? 'Format: Full-Bleed Graphic'
                     : 'Awaiting content'}
                 </span>
               </div>
@@ -1038,8 +1063,8 @@ export default function BannerManagementPage() {
                 className="relative w-full aspect-[16/9] rounded-xl overflow-hidden flex flex-col justify-center items-center p-3 border shadow-inner"
                 style={{ backgroundColor: formBgColor }}
               >
-                {/* Check if user provided Tag, Eyebrow, Title, Subtitle, or CTA Button */}
-                {Boolean(formTag.trim() || formEyebrow.trim() || formTitle.trim() || formSubtitle.trim() || formCtaLabel.trim()) ? (
+                {/* Check if user selected Rounded card style */}
+                {formCardStyle === 'rounded' ? (
                   // Image 3 style: Split Card with Pure White Left Content + Image on Right
                   <div className="w-full h-full bg-white rounded-xl border border-amber-200 overflow-hidden flex shadow-sm">
                     <div className="flex-[3] p-3 bg-white flex flex-col justify-center min-w-0">

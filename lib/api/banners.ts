@@ -5,6 +5,12 @@ type ApiEnvelope<T> = { success: boolean; data: T; error?: string; message?: str
 export type BannerPlacement = 'book_services' | 'extramart' | 'book_now_scheduled' | 'book_now_instant';
 export type BannerActionType = 'screen' | 'category' | 'url' | 'tab' | 'none';
 export type BannerTone = 'light' | 'dark';
+/**
+ * Controls the card shape/style on the mobile app:
+ * - 'full'    → edge-to-edge full-bleed graphic (no padding, no border radius)
+ * - 'rounded' → padded card with rounded corners (split-card or image card)
+ */
+export type BannerCardStyle = 'full' | 'rounded';
 
 export interface AdminBanner {
   _id: string;
@@ -19,6 +25,8 @@ export interface AdminBanner {
   actionParams?: Record<string, any>;
   backgroundColor?: string;
   tone?: BannerTone;
+  /** Card display style: 'full' = edge-to-edge, 'rounded' = padded card with corners */
+  cardStyle?: BannerCardStyle;
   ctaLabel?: string;
   sortOrder: number;
   isActive: boolean;
@@ -40,6 +48,8 @@ export interface CreateBannerPayload {
   actionParams?: Record<string, any>;
   backgroundColor?: string;
   tone?: BannerTone;
+  /** Card display style: 'full' = edge-to-edge, 'rounded' = padded card with corners */
+  cardStyle?: BannerCardStyle;
   ctaLabel?: string;
   sortOrder?: number;
   isActive?: boolean;

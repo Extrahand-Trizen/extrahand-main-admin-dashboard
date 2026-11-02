@@ -36,13 +36,34 @@ export type PartnerSearchResult = {
   fullName?: string;
   phone?: string;
   phoneNumber?: string;
+  mobile?: string;
+  mobileNumber?: string;
   categories?: string[];
   workAreas?: string[];
-  partnerProfile?: { categories?: string[]; workAreas?: string[] };
+  partnerProfile?: {
+    categories?: string[];
+    workAreas?: string[];
+    phone?: string;
+  };
+};
+
+export type EligibleAssignmentPartnersResponse = ApiResponse<PartnerSearchResult[]> & {
+  excludedPhones?: string[];
 };
 
 export async function getAssignmentRules(): Promise<ApiResponse<AssignmentRules>> {
   return apiRequest<ApiResponse<AssignmentRules>>('/api/v1/assignment-management');
+}
+
+export async function getEligibleAssignmentPartners(
+  search?: string,
+  page = 1,
+): Promise<EligibleAssignmentPartnersResponse> {
+  const params = new URLSearchParams({ page: String(page) });
+  if (search?.trim()) params.set('search', search.trim());
+  return apiRequest<EligibleAssignmentPartnersResponse>(
+    `/api/v1/assignment-management/eligible-partners?${params.toString()}`,
+  );
 }
 
 export async function searchAssignmentPartners(query: string): Promise<ApiResponse<PartnerSearchResult[]>> {
