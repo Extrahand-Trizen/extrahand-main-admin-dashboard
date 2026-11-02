@@ -34,6 +34,10 @@ export async function getLocationCatalog(): Promise<LocationResponse> {
   return apiRequest<LocationResponse>('/api/v1/locations');
 }
 
+export async function getActiveLocationCatalog(): Promise<LocationResponse> {
+  return apiRequest<LocationResponse>('/api/v1/locations/active');
+}
+
 async function mutateLocation(endpoint: string, method: 'POST' | 'PATCH' | 'DELETE', body?: object) {
   return apiRequest<LocationResponse>(endpoint, {
     method,
