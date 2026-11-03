@@ -201,6 +201,76 @@ export const updateWhatsAppNotificationSettings = async (
   return res.data;
 };
 
+export interface AppBrandingSettings {
+  logoUrl: string | null;
+  activeIconId: string;
+  activeIconUrl: string | null;
+  launcherIcons: LauncherIcon[];
+  launcherIconUrl?: string | null;
+}
+
+export interface LauncherIcon {
+  iconId: string;
+  name: string;
+  imageUrl: string;
+  createdAt?: string;
+}
+
+export const getAppBrandingSettings = async (): Promise<AppBrandingSettings> => {
+  const res = await apiRequest<{ success: boolean; data: AppBrandingSettings }>(
+    '/api/v1/admin/settings/app-branding',
+  );
+  return res.data;
+};
+
+export const uploadAppBrandingLogo = async (image: File): Promise<AppBrandingSettings> => {
+  const formData = new FormData();
+  formData.append('image', image);
+  const res = await apiRequest<{ success: boolean; data: AppBrandingSettings }>(
+    '/api/v1/admin/settings/app-branding/logo',
+    { method: 'POST', body: formData },
+  );
+  return res.data;
+};
+
+export const resetAppBrandingLogo = async (): Promise<AppBrandingSettings> => {
+  const res = await apiRequest<{ success: boolean; data: AppBrandingSettings }>(
+    '/api/v1/admin/settings/app-branding/logo',
+    { method: 'DELETE' },
+  );
+  return res.data;
+};
+
+export const uploadAppLauncherIcon = async (
+  image: File,
+  name: string,
+): Promise<AppBrandingSettings> => {
+  const formData = new FormData();
+  formData.append('image', image);
+  formData.append('name', name);
+  const res = await apiRequest<{ success: boolean; data: AppBrandingSettings }>(
+    '/api/v1/admin/settings/app-branding/launcher-icons',
+    { method: 'POST', body: formData },
+  );
+  return res.data;
+};
+
+export const activateAppLauncherIcon = async (iconId: string): Promise<AppBrandingSettings> => {
+  const res = await apiRequest<{ success: boolean; data: AppBrandingSettings }>(
+    '/api/v1/admin/settings/app-branding/active-icon',
+    { method: 'PUT', body: JSON.stringify({ iconId }) },
+  );
+  return res.data;
+};
+
+export const deleteAppLauncherIcon = async (iconId: string): Promise<AppBrandingSettings> => {
+  const res = await apiRequest<{ success: boolean; data: AppBrandingSettings }>(
+    `/api/v1/admin/settings/app-branding/launcher-icons/${encodeURIComponent(iconId)}`,
+    { method: 'DELETE' },
+  );
+  return res.data;
+};
+
 export interface RoundRobinMember {
   userId: string;
   name: string;

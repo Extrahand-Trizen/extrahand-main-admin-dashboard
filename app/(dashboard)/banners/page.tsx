@@ -20,6 +20,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
+import { AppLauncherIconSettings } from '@/components/admin/AppLauncherIconSettings';
+import HomeFeaturedServicesTab from './components/home-featured-services-tab';
+import HomePromotionsTab from '../coupons/components/home-promotions-tab';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -351,32 +354,48 @@ export default function BannerManagementPage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div>
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
             <ImageIcon className="h-6 w-6 text-amber-600" />
-            Banner Management
+            Banner &amp; App Launcher Icon Management
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Manage carousel banners for Book Services and ExtraMart. Upload images to MinIO or use color styles, and link to any mobile screen or category.
+            Manage customer app banners and launcher icon settings from one place.
           </p>
         </div>
-
-        <Button
-          onClick={openCreateDialog}
-          className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Add New Banner
-        </Button>
       </div>
 
-      {/* Tabs */}
-      <Tabs
-        value={activePlacement}
-        onValueChange={(val) => setActivePlacement(val as BannerPlacement)}
-        className="space-y-6"
-      >
+      <Tabs defaultValue="banners" className="space-y-6">
+        <TabsList className="h-auto w-full justify-start gap-1 rounded-lg border bg-white p-1 sm:w-auto">
+          <TabsTrigger value="banners" className="px-5 py-2">
+            Banners
+          </TabsTrigger>
+          <TabsTrigger value="app-launcher-icon" className="px-5 py-2">
+            App Launcher Icon
+          </TabsTrigger>
+          <TabsTrigger value="home-featured-services" className="px-5 py-2">
+            Featured Services
+          </TabsTrigger>
+          <TabsTrigger value="home-offers" className="px-5 py-2">
+            Offers
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="banners" className="space-y-6">
+          <div className="flex justify-end">
+            <Button
+              onClick={openCreateDialog}
+              className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
+            >
+              <Plus className="h-4 w-4" />
+              Add New Banner
+            </Button>
+          </div>
+          <Tabs
+            value={activePlacement}
+            onValueChange={(val) => setActivePlacement(val as BannerPlacement)}
+            className="space-y-6"
+          >
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b pb-4 gap-4">
           <TabsList className="bg-gray-100 p-1">
             <TabsTrigger
@@ -646,6 +665,17 @@ export default function BannerManagementPage() {
               })}
             </div>
           )}
+        </TabsContent>
+          </Tabs>
+        </TabsContent>
+        <TabsContent value="app-launcher-icon">
+          <AppLauncherIconSettings />
+        </TabsContent>
+        <TabsContent value="home-featured-services">
+          <HomeFeaturedServicesTab />
+        </TabsContent>
+        <TabsContent value="home-offers">
+          <HomePromotionsTab />
         </TabsContent>
       </Tabs>
 

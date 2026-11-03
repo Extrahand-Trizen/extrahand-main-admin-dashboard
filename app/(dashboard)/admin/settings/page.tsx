@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { AppLogoSettings } from "@/components/admin/AppLogoSettings";
 import {
   getTaskPostedEmailSettings,
   getRoundRobinTeamSettings,
@@ -51,7 +52,6 @@ export default function AdminSettingsPage() {
       queryKey: ["whatsapp-notification-settings"],
       queryFn: getWhatsAppNotificationSettings,
     });
-
     useEffect(() => {
       if (settingsQuery.data) setSettings(settingsQuery.data);
     }, [settingsQuery.data]);
@@ -215,6 +215,8 @@ export default function AdminSettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        <AppLogoSettings />
 
         <Card>
           <CardHeader>

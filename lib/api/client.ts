@@ -110,7 +110,8 @@ async function getAdminToken(): Promise<string | null> {
  */
 export async function apiRequest<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  requestOptions: { throwOnError?: boolean } = {},
 ): Promise<T> {
   const isMutation = options.method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method.toUpperCase());
   const token = await getAdminToken();
@@ -131,7 +132,7 @@ export async function apiRequest<T>(
     headers: requestHeaders,
   }).catch((networkErr: unknown) => {
     // Backend unreachable (server down, CORS, DNS) — fail gracefully for reads
-    if (!isMutation) {
+    if (!isMutation && !requestOptions.throwOnError) {
       console.warn(`[api] Network error on ${endpoint}:`, (networkErr as Error)?.message);
       return null;
     }
@@ -177,10 +178,10 @@ export async function apiRequest<T>(
         .json()
         .catch(() => ({ error: retryResponse.statusText }));
       const retryErrorMessage =
-        retryErrorData.error || `API request failed: ${retryResponse.statusText}`;
+        retryErrorData.error || retryErrorData.message || `API request failed: ${retryResponse.statusText}`;
       console.error(`API Error (${retryResponse.status}):`, retryErrorMessage);
 
-      if (isMutation || retryResponse.status >= 500) {
+      if (isMutation || requestOptions.throwOnError || retryResponse.status >= 500) {
         throw new Error(retryErrorMessage);
       }
 
@@ -197,11 +198,11 @@ export async function apiRequest<T>(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: response.statusText }));
-    const errorMessage = errorData.error || `API request failed: ${response.statusText}`;
+    const errorMessage = errorData.error || errorData.message || `API request failed: ${response.statusText}`;
     console.error(`API Error (${response.status}):`, errorMessage);
     
     // Only throw for critical errors (5xx) or mutations, return null for client errors (4xx except 401)
-    if (isMutation || response.status >= 500) {
+    if (isMutation || requestOptions.throwOnError || response.status >= 500) {
       throw new Error(errorMessage);
     }
     
