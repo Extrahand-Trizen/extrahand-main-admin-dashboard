@@ -265,7 +265,6 @@ export default function UsersPage() {
   });
 
   const [isLoaded, setIsLoaded] = useState(false);
-  const normalizedRoleFilter = roleFilter === "helper" ? "all" : roleFilter;
 
   // Load saved filters on mount
   useEffect(() => {
@@ -275,10 +274,7 @@ export default function UsersPage() {
         const parsed = JSON.parse(saved);
         if (parsed.search !== undefined) setSearch(parsed.search);
         if (parsed.statusFilter !== undefined) setStatusFilter(parsed.statusFilter);
-        if (parsed.roleFilter !== undefined) {
-          const fallbackRole = parsed.roleFilter === "helper" ? "all" : parsed.roleFilter;
-          setRoleFilter(fallbackRole);
-        }
+        if (parsed.roleFilter !== undefined) setRoleFilter(parsed.roleFilter);
         if (parsed.aadhaarFilter !== undefined) setAadhaarFilter(parsed.aadhaarFilter);
         if (parsed.certifiedFilter !== undefined) setCertifiedFilter(parsed.certifiedFilter);
         if (parsed.categoryFilter !== undefined) setCategoryFilter(parsed.categoryFilter);
@@ -340,7 +336,7 @@ export default function UsersPage() {
   const activeUserFilters: UserFilters = {
     search: search || undefined,
     status: statusFilter !== "all" ? statusFilter : undefined,
-    role: normalizedRoleFilter !== "all" ? normalizedRoleFilter : undefined,
+    role: roleFilter !== "all" ? roleFilter : undefined,
     category: categoryFilter !== "all" ? categoryFilter : undefined,
     city: selectedCityFilter !== "all" ? selectedCityFilter : undefined,
     area:
@@ -394,7 +390,7 @@ export default function UsersPage() {
       "users",
       search,
       statusFilter,
-      normalizedRoleFilter,
+      roleFilter,
       aadhaarFilter,
       certifiedFilter,
       categoryFilter,

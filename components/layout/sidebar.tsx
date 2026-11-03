@@ -394,6 +394,18 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
                       Send Notification
                     </Link>
                     <Link
+                      href="/notifications/whatsapp"
+                      onClick={handleLinkClick}
+                      className={cn(
+                        'block rounded-md px-3 py-2 text-xs font-medium transition-colors',
+                        pathname?.startsWith('/notifications/whatsapp') && !pathname?.startsWith('/notifications/whatsapp/history')
+                          ? 'bg-yellow-50 text-yellow-700'
+                          : 'text-gray-500 hover:bg-yellow-50/50 hover:text-yellow-600'
+                      )}
+                    >
+                      Send WhatsApp Notification
+                    </Link>
+                    <Link
                       href="/notifications/history"
                       onClick={handleLinkClick}
                       className={cn(
@@ -404,6 +416,18 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
                       )}
                     >
                       History
+                    </Link>
+                    <Link
+                      href="/notifications/whatsapp/history"
+                      onClick={handleLinkClick}
+                      className={cn(
+                        'block rounded-md px-3 py-2 text-xs font-medium transition-colors',
+                        pathname?.startsWith('/notifications/whatsapp/history')
+                          ? 'bg-yellow-50 text-yellow-700'
+                          : 'text-gray-500 hover:bg-yellow-50/50 hover:text-yellow-600'
+                      )}
+                    >
+                      WhatsApp History
                     </Link>
                   </div>}
                   </div>
