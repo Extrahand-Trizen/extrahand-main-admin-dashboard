@@ -707,7 +707,6 @@ export default function UsersPage() {
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="customer">Customer</SelectItem>
-                  <SelectItem value="helper">Helper</SelectItem>
                   <SelectItem value="partner">Partner</SelectItem>
                 </SelectContent>
               </Select>
