@@ -229,6 +229,23 @@ export const updateRoundRobinTeamSettings = async (
   return res?.data;
 };
 
+export const getAadhaarRoundRobinTeamSettings = async (): Promise<RoundRobinTeamSettingsData> => {
+  const res = await apiRequest<{ success: boolean; data: RoundRobinTeamSettingsData }>(
+    "/api/v1/admin/settings/aadhaar-round-robin-team",
+  );
+  return res?.data;
+};
+
+export const updateAadhaarRoundRobinTeamSettings = async (
+  emails: string[],
+): Promise<RoundRobinTeamSettingsData> => {
+  const res = await apiRequest<{ success: boolean; data: RoundRobinTeamSettingsData }>(
+    "/api/v1/admin/settings/aadhaar-round-robin-team",
+    { method: "PUT", body: JSON.stringify({ emails }) },
+  );
+  return res?.data;
+};
+
 export const updateUser = async (
   userId: string,
   updates: {
