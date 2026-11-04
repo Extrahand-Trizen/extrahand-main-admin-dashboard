@@ -1013,10 +1013,14 @@ export default function TaskDetailsPage() {
                   <Label className="text-sm font-medium text-gray-700">
                     Category
                   </Label>
-                  <div className="mt-1">
-                    {task.category ? (
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    {task.category && (
                       <Badge variant="outline">{task.category}</Badge>
-                    ) : (
+                    )}
+                    {task.categoryLabel && (
+                      <Badge variant="outline">{task.categoryLabel}</Badge>
+                    )}
+                    {!task.category && !task.categoryLabel && (
                       <span className="text-sm text-gray-500">
                         Not specified
                       </span>

@@ -223,6 +223,7 @@ export interface Task {
   description: string;
   category: string;
   categorySlug?: string;
+  categoryLabel?: string;
   status:
     | 'open'
     | 'assigned'
