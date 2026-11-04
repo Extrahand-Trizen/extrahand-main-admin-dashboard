@@ -24,6 +24,9 @@ export async function listUsers(filters?: UserFilters): Promise<ApiResponse<User
   if (typeof filters?.isCertified === 'boolean') {
     params.append('isCertified', String(filters.isCertified));
   }
+  if (typeof filters?.isPaymentTester === 'boolean') {
+    params.append('isPaymentTester', String(filters.isPaymentTester));
+  }
   if (filters?.createdFrom) params.append('createdFrom', filters.createdFrom);
   if (filters?.createdTo) params.append('createdTo', filters.createdTo);
   if (filters?.uids) params.append('uids', filters.uids);

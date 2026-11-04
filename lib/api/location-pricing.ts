@@ -146,10 +146,14 @@ export function updateCategoryMinOrderValue(categoryId: string, minOrderValue: n
   });
 }
 
-export function listPricingSkus(categoryId: string, sectionId?: string) {
-  const query = new URLSearchParams({ categoryId });
+export function listPricingSkus(categoryId?: string, sectionId?: string) {
+  const query = new URLSearchParams();
+  if (categoryId) query.set('categoryId', categoryId);
   if (sectionId) query.set('sectionId', sectionId);
-  return apiRequest<ApiEnvelope<PricingSku[]>>(`/api/v1/location-pricing/skus?${query.toString()}`);
+  return apiRequest<ApiEnvelope<PricingSku[]>>(
+    `/api/v1/location-pricing/skus${query.toString() ? `?${query.toString()}` : ''}`,
+    { cache: 'no-store' },
+  );
 }
 
 export function listHourlyPrices(skuId?: string) {

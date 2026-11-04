@@ -13,6 +13,7 @@ export interface User {
   userType?: 'individual' | 'business';
   status: 'active' | 'suspended' | 'banned' | 'inactive';
   isVerified: boolean;
+  isPaymentTester?: boolean;
   isEmailVerified?: boolean;
   isActive?: boolean;
   photoURL?: string;
@@ -618,6 +619,7 @@ export interface UserFilters {
   includeSummary?: boolean;
   isAadhaarVerified?: boolean;
   isCertified?: boolean;
+  isPaymentTester?: boolean;
   createdFrom?: string;
   createdTo?: string;
   page?: number;

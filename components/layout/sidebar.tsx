@@ -18,11 +18,9 @@ import {
   PhoneCall,
   ShoppingBag,
   SlidersHorizontal,
-  MapPinned,
   MapPin,
   BellRing,
-  Tag,
-  Image as ImageIcon,
+  Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -77,24 +75,6 @@ const navigation: Array<{
     permission: 'task.list',
   },
   {
-    name: 'Location Pricing',
-    href: '/location-pricing',
-    icon: MapPinned,
-    superAdminOnly: true,
-  },
-  {
-    name: 'Category Pricing & Minimums',
-    href: '/category-minimums',
-    icon: Tag,
-    superAdminOnly: true,
-  },
-  {
-    name: 'Banner Management',
-    href: '/banners',
-    icon: ImageIcon,
-    superAdminOnly: true,
-  },
-  {
     name: 'Notifications',
     href: '/notifications',
     icon: BellRing,
@@ -143,14 +123,19 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
   const [notificationsSectionOpen, setNotificationsSectionOpen] = useState(
     pathname?.startsWith('/notifications')
   );
-  const [locationPricingSectionOpen, setLocationPricingSectionOpen] = useState(
-    pathname?.startsWith('/location-pricing')
-  );
   const [partnerSectionOpen, setPartnerSectionOpen] = useState(
     pathname?.startsWith('/partner-registrations')
   );
   const [usersSectionOpen, setUsersSectionOpen] = useState(
     pathname?.startsWith('/users')
+  );
+  const [servicesConfigSectionOpen, setServicesConfigSectionOpen] = useState(
+    ['/services', '/book-now-availability', '/category-minimums', '/location-pricing', '/hourly-helper-availability', '/banners', '/coupons', '/fee-settings']
+      .some((path) => pathname === path || pathname?.startsWith(`${path}/`)),
+  );
+  const [priceSettingsOpen, setPriceSettingsOpen] = useState(
+    ['/category-minimums', '/location-pricing', '/hourly-helper-availability', '/book-now-availability']
+      .some((path) => pathname === path || pathname?.startsWith(`${path}/`)),
   );
 
   const handleLinkClick = () => {
@@ -272,6 +257,18 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
                       >
                         Customer Activity
                       </Link>
+                      <Link
+                        href="/users/payment-testing"
+                        onClick={handleLinkClick}
+                        className={cn(
+                          'block rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                          pathname === '/users/payment-testing'
+                            ? 'bg-yellow-50 text-yellow-700'
+                            : 'text-gray-700 hover:bg-yellow-50/50 hover:text-yellow-700'
+                        )}
+                      >
+                        Payment Testing
+                      </Link>
                     </div>
                   )}
                 </div>
@@ -363,62 +360,6 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
                       )}
                     >
                       Area Rules
-                    </Link>
-                  </div>}
-                  </div>
-                ) : item.href === '/location-pricing' ? (
-                  <div className="space-y-1">
-                    <button
-                      onClick={() => setLocationPricingSectionOpen(!locationPricingSectionOpen)}
-                      className={cn(
-                        'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
-                        isActive
-                          ? 'bg-yellow-50 text-yellow-700'
-                          : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
-                      )}
-                    >
-                      <span className="flex items-center gap-3">
-                        <item.icon className={cn('h-5 w-5', isActive ? 'text-yellow-600' : 'text-gray-400')} />
-                        {item.name}
-                      </span>
-                      {locationPricingSectionOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    </button>
-                  {locationPricingSectionOpen && <div className="ml-6 space-y-1 border-l border-gray-200 pl-2">
-                    <Link
-                      href="/location-pricing"
-                      onClick={handleLinkClick}
-                      className={cn(
-                        'block rounded-md px-3 py-2 text-xs font-medium transition-colors',
-                        pathname === '/location-pricing'
-                          ? 'bg-yellow-50 text-yellow-700'
-                          : 'text-gray-500 hover:bg-yellow-50/50 hover:text-yellow-600'
-                      )}
-                    >
-                      Pricing Overview
-                    </Link>
-                    <Link
-                      href="/location-pricing/configure"
-                      onClick={handleLinkClick}
-                      className={cn(
-                        'block rounded-md px-3 py-2 text-xs font-medium transition-colors',
-                        pathname?.startsWith('/location-pricing/configure')
-                          ? 'bg-yellow-50 text-yellow-700'
-                          : 'text-gray-500 hover:bg-yellow-50/50 hover:text-yellow-600'
-                      )}
-                    >
-                      Configure Price
-                    </Link>
-                    <Link
-                      href="/hourly-helper-availability"
-                      onClick={handleLinkClick}
-                      className={cn(
-                        'block rounded-md px-3 py-2 text-xs font-medium transition-colors',
-                        pathname?.startsWith('/hourly-helper-availability')
-                          ? 'bg-yellow-50 text-yellow-700'
-                          : 'text-gray-500 hover:bg-yellow-50/50 hover:text-yellow-600'
-                      )}
-                    >
-                      Hourly Availability
                     </Link>
                   </div>}
                   </div>
@@ -595,6 +536,159 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
                       Aadhaar Follow-ups
                     </Link>
                   </>
+                )}
+                {item.href === '/qcommerce-orders' && (
+                  (isSuperAdmin || isOperationsAdminRole) && (
+                    <div className="space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => setServicesConfigSectionOpen((open) => !open)}
+                        aria-expanded={servicesConfigSectionOpen}
+                        className={cn(
+                          'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                          ['/services', '/book-now-availability', '/category-minimums', '/location-pricing', '/hourly-helper-availability', '/banners', '/coupons', '/fee-settings']
+                            .some((path) => pathname === path || pathname?.startsWith(`${path}/`))
+                            ? 'bg-yellow-50 text-yellow-700'
+                            : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600',
+                        )}
+                      >
+                        <span className="flex items-center gap-3">
+                          <Layers className="h-5 w-5 text-gray-400" />
+                          Services &amp; Configuration
+                        </span>
+                        {servicesConfigSectionOpen ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </button>
+                      {servicesConfigSectionOpen && (
+                        <div className="ml-6 space-y-1 border-l border-gray-200 pl-2">
+                          {(isSuperAdmin || isOperationsAdminRole) && (
+                            <Link
+                              href="/services"
+                              onClick={handleLinkClick}
+                              className={cn(
+                                'block rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                                pathname === '/services' || pathname?.startsWith('/services/')
+                                  ? 'bg-yellow-50 text-yellow-700'
+                                  : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600',
+                              )}
+                            >
+                              Service Management
+                            </Link>
+                          )}
+                          {isOperationsAdminRole && !isSuperAdmin && (
+                            <Link
+                              href="/book-now-availability"
+                              onClick={handleLinkClick}
+                              className={cn(
+                                'block rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                                pathname === '/book-now-availability'
+                                  ? 'bg-yellow-50 text-yellow-700'
+                                  : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600',
+                              )}
+                            >
+                              Book Now Availability
+                            </Link>
+                          )}
+                          {isSuperAdmin && (
+                            <div className="space-y-1">
+                              <button
+                                type="button"
+                                onClick={() => setPriceSettingsOpen((open) => !open)}
+                                aria-expanded={priceSettingsOpen}
+                                className={cn(
+                                  'flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                                  ['/category-minimums', '/location-pricing', '/hourly-helper-availability', '/book-now-availability']
+                                    .some((path) => pathname === path || pathname?.startsWith(`${path}/`))
+                                    ? 'text-yellow-700'
+                                    : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600',
+                                )}
+                              >
+                                <span className="flex items-center gap-2">
+                                  <SlidersHorizontal className="h-4 w-4" />
+                                  Price Settings
+                                </span>
+                                {priceSettingsOpen ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                              </button>
+                              {priceSettingsOpen && (
+                                <div className="ml-3 space-y-1 border-l border-gray-200 pl-2">
+                                  {[
+                                    { name: 'Category Pricing & Minimums', href: '/category-minimums' },
+                                    { name: 'Location Pricing', href: '/location-pricing' },
+                                    { name: 'Configure Price', href: '/location-pricing/configure' },
+                                    { name: 'Hourly Availability', href: '/hourly-helper-availability' },
+                                    { name: 'Book Now Availability', href: '/book-now-availability' },
+                                  ].map((priceItem) => (
+                                    <Link
+                                      key={priceItem.href}
+                                      href={priceItem.href}
+                                      onClick={handleLinkClick}
+                                      className={cn(
+                                        'block rounded-md px-3 py-2 text-xs font-medium transition-colors',
+                                        pathname === priceItem.href || pathname?.startsWith(`${priceItem.href}/`)
+                                          ? 'bg-yellow-50 text-yellow-700'
+                                          : 'text-gray-500 hover:bg-yellow-50/50 hover:text-yellow-600',
+                                      )}
+                                    >
+                                      {priceItem.name}
+                                    </Link>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {isSuperAdmin && (
+                            <Link
+                              href="/banners"
+                              onClick={handleLinkClick}
+                              className={cn(
+                                'block rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                                pathname === '/banners' || pathname?.startsWith('/banners/')
+                                  ? 'bg-yellow-50 text-yellow-700'
+                                  : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600',
+                              )}
+                            >
+                              Banner &amp; App Launcher Icon Management
+                            </Link>
+                          )}
+                          {(isSuperAdmin || isOperationsAdminRole) && (
+                            <Link
+                              href="/coupons"
+                              onClick={handleLinkClick}
+                              className={cn(
+                                'block rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                                pathname === '/coupons' || pathname?.startsWith('/coupons/')
+                                  ? 'bg-yellow-50 text-yellow-700'
+                                  : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600',
+                              )}
+                            >
+                              Coupons
+                            </Link>
+                          )}
+                          {(isSuperAdmin || isOperationsAdminRole) && (
+                            <Link
+                              href="/fee-settings"
+                              onClick={handleLinkClick}
+                              className={cn(
+                                'block rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                                pathname === '/fee-settings' || pathname?.startsWith('/fee-settings/')
+                                  ? 'bg-yellow-50 text-yellow-700'
+                                  : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600',
+                              )}
+                            >
+                              GST &amp; Platform Fees
+                            </Link>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
                 )}
               </Fragment>
             );
