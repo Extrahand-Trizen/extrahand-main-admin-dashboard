@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Layers, Loader2, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
+import { Layers, ListChecks, Loader2, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,11 +31,16 @@ import {
 import {
   createCatalogService,
   listServiceCatalog,
+  listServiceCategoryContent,
+  listServiceSkuContent,
   updateCatalogService,
+  updateServiceCategoryScope,
+  updateServiceSkuScope,
   updateCatalogServiceStatus,
   uploadCatalogServiceImage,
   type CatalogService,
   type CreateCatalogService,
+  type ServiceScopeSection,
   type ServiceCategory,
   type UpdateCatalogService,
 } from '@/lib/api/services';
@@ -108,6 +113,28 @@ function isValidOfferPrice(offerPrice: number | null, basePrice: number) {
   );
 }
 
+type ScopeSectionForm = Omit<ServiceScopeSection, 'includedItems' | 'notIncludedItems'> & {
+  includedItemsText: string;
+  notIncludedItemsText: string;
+};
+
+function formatScopeItems(items: string[] | undefined) {
+  return (items || []).join('\n');
+}
+
+function parseScopeItems(value: string) {
+  return value
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function usesCategoryScope(categorySlug: string) {
+  return ['hourly-helper', 'personal-assistant', 'personal-assistance'].includes(
+    categorySlug.trim().toLowerCase(),
+  );
+}
+
 export default function ServicesPage() {
   const queryClient = useQueryClient();
   const [formOpen, setFormOpen] = useState(false);
@@ -143,6 +170,12 @@ export default function ServicesPage() {
   const [editPricingUnit, setEditPricingUnit] = useState<'fixed' | 'hourly'>('fixed');
   const [editPartnerCategoryId, setEditPartnerCategoryId] = useState('cleaning');
   const [editIsActive, setEditIsActive] = useState(true);
+  const [editIncludesText, setEditIncludesText] = useState('');
+  const [editExcludesText, setEditExcludesText] = useState('');
+  const [editingScopeCategory, setEditingScopeCategory] = useState<ServiceCategory | null>(null);
+  const [scopeIncludedTitle, setScopeIncludedTitle] = useState('Included');
+  const [scopeNotIncludedTitle, setScopeNotIncludedTitle] = useState('Not included');
+  const [scopeSections, setScopeSections] = useState<ScopeSectionForm[]>([]);
 
   const { data: categories = [], isLoading, isRefetching, error, refetch } = useQuery({
     queryKey: ['service-catalog-admin'],
@@ -150,6 +183,32 @@ export default function ServicesPage() {
     staleTime: 0,
     refetchOnMount: 'always',
     });
+  const {
+    data: categoryContents = [],
+    isLoading: isScopeContentLoading,
+    error: scopeContentError,
+    refetch: refetchScopeContent,
+  } = useQuery({
+    queryKey: ['service-category-scope-content'],
+    queryFn: listServiceCategoryContent,
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
+  const categoryContentBySlug = useMemo(
+    () => new Map(categoryContents.map((content) => [content.categorySlug, content] as const)),
+    [categoryContents],
+  );
+  const {
+    data: skuContents = [],
+    isLoading: isSkuContentLoading,
+    error: skuContentError,
+    refetch: refetchSkuContent,
+  } = useQuery({
+    queryKey: ['service-sku-scope-content'],
+    queryFn: listServiceSkuContent,
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
   const {
     data: pricingSkus = [],
     isLoading: isPricingLoading,
@@ -294,17 +353,35 @@ export default function ServicesPage() {
       serviceId,
       payload,
       imageFile,
+      packageScope,
     }: {
       serviceId: string;
       payload: UpdateCatalogService;
       imageFile: File | null;
+      packageScope?: {
+        categorySlug: string;
+        skuSlug: string;
+        displayName: string;
+        includes: string[];
+        excludes: string[];
+      };
       isSoftDelete?: boolean;
       offerCleared?: boolean;
     }) => {
       const imageUrl = imageFile
         ? await uploadCatalogServiceImage(imageFile)
         : payload.imageUrl;
-      return updateCatalogService(serviceId, { ...payload, imageUrl });
+      const updatedService = await updateCatalogService(serviceId, { ...payload, imageUrl });
+      if (packageScope) {
+        await updateServiceSkuScope(
+          packageScope.categorySlug,
+          packageScope.skuSlug,
+          packageScope.displayName,
+          packageScope.includes,
+          packageScope.excludes,
+        );
+      }
+      return updatedService;
     },
     onSuccess: async (_data, variables) => {
       const message = variables.isSoftDelete
@@ -322,6 +399,7 @@ export default function ServicesPage() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['service-catalog-admin'] }),
         queryClient.invalidateQueries({ queryKey: ['service-catalog-global-prices'] }),
+        queryClient.invalidateQueries({ queryKey: ['service-sku-scope-content'] }),
       ]);
     },
     onError: (updateError: Error) => {
@@ -355,6 +433,28 @@ export default function ServicesPage() {
     },
     onError: (updateError: Error) => {
       toast.error(updateError.message || 'Failed to update service status');
+    },
+  });
+
+  const scopeMutation = useMutation({
+    mutationFn: ({
+      category,
+      scope,
+    }: {
+      category: ServiceCategory;
+      scope: {
+        includedTitle: string;
+        notIncludedTitle: string;
+        sections: ServiceScopeSection[];
+      };
+    }) => updateServiceCategoryScope(category.slug, category.name, scope),
+    onSuccess: async () => {
+      toast.success('Service scope updated in the app');
+      setEditingScopeCategory(null);
+      await queryClient.invalidateQueries({ queryKey: ['service-category-scope-content'] });
+    },
+    onError: (updateError: Error) => {
+      toast.error(updateError.message || 'Failed to update service scope');
     },
   });
 
@@ -424,11 +524,74 @@ export default function ServicesPage() {
     setEditPricingUnit(service.pricingUnit);
     setEditPartnerCategoryId(service.partnerCategoryId || service.taskCategory || 'cleaning');
     setEditIsActive(service.isActive);
+    const storedContent = skuContents.find(
+      (content) =>
+        content.categorySlug.toLowerCase() === categorySlug.toLowerCase() &&
+        content.skuSlug.toLowerCase() === service.slug.toLowerCase(),
+    );
+    setEditIncludesText(formatScopeItems(storedContent?.includes));
+    setEditExcludesText(formatScopeItems(storedContent?.excludes));
+  };
+
+  const openScopeEditor = (category: ServiceCategory) => {
+    const storedScope = categoryContentBySlug.get(category.slug)?.scope;
+    setEditingScopeCategory(category);
+    setScopeIncludedTitle(storedScope?.includedTitle || 'Included');
+    setScopeNotIncludedTitle(storedScope?.notIncludedTitle || 'Not included');
+    setScopeSections(
+      storedScope?.sections.length
+        ? storedScope.sections.map((section) => ({
+            id: section.id,
+            label: section.label,
+            includedItemsText: formatScopeItems(section.includedItems),
+            notIncludedItemsText: formatScopeItems(section.notIncludedItems),
+          }))
+        : [{
+            id: category.slug,
+            label: category.name,
+            includedItemsText: '',
+            notIncludedItemsText: '',
+          }],
+    );
+  };
+
+  const saveScope = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingScopeCategory) return;
+    if (
+      !scopeIncludedTitle.trim() ||
+      !scopeNotIncludedTitle.trim() ||
+      scopeSections.some((section) => !section.id.trim() || !section.label.trim())
+    ) {
+      toast.error('Enter both section headings and a label for every category tab');
+      return;
+    }
+
+    scopeMutation.mutate({
+      category: editingScopeCategory,
+      scope: {
+        includedTitle: scopeIncludedTitle.trim(),
+        notIncludedTitle: scopeNotIncludedTitle.trim(),
+        sections: scopeSections.map((section) => ({
+          id: section.id.trim(),
+          label: section.label.trim(),
+          includedItems: parseScopeItems(section.includedItemsText),
+          notIncludedItems: parseScopeItems(section.notIncludedItemsText),
+        })),
+      },
+    });
   };
 
   const saveService = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!editingService) return;
+    if (
+      !usesCategoryScope(editingCategorySlug) &&
+      (isSkuContentLoading || skuContentError)
+    ) {
+      toast.error('Service includes and exclusions could not be loaded. Refresh and try again.');
+      return;
+    }
     const numericBasePrice = Number(editBasePrice);
     const offerPrice = editOfferPrice.trim() ? Number(editOfferPrice) : null;
     const numericDuration = Number(editDurationMinutes);
@@ -465,7 +628,23 @@ export default function ServicesPage() {
       numericDuration === editingService.durationMinutes &&
       editPricingUnit === editingService.pricingUnit &&
       editPartnerCategoryId ===
-        (editingService.partnerCategoryId || editingService.taskCategory || 'cleaning');
+        (editingService.partnerCategoryId || editingService.taskCategory || 'cleaning') &&
+      editIncludesText ===
+        formatScopeItems(
+          skuContents.find(
+            (content) =>
+              content.categorySlug.toLowerCase() === originalCategorySlug?.toLowerCase() &&
+              content.skuSlug.toLowerCase() === editingService.slug.toLowerCase(),
+          )?.includes,
+        ) &&
+      editExcludesText ===
+        formatScopeItems(
+          skuContents.find(
+            (content) =>
+              content.categorySlug.toLowerCase() === originalCategorySlug?.toLowerCase() &&
+              content.skuSlug.toLowerCase() === editingService.slug.toLowerCase(),
+          )?.excludes,
+        );
     if (statusOnlyChange) {
       updateServiceStatusMutation.mutate({
         serviceId: editingService._id,
@@ -490,6 +669,17 @@ export default function ServicesPage() {
         partnerCategoryId: editPartnerCategoryId,
         isActive: editIsActive,
       },
+      ...(!usesCategoryScope(editingCategorySlug)
+        ? {
+            packageScope: {
+              categorySlug: editingCategorySlug,
+              skuSlug: editingService.slug,
+              displayName: editName.trim(),
+              includes: parseScopeItems(editIncludesText),
+              excludes: parseScopeItems(editExcludesText),
+            },
+          }
+        : {}),
     });
   };
 
@@ -534,18 +724,23 @@ export default function ServicesPage() {
               void refetch();
               void refetchPricing();
               void refetchCategories();
+              void refetchScopeContent();
+              void refetchSkuContent();
             }}
             disabled={
               isLoading ||
               isRefetching ||
               isPricingLoading ||
               isPricingRefetching ||
-              isCategoriesLoading
+              isCategoriesLoading ||
+              isSkuContentLoading
             }
           >
             <RefreshCw
               className={`mr-2 h-4 w-4 ${
-                isRefetching || isPricingRefetching || isCategoriesLoading ? 'animate-spin' : ''
+                isRefetching || isPricingRefetching || isCategoriesLoading || isSkuContentLoading
+                  ? 'animate-spin'
+                  : ''
               }`}
             />
             Refresh
@@ -560,6 +755,17 @@ export default function ServicesPage() {
           </Button>
         </div>
       </div>
+
+      {scopeContentError ? (
+        <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          Could not load service scope content: {(scopeContentError as Error).message}
+        </p>
+      ) : null}
+      {skuContentError ? (
+        <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          Could not load service includes and exclusions: {(skuContentError as Error).message}
+        </p>
+      ) : null}
 
       {formOpen && (
         <Dialog open={formOpen} onOpenChange={setFormOpen}>
@@ -898,8 +1104,25 @@ export default function ServicesPage() {
                     (category.services.length > 0 ? category.services : [null]).map((service) => (
                       <TableRow key={`${category._id}-${service?._id || 'empty'}`}>
                         <TableCell>
-                          <div className="font-medium text-gray-900">{category.name}</div>
-                          <div className="font-mono text-xs text-gray-500">{category.slug}</div>
+                          <div className="space-y-2">
+                            <div>
+                              <div className="font-medium text-gray-900">{category.name}</div>
+                              <div className="font-mono text-xs text-gray-500">{category.slug}</div>
+                            </div>
+                            {(service === category.services[0] || !service) &&
+                            usesCategoryScope(category.slug) ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openScopeEditor(category)}
+                                disabled={isScopeContentLoading || Boolean(scopeContentError)}
+                              >
+                                <ListChecks className="h-4 w-4" />
+                                Edit app scope
+                              </Button>
+                            ) : null}
+                          </div>
                         </TableCell>
                         <TableCell>
                           {service ? (
@@ -1000,6 +1223,10 @@ export default function ServicesPage() {
                               size="icon"
                               aria-label={`Edit ${service.name}`}
                               title="Edit service"
+                              disabled={
+                                !usesCategoryScope(category.slug) &&
+                                (isSkuContentLoading || Boolean(skuContentError))
+                              }
                               onClick={() => openServiceEditor(service, category.slug)}
                             >
                               <Pencil className="h-4 w-4" />
@@ -1160,6 +1387,33 @@ export default function ServicesPage() {
                   ))}
                 </select>
               </label>
+              {!usesCategoryScope(editingCategorySlug) ? (
+                <>
+                  <label className="space-y-1.5 text-sm font-medium text-gray-700 sm:col-span-2">
+                    What's included
+                    <textarea
+                      className={`${fieldClassName} min-h-28 resize-y`}
+                      value={editIncludesText}
+                      onChange={(event) => setEditIncludesText(event.target.value)}
+                      placeholder="Enter one included item per line"
+                      aria-label="What is included in this service"
+                    />
+                  </label>
+                  <label className="space-y-1.5 text-sm font-medium text-gray-700 sm:col-span-2">
+                    What's not included
+                    <textarea
+                      className={`${fieldClassName} min-h-28 resize-y`}
+                      value={editExcludesText}
+                      onChange={(event) => setEditExcludesText(event.target.value)}
+                      placeholder="Enter one excluded item per line"
+                      aria-label="What is not included in this service"
+                    />
+                  </label>
+                  <p className="text-xs font-normal text-gray-500 sm:col-span-2">
+                    Enter one item per line. These lists are shown with this service in the customer app.
+                  </p>
+                </>
+              ) : null}
             </div>
             <DialogFooter className="border-t pt-4">
               <Button
@@ -1183,12 +1437,189 @@ export default function ServicesPage() {
               <Button
                 type="submit"
                 className="bg-amber-600 text-white hover:bg-amber-700"
-                disabled={isServiceUpdatePending}
+                disabled={
+                  isServiceUpdatePending ||
+                  (!usesCategoryScope(editingCategorySlug) &&
+                    (isSkuContentLoading || Boolean(skuContentError)))
+                }
               >
                 {isServiceUpdatePending && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
                 Save service
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={Boolean(editingScopeCategory)}
+        onOpenChange={(open) => {
+          if (!open && !scopeMutation.isPending) setEditingScopeCategory(null);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit app scope</DialogTitle>
+            <DialogDescription>
+              Changes apply to the {editingScopeCategory?.name} category in the customer app.
+              Enter one included or not-included item per line.
+            </DialogDescription>
+          </DialogHeader>
+          {scopeContentError ? (
+            <p className="text-sm text-red-600">
+              Could not load saved scope content: {(scopeContentError as Error).message}
+            </p>
+          ) : null}
+          <form className="space-y-5" onSubmit={saveScope}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="space-y-1.5 text-sm font-medium text-gray-700">
+                Included section heading
+                <Input
+                  value={scopeIncludedTitle}
+                  onChange={(event) => setScopeIncludedTitle(event.target.value)}
+                  maxLength={120}
+                  required
+                />
+              </label>
+              <label className="space-y-1.5 text-sm font-medium text-gray-700">
+                Not-included section heading
+                <Input
+                  value={scopeNotIncludedTitle}
+                  onChange={(event) => setScopeNotIncludedTitle(event.target.value)}
+                  maxLength={120}
+                  required
+                />
+              </label>
+            </div>
+            <div className="space-y-4">
+              {scopeSections.map((section, index) => (
+                <Card key={`${section.id}-${index}`} className="border-gray-200">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                    <CardTitle className="text-base">Scope tab {index + 1}</CardTitle>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setScopeSections((current) =>
+                          current.filter((_, sectionIndex) => sectionIndex !== index),
+                        )
+                      }
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Remove
+                    </Button>
+                  </CardHeader>
+                  <CardContent className="grid gap-4 sm:grid-cols-2">
+                    <label className="space-y-1.5 text-sm font-medium text-gray-700">
+                      Tab label
+                      <Input
+                        value={section.label}
+                        onChange={(event) =>
+                          setScopeSections((current) =>
+                            current.map((item, sectionIndex) =>
+                              sectionIndex === index
+                                ? { ...item, label: event.target.value }
+                                : item,
+                            ),
+                          )
+                        }
+                        maxLength={120}
+                        required
+                      />
+                    </label>
+                    <label className="space-y-1.5 text-sm font-medium text-gray-700">
+                      Tab identifier
+                      <Input
+                        value={section.id}
+                        onChange={(event) =>
+                          setScopeSections((current) =>
+                            current.map((item, sectionIndex) =>
+                              sectionIndex === index
+                                ? { ...item, id: event.target.value }
+                                : item,
+                            ),
+                          )
+                        }
+                        maxLength={100}
+                        required
+                      />
+                    </label>
+                    <label className="space-y-1.5 text-sm font-medium text-gray-700">
+                      Included items
+                      <textarea
+                        className={`${fieldClassName} min-h-32 resize-y`}
+                        value={section.includedItemsText}
+                        onChange={(event) =>
+                          setScopeSections((current) =>
+                            current.map((item, sectionIndex) =>
+                              sectionIndex === index
+                                ? { ...item, includedItemsText: event.target.value }
+                                : item,
+                            ),
+                          )
+                        }
+                        placeholder="One item per line"
+                      />
+                    </label>
+                    <label className="space-y-1.5 text-sm font-medium text-gray-700">
+                      Not-included items
+                      <textarea
+                        className={`${fieldClassName} min-h-32 resize-y`}
+                        value={section.notIncludedItemsText}
+                        onChange={(event) =>
+                          setScopeSections((current) =>
+                            current.map((item, sectionIndex) =>
+                              sectionIndex === index
+                                ? { ...item, notIncludedItemsText: event.target.value }
+                                : item,
+                            ),
+                          )
+                        }
+                        placeholder="One item per line"
+                      />
+                    </label>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                setScopeSections((current) => [
+                  ...current,
+                  {
+                    id: `${editingScopeCategory?.slug || 'scope'}-${Date.now()}`,
+                    label: '',
+                    includedItemsText: '',
+                    notIncludedItemsText: '',
+                  },
+                ])
+              }
+            >
+              <Plus className="h-4 w-4" />
+              Add scope tab
+            </Button>
+            <DialogFooter className="border-t pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditingScopeCategory(null)}
+                disabled={scopeMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-amber-600 text-white hover:bg-amber-700"
+                disabled={scopeMutation.isPending}
+              >
+                {scopeMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : null}
+                Save app scope
               </Button>
             </DialogFooter>
           </form>
