@@ -32,7 +32,9 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   createLocation,
+  listLocations,
   searchLocations,
+  type LocationRecord,
   type GoogleLocationResult,
 } from '@/lib/api/location-pricing';
 import {
@@ -51,6 +53,21 @@ const LOCATION_TYPES: Array<{ value: BookNowLocationType | 'all'; label: string 
   { value: 'state', label: 'State' },
 ];
 
+function getCityCatalogNames(cityName: string, stateName: string) {
+  const name = cityName.trim().replace(/\s+/g, ' ');
+  const compactName = name.toLocaleLowerCase('en-IN').replace(/[\s-]+/g, '');
+  if (
+    /^telangana$/i.test(stateName) &&
+    ['mahabubnagar', 'mahbubnagar'].includes(compactName)
+  ) {
+    return {
+      canonicalName: 'Mahabubnagar',
+      aliases: ['Mahabubnagar', 'Mahabub Nagar', 'Mahbubnagar', 'Mahbub Nagar'],
+    };
+  }
+  return { canonicalName: name, aliases: [name] };
+}
+
 export default function BookNowAvailabilityPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
@@ -58,6 +75,9 @@ export default function BookNowAvailabilityPage() {
   const [type, setType] = useState<BookNowLocationType | 'all'>('all');
   const [catalogId, setCatalogId] = useState('');
   const [status, setStatus] = useState<'all' | 'enabled' | 'disabled' | 'mixed'>('all');
+  const [addCityOpen, setAddCityOpen] = useState(false);
+  const [newCityName, setNewCityName] = useState('');
+  const [newCityStateId, setNewCityStateId] = useState('');
   const [addAreaOpen, setAddAreaOpen] = useState(false);
   const [newAreaName, setNewAreaName] = useState('');
   const [debouncedAreaSearch, setDebouncedAreaSearch] = useState('');
@@ -78,6 +98,17 @@ export default function BookNowAvailabilityPage() {
   const serviceCatalogQuery = useQuery({
     queryKey: ['book-now-availability-service-catalog'],
     queryFn: listServiceCatalog,
+    staleTime: 5 * 60_000,
+  });
+  const statesQuery = useQuery({
+    queryKey: ['book-now-availability-states'],
+    queryFn: async () => {
+      const response = await listLocations({ type: 'state', isActive: 'true' });
+      if (!response?.success || !Array.isArray(response.data)) {
+        throw new Error(response?.error || 'Failed to load states');
+      }
+      return response.data.filter((state) => state.isActive);
+    },
     staleTime: 5 * 60_000,
   });
   const query = useQuery({
@@ -121,6 +152,51 @@ export default function BookNowAvailabilityPage() {
     },
     onError: (error: Error) =>
       toast.error(error.message || 'Failed to remove location from Book Now'),
+  });
+  const createCityMutation = useMutation({
+    mutationFn: async ({ name, stateId }: { name: string; stateId: string }) => {
+      const state = (statesQuery.data || []).find((item) => item._id === stateId);
+      if (!state) throw new Error('Select a valid state');
+      const names = getCityCatalogNames(name, state.displayName || state.canonicalName || '');
+      const created = await createLocation('city', {
+        stateId,
+        canonicalName: names.canonicalName,
+        displayName: names.canonicalName,
+        aliases: names.aliases,
+      });
+      if (!created?.success || !created.data?._id) {
+        throw new Error(created?.error || 'Failed to add city');
+      }
+
+      try {
+        await updateBookNowLocationAvailability({
+          locationType: 'city',
+          locationId: created.data._id,
+          isEnabled: false,
+        });
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : 'Unknown error';
+        throw new Error(`City was added, but its availability could not be set. Refresh and configure it manually. ${detail}`);
+      }
+
+      return created.data;
+    },
+    onSuccess: async (city) => {
+      const cityName = city.displayName || city.canonicalName || 'City';
+      toast.success(`${cityName} added as unavailable`);
+      setAddCityOpen(false);
+      setNewCityName('');
+      setNewCityStateId('');
+      setSearch(cityName);
+      setType('city');
+      setCatalogId('');
+      setStatus('all');
+      await queryClient.invalidateQueries({ queryKey: ['book-now-location-availability'] });
+    },
+    onError: async (error: Error) => {
+      toast.error(error.message || 'Failed to add city');
+      await queryClient.invalidateQueries({ queryKey: ['book-now-location-availability'] });
+    },
   });
   const createAreaMutation = useMutation({
     mutationFn: async (result: GoogleLocationResult) => {
@@ -174,6 +250,11 @@ export default function BookNowAvailabilityPage() {
   const selectedCategory = serviceCatalogQuery.data?.find(
     (category) => category.slug === catalogId,
   );
+  const availableStates = statesQuery.data || [];
+  const selectedCityStateId =
+    newCityStateId ||
+    availableStates.find((state) => /^telangana$/i.test(state.displayName || state.canonicalName || ''))?._id ||
+    '';
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
@@ -191,6 +272,15 @@ export default function BookNowAvailabilityPage() {
           <Button variant="outline" size="sm" onClick={() => void query.refetch()} disabled={query.isFetching}>
             <RefreshCw className={`mr-2 h-4 w-4 ${query.isFetching ? 'animate-spin' : ''}`} />
             Refresh
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAddCityOpen(true)}
+            disabled={statesQuery.isLoading || statesQuery.isError || availableStates.length === 0}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add city
           </Button>
           <Button size="sm" onClick={() => setAddAreaOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -466,6 +556,99 @@ export default function BookNowAvailabilityPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={addCityOpen}
+        onOpenChange={(open) => {
+          setAddCityOpen(open);
+          if (!open && !createCityMutation.isPending) {
+            setNewCityName('');
+            setNewCityStateId('');
+          }
+        }}
+      >
+        <DialogContent>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (newCityName.trim() && selectedCityStateId) {
+                createCityMutation.mutate({
+                  name: newCityName.trim(),
+                  stateId: selectedCityStateId,
+                });
+              }
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>Add Book Now city</DialogTitle>
+              <DialogDescription>
+                Add a city to the location catalog. New cities start as unavailable; enable Book Now after adding it.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label htmlFor="book-now-city-name">City name</Label>
+                <Input
+                  id="book-now-city-name"
+                  className="mt-2"
+                  placeholder="e.g. Mahabub Nagar"
+                  value={newCityName}
+                  onChange={(event) => setNewCityName(event.target.value)}
+                  maxLength={120}
+                  autoFocus
+                  autoComplete="off"
+                />
+              </div>
+              <div>
+                <Label htmlFor="book-now-city-state">State</Label>
+                <Select
+                  value={selectedCityStateId}
+                  onValueChange={setNewCityStateId}
+                  disabled={statesQuery.isLoading || statesQuery.isError}
+                >
+                  <SelectTrigger id="book-now-city-state" className="mt-2">
+                    <SelectValue placeholder="Select a state" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableStates.map((state: LocationRecord) => (
+                      <SelectItem key={state._id} value={state._id}>
+                        {state.displayName || state.canonicalName || state._id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {statesQuery.isError ? (
+                  <p role="alert" className="mt-2 text-xs text-rose-600">
+                    Could not load states. Refresh the page and try again.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setAddCityOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={
+                  !newCityName.trim() ||
+                  !selectedCityStateId ||
+                  createCityMutation.isPending
+                }
+              >
+                {createCityMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Add unavailable city
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={addAreaOpen} onOpenChange={setAddAreaOpen}>
         <DialogContent>

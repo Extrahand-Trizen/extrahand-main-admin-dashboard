@@ -55,7 +55,9 @@ import {
   type HourlyAvailabilityItem,
   type LocationType,
   type GoogleLocationResult,
+  setHourlyAvailabilitySlotSettings,
 } from "@/lib/api/location-pricing";
+import { Switch } from "@/components/ui/switch";
 
 const AVAILABILITY_QUERY_KEY = "hourly-helper-availabilities";
 const ITEMS_PER_PAGE = 10;
@@ -79,6 +81,13 @@ export default function HourlyHelperAvailabilityPage() {
     item: HourlyAvailabilityItem;
     nextState: boolean;
   } | null>(null);
+  const [slotSettingsTarget, setSlotSettingsTarget] = useState<HourlyAvailabilityItem | null>(null);
+  const [slotSettingsDraft, setSlotSettingsDraft] = useState<HourlyAvailabilityItem["slotSettings"]>({
+    mode: "helper_capacity",
+    startTime: "07:00",
+    endTime: "20:00",
+    blockedHours: 2,
+  });
 
   // Debounce Google location search input
   useEffect(() => {
@@ -134,6 +143,25 @@ export default function HourlyHelperAvailabilityPage() {
     },
     onError: (err: any) => {
       toast.error(err.message || "Failed to update location availability");
+    },
+  });
+
+  const slotSettingsMutation = useMutation({
+    mutationFn: async () => {
+      if (!slotSettingsTarget) throw new Error("Choose a location first");
+      return setHourlyAvailabilitySlotSettings(
+        slotSettingsTarget.locationType,
+        slotSettingsTarget.locationId,
+        slotSettingsDraft,
+      );
+    },
+    onSuccess: () => {
+      toast.success(`Slot settings saved for ${slotSettingsTarget?.displayName || "location"}`);
+      queryClient.invalidateQueries({ queryKey: [AVAILABILITY_QUERY_KEY] });
+      setSlotSettingsTarget(null);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Failed to save slot settings");
     },
   });
 
@@ -216,7 +244,7 @@ export default function HourlyHelperAvailabilityPage() {
             </Badge>
           </div>
           <p className="mt-1 text-sm text-gray-500">
-            Manage Hourly Helper availability independently for each location based on real-time partner coverage.
+            Manage Hourly Helper availability independently by location, using live helper capacity or configured booking slots.
           </p>
         </div>
 
@@ -500,6 +528,23 @@ export default function HourlyHelperAvailabilityPage() {
                     </TableCell>
 
                     <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSlotSettingsTarget(item);
+                          setSlotSettingsDraft(item.slotSettings || {
+                            mode: "helper_capacity",
+                            startTime: "07:00",
+                            endTime: "20:00",
+                            blockedHours: 2,
+                          });
+                        }}
+                        className="h-8 text-xs font-semibold"
+                      >
+                        Configure Slots
+                      </Button>
                       {item.isEnabled ? (
                         <Button
                           variant="outline"
@@ -519,6 +564,7 @@ export default function HourlyHelperAvailabilityPage() {
                           Enable Helper
                         </Button>
                       )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -667,6 +713,116 @@ export default function HourlyHelperAvailabilityPage() {
           <DialogFooter className="pt-2">
             <Button variant="outline" size="sm" onClick={() => setAddModalOpen(false)} disabled={isProvisioning}>
               Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(slotSettingsTarget)}
+        onOpenChange={(open) => !open && setSlotSettingsTarget(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Hourly Helper Slot Settings</DialogTitle>
+            <DialogDescription>
+              {slotSettingsTarget?.displayName} · Configure this location&apos;s customer booking slots.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 py-2">
+            <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Use schedule-only availability</p>
+                <p className="mt-1 text-xs text-gray-500">
+                  When enabled, slots do not depend on live helper availability.
+                </p>
+              </div>
+              <Switch
+                checked={slotSettingsDraft.mode === "managed_schedule"}
+                onCheckedChange={(checked) => setSlotSettingsDraft((current) => ({
+                  ...current,
+                  mode: checked ? "managed_schedule" : "helper_capacity",
+                }))}
+                aria-label="Use schedule-only slot availability"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label htmlFor="hourly-slot-start" className="text-xs font-semibold text-gray-700">
+                  Daily slot range starts
+                </label>
+                <Input
+                  id="hourly-slot-start"
+                  type="time"
+                  min="07:00"
+                  max="19:30"
+                  step={1800}
+                  value={slotSettingsDraft.startTime}
+                  onChange={(event) => setSlotSettingsDraft((current) => ({
+                    ...current,
+                    startTime: event.target.value,
+                  }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="hourly-slot-end" className="text-xs font-semibold text-gray-700">
+                  Daily slot range ends
+                </label>
+                <Input
+                  id="hourly-slot-end"
+                  type="time"
+                  min="07:30"
+                  max="20:00"
+                  step={1800}
+                  value={slotSettingsDraft.endTime}
+                  onChange={(event) => setSlotSettingsDraft((current) => ({
+                    ...current,
+                    endTime: event.target.value,
+                  }))}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="hourly-slot-block-hours" className="text-xs font-semibold text-gray-700">
+                Block new slots for this many hours from now
+              </label>
+              <Input
+                id="hourly-slot-block-hours"
+                type="number"
+                min={0}
+                max={24}
+                step={0.5}
+                value={slotSettingsDraft.blockedHours}
+                onChange={(event) => setSlotSettingsDraft((current) => ({
+                  ...current,
+                  blockedHours: Number(event.target.value),
+                }))}
+              />
+              <p className="text-xs text-gray-500">
+                After this period, slots within the daily range open regardless of live helper capacity.
+                The service day remains limited to 7:00 AM–8:00 PM.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSlotSettingsTarget(null)}
+              disabled={slotSettingsMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => slotSettingsMutation.mutate()}
+              disabled={slotSettingsMutation.isPending}
+              className="bg-amber-600 text-white hover:bg-amber-700"
+            >
+              {slotSettingsMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Slot Settings
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -38,6 +38,42 @@ export type ServiceCategory = {
   services: CatalogService[];
 };
 
+export type ServiceScopeSection = {
+  id: string;
+  label: string;
+  includedItems: string[];
+  notIncludedItems: string[];
+};
+
+export type ServiceScope = {
+  includedTitle: string;
+  notIncludedTitle: string;
+  sections: ServiceScopeSection[];
+};
+
+export type ServiceCategoryContent = {
+  _id?: string;
+  categorySlug: string;
+  title: string;
+  subtitle?: string;
+  description?: string;
+  heroImageUrl?: string;
+  iconUrl?: string;
+  faqCategoryKeys?: string[];
+  sortOrder?: number;
+  isActive?: boolean;
+  scope?: ServiceScope;
+};
+
+export type ServiceSkuContent = {
+  _id: string;
+  categorySlug: string;
+  skuSlug: string;
+  displayName: string;
+  includes: string[];
+  excludes: string[];
+};
+
 export type CreateCatalogService = {
   categorySlug?: string;
   categoryName?: string;
@@ -158,6 +194,64 @@ export async function listServiceCatalog(): Promise<ServiceCategory[]> {
   const response = await apiRequest<ApiEnvelope<ServiceCategory[]>>('/api/v1/services');
   if (!response?.success || !Array.isArray(response.data)) {
     throw new Error(response?.message || response?.error || 'Failed to load services');
+  }
+  return response.data;
+}
+
+export async function listServiceCategoryContent(): Promise<ServiceCategoryContent[]> {
+  const response = await apiRequest<ApiEnvelope<ServiceCategoryContent[]>>(
+    '/api/v1/services/category-content',
+  );
+  if (!response?.success || !Array.isArray(response.data)) {
+    throw new Error(response?.message || response?.error || 'Failed to load service scope content');
+  }
+  return response.data;
+}
+
+export async function listServiceSkuContent(): Promise<ServiceSkuContent[]> {
+  const response = await apiRequest<ApiEnvelope<ServiceSkuContent[]>>(
+    '/api/v1/services/sku-content',
+  );
+  if (!response?.success || !Array.isArray(response.data)) {
+    throw new Error(response?.message || response?.error || 'Failed to load service package content');
+  }
+  return response.data;
+}
+
+export async function updateServiceSkuScope(
+  categorySlug: string,
+  skuSlug: string,
+  displayName: string,
+  includes: string[],
+  excludes: string[],
+): Promise<ServiceSkuContent> {
+  const response = await apiRequest<ApiEnvelope<ServiceSkuContent>>(
+    `/api/v1/services/sku-content/${encodeURIComponent(categorySlug)}/${encodeURIComponent(skuSlug)}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ displayName, includes, excludes }),
+    },
+  );
+  if (!response?.success || !response.data) {
+    throw new Error(response?.message || response?.error || 'Failed to update service package scope');
+  }
+  return response.data;
+}
+
+export async function updateServiceCategoryScope(
+  categorySlug: string,
+  title: string,
+  scope: ServiceScope,
+): Promise<ServiceCategoryContent> {
+  const response = await apiRequest<ApiEnvelope<ServiceCategoryContent>>(
+    `/api/v1/services/category-content/${encodeURIComponent(categorySlug)}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ title, scope }),
+    },
+  );
+  if (!response?.success || !response.data?.scope) {
+    throw new Error(response?.message || response?.error || 'Failed to update service scope');
   }
   return response.data;
 }

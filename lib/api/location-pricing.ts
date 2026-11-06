@@ -186,6 +186,12 @@ export type HourlyAvailabilityItem = {
   isEnabled: boolean;
   isExplicit: boolean;
   eligibleHelperCount: number;
+  slotSettings: {
+    mode: "helper_capacity" | "managed_schedule";
+    startTime: string;
+    endTime: string;
+    blockedHours: number;
+  };
   updatedAt?: string;
   updatedBy?: string;
 };
@@ -203,6 +209,17 @@ export function toggleHourlyAvailability(type: LocationType, id: string, isEnabl
     method: 'POST',
     body: JSON.stringify({ isEnabled }),
   });
+}
+
+export function setHourlyAvailabilitySlotSettings(
+  type: LocationType,
+  id: string,
+  settings: HourlyAvailabilityItem["slotSettings"],
+) {
+  return apiRequest<ApiEnvelope<HourlyAvailabilityItem["slotSettings"]>>(
+    `/api/v1/location-pricing/hourly-availability/${type}/${encodeURIComponent(id)}/slot-settings`,
+    { method: "PATCH", body: JSON.stringify({ settings }) },
+  );
 }
 
 export type PostCompareAvailabilityItem = {
