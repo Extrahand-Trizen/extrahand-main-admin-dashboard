@@ -165,7 +165,9 @@ export default function WhatsAppNotificationHistoryPage() {
                         <TableCell className="max-w-[260px] text-xs text-gray-600">
                           {campaign.app === "helper_app"
                             ? `${campaign.categories.join(", ")} · ${campaign.cities.join(", ")}`
-                            : "—"}
+                            : campaign.app === "customer_app" && campaign.cities.length > 0
+                              ? campaign.cities.join(", ")
+                              : "—"}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {campaign.recipientCount.toLocaleString("en-IN")}

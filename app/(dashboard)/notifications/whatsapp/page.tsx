@@ -148,7 +148,7 @@ export default function SendWhatsAppNotificationPage() {
       countWhatsAppAudience({
         app: app!,
         categories: app === "helper_app" ? categories : [],
-        cities: app === "helper_app" ? cities : [],
+        cities: app === "helper_app" || app === "customer_app" ? cities : [],
         workAreas: app === "helper_app" ? selectedCityWorkAreas : [],
       }),
     enabled:
@@ -190,6 +190,8 @@ export default function SendWhatsAppNotificationPage() {
     setApp(nextApp);
     if (nextApp !== "helper_app") {
       setCategories([]);
+    }
+    if (nextApp === "seller_app") {
       setCities([]);
     }
   };
@@ -232,7 +234,7 @@ export default function SendWhatsAppNotificationPage() {
     sendMutation.mutate({
       app,
       categories: app === "helper_app" ? categories : [],
-      cities: app === "helper_app" ? cities : [],
+      cities: app === "helper_app" || app === "customer_app" ? cities : [],
       workAreas: app === "helper_app" ? selectedCityWorkAreas : [],
       templateId: selectedTemplate.id,
       variables: Object.fromEntries(
@@ -251,6 +253,8 @@ export default function SendWhatsAppNotificationPage() {
     .filter(Boolean)
     .filter((name, index, list) => list.findIndex((entry) => entry.toLowerCase() === name.toLowerCase()) === index)
     .sort((first, second) => first.localeCompare(second));
+  const templateStep = app === "helper_app" || app === "customer_app" ? 3 : 2;
+  const variablesStep = templateStep + 1;
 
   return (
     <div className="space-y-6">
@@ -308,42 +312,52 @@ export default function SendWhatsAppNotificationPage() {
                 </div>
               </section>
 
-              {app === "helper_app" && (
+              {(app === "helper_app" || app === "customer_app") && (
                 <section className="space-y-4 border-t pt-5">
                   <div>
-                    <Label>2. Partner filters</Label>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Partners must match a selected category and have work areas in a selected city.
-                      Profile address is not used. Only approved partners are included.
-                    </p>
+                    <Label>
+                      {app === "helper_app" ? "2. Partner filters" : "2. Customer city filter (optional)"}
+                    </Label>
+                    {app === "helper_app" ? (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Partners must match a selected category and have work areas in a selected city.
+                        Profile address is not used. Only approved partners are included.
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Select a city to notify only customers whose profile city matches. Leave unselected to include customers in all cities.
+                      </p>
+                    )}
                   </div>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <fieldset className="space-y-2">
-                      <legend className="text-sm font-medium text-gray-800">Categories</legend>
-                      <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border p-2">
-                        {categoriesQuery.isLoading ? (
-                          <p className="p-2 text-sm text-gray-500">Loading categories...</p>
-                        ) : categoriesQuery.isError ? (
-                          <p className="p-2 text-sm text-red-600">
-                            Couldn&apos;t load categories: {categoriesQuery.error.message}
-                          </p>
-                        ) : categoryOptions.length === 0 ? (
-                          <p className="p-2 text-sm text-gray-500">No categories available.</p>
-                        ) : (
-                          categoryOptions.map((category) => (
-                            <label key={category} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-gray-50">
-                              <input
-                                type="checkbox"
-                                checked={categories.includes(category)}
-                                onChange={() => toggleSelection(categories, category, setCategories)}
-                                className="h-4 w-4 accent-yellow-600"
-                              />
-                              {category}
-                            </label>
-                          ))
-                        )}
-                      </div>
-                    </fieldset>
+                  <div className={`grid gap-4 ${app === "helper_app" ? "md:grid-cols-2" : "md:grid-cols-1"}`}>
+                    {app === "helper_app" && (
+                      <fieldset className="space-y-2">
+                        <legend className="text-sm font-medium text-gray-800">Categories</legend>
+                        <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border p-2">
+                          {categoriesQuery.isLoading ? (
+                            <p className="p-2 text-sm text-gray-500">Loading categories...</p>
+                          ) : categoriesQuery.isError ? (
+                            <p className="p-2 text-sm text-red-600">
+                              Couldn&apos;t load categories: {categoriesQuery.error.message}
+                            </p>
+                          ) : categoryOptions.length === 0 ? (
+                            <p className="p-2 text-sm text-gray-500">No categories available.</p>
+                          ) : (
+                            categoryOptions.map((category) => (
+                              <label key={category} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-gray-50">
+                                <input
+                                  type="checkbox"
+                                  checked={categories.includes(category)}
+                                  onChange={() => toggleSelection(categories, category, setCategories)}
+                                  className="h-4 w-4 accent-yellow-600"
+                                />
+                                {category}
+                              </label>
+                            ))
+                          )}
+                        </div>
+                      </fieldset>
+                    )}
                     <fieldset className="space-y-2">
                       <legend className="text-sm font-medium text-gray-800">Cities</legend>
                       <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border p-2">
@@ -379,7 +393,7 @@ export default function SendWhatsAppNotificationPage() {
               )}
 
               <section className="space-y-3 border-t pt-5">
-                <Label htmlFor="whatsapp-template">2. Approved WhatsApp template</Label>
+                <Label htmlFor="whatsapp-template">{templateStep}. Approved WhatsApp template</Label>
                 {templatesQuery.isLoading ? (
                   <div className="flex items-center gap-2 text-sm text-gray-500">
                     <Loader2 className="h-4 w-4 animate-spin" /> Loading templates from Dialog...
@@ -422,7 +436,7 @@ export default function SendWhatsAppNotificationPage() {
               {selectedTemplate && (
                 <section className="space-y-4 border-t pt-5">
                   <div>
-                    <Label>3. Template variables</Label>
+                    <Label>{variablesStep}. Template variables</Label>
                     <p className="mt-1 text-xs text-gray-500">
                       Enter the value for each placeholder used by this template.
                     </p>
@@ -567,6 +581,7 @@ export default function SendWhatsAppNotificationPage() {
               The approved template <strong>{selectedTemplate?.metaTemplateName}</strong> will be queued for{" "}
               <strong>{recipientCount.toLocaleString("en-IN")} {appName(app)} users</strong>.
               {app === "helper_app" && ` Matching categories: ${categories.join(", ")}. Cities: ${cities.join(", ")}.`}
+            {app === "customer_app" && cities.length > 0 && ` Customers in: ${cities.join(", ")}.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -57,11 +57,12 @@ const PARTNER_STATUS_OPTIONS = [
 ];
 
 const PARTNER_CATEGORY_OPTIONS = [
-  "Home Services",
-  "Delivery & Logistics",
-  "Driving",
-  "Professional Services",
-  "Care Services",
+  { value: "cleaning_related", label: "Cleaning & Related Services" },
+  { value: "Home Services", label: "Home Services" },
+  { value: "Delivery & Logistics", label: "Delivery & Logistics" },
+  { value: "Driving", label: "Driving" },
+  { value: "Professional Services", label: "Professional Services" },
+  { value: "Care Services", label: "Care Services" },
 ];
 
 const getStatusLabel = (status?: string) => {
@@ -369,8 +370,8 @@ export default function PartnerRegistrationsPage() {
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
                   {PARTNER_CATEGORY_OPTIONS.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
+                    <SelectItem key={category.value} value={category.value}>
+                      {category.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

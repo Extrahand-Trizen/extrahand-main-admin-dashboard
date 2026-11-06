@@ -126,6 +126,31 @@ const getRoleLabel = (
   return "N/A";
 };
 
+const getPrimarySkillCategories = (user: User) => {
+  const categories = [
+    ...Object.keys(user.partnerProfile?.skills || {}),
+    ...(user.skills?.list ?? [])
+      .map((skill) => skill.category)
+      .filter((category): category is string => Boolean(category?.trim())),
+    ...(user.partnerProfile?.categories ?? []),
+    ...(user.skills?.primaryCategory ? [user.skills.primaryCategory] : []),
+  ];
+
+  return Array.from(
+    new Map(
+      categories
+        .map((category) => category.trim())
+        .filter(Boolean)
+        .map((category) => [
+          category.toLowerCase(),
+          category
+            .replace(/[_-]+/g, " ")
+            .replace(/\b\w/g, (char) => char.toUpperCase()),
+        ]),
+    ).values(),
+  ).join(", ");
+};
+
 const deriveAreaFromAddress = (address?: string, city?: string) => {
   if (!address) return null;
   const cityLower = city?.trim().toLowerCase();
@@ -268,6 +293,7 @@ export default function UsersPage() {
 
   // Load saved filters on mount
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
     try {
       const saved = sessionStorage.getItem("users_filters");
       if (saved) {
@@ -288,6 +314,17 @@ export default function UsersPage() {
     } catch (e) {
       console.error("Error loading filters from sessionStorage", e);
     }
+
+    const roleParam = params.get("role");
+    const aadhaarParam = params.get("aadhaar");
+    if (roleParam && ["all", "customer", "helper", "partner"].includes(roleParam)) {
+      setRoleFilter(roleParam);
+    }
+    if (aadhaarParam && ["all", "verified", "not_verified"].includes(aadhaarParam)) {
+      setAadhaarFilter(aadhaarParam);
+    }
+    if (roleParam || aadhaarParam) setPage(1);
+
     setIsLoaded(true);
   }, []);
 
@@ -512,6 +549,7 @@ export default function UsersPage() {
   const { data: registeredCountData } = useQuery({
     queryKey: [
       "users-registered-count",
+      roleFilter,
       selectedCityFilter,
       areaFilter,
       createdFrom,
@@ -519,6 +557,7 @@ export default function UsersPage() {
     ],
     queryFn: () =>
       listUsers({
+        role: roleFilter !== "all" ? roleFilter : undefined,
         city: selectedCityFilter !== "all" ? selectedCityFilter : undefined,
         area:
           selectedCityFilter.trim().toLowerCase() === "hyderabad" &&
@@ -545,7 +584,7 @@ export default function UsersPage() {
     queryFn: () =>
       listUsers({
         isAadhaarVerified: true,
-        role: "helper",
+        role: "partner",
         city: selectedCityFilter !== "all" ? selectedCityFilter : undefined,
         area:
           selectedCityFilter.trim().toLowerCase() === "hyderabad" &&
@@ -563,6 +602,16 @@ export default function UsersPage() {
 
   const registeredInRange = registeredCountData?.pagination?.total ?? 0;
   const verifiedInRange = verifiedCountData?.pagination?.total ?? 0;
+  const registeredCountLabel =
+    roleFilter === "all"
+      ? "Registered users"
+      : `Registered ${
+          roleFilter === "customer"
+            ? "customers"
+            : roleFilter === "helper"
+              ? "helpers"
+              : "partners"
+        }`;
 
   const handleExportUsers = async () => {
     setIsExporting(true);
@@ -901,7 +950,8 @@ export default function UsersPage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-gray-600">
-              Registered users{createdFrom || createdTo ? " in selected date range" : ""}
+              {registeredCountLabel}
+              {createdFrom || createdTo ? " in selected date range" : ""}
             </p>
             <p className="text-2xl font-semibold text-gray-900">
               {Number(registeredInRange).toLocaleString()}
@@ -911,7 +961,7 @@ export default function UsersPage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-gray-600">
-              Aadhaar verified Helpers{createdFrom || createdTo ? " in selected date range" : ""}
+              Aadhaar verified Partners{createdFrom || createdTo ? " in selected date range" : ""}
             </p>
             <p className="text-2xl font-semibold text-gray-900">
               {Number(verifiedInRange).toLocaleString()}
@@ -976,7 +1026,7 @@ export default function UsersPage() {
                   </TableHeader>
                   <TableBody>
                     {users.map((user) => (
-                       <TableRow
+                      <TableRow
                         key={user.userId}
                         className="cursor-pointer hover:bg-gray-50 transition-colors"
                         onClick={() =>
@@ -1011,19 +1061,9 @@ export default function UsersPage() {
                           <Badge variant="outline">{getRoleLabel(user)}</Badge>
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-sm text-gray-500">
-                          {getRoleLabel(user).includes("Helper") ? (
-                            user.skills?.list && user.skills.list.length > 0 ? (
-                              <span className="truncate max-w-[150px] sm:max-w-[200px] block font-medium text-gray-700 capitalize" title={user.skills.list.map(s => s.name).join(", ")}>
-                                {user.skills.list.map(s => s.name).join(", ")}
-                              </span>
-                            ) : user.skills?.primaryCategory ? (
-                              <span className="capitalize font-medium text-gray-700">{user.skills.primaryCategory.replace(/_/g, " ")}</span>
-                            ) : (
-                              "—"
-                            )
-                          ) : (
-                            "—"
-                          )}
+                          <span className="truncate max-w-[150px] sm:max-w-[200px] block font-medium text-gray-700">
+                            {getPrimarySkillCategories(user) || "—"}
+                          </span>
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-sm text-gray-500">
                           {getUserAreaLabel(user)}

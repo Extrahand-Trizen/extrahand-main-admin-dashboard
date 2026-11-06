@@ -574,7 +574,6 @@ export interface AnalyticsOverview {
   };
   Helpers: {
     totalRegistered: number;
-    aadhaarVerified?: number;
     categoryCounts?: Array<{
       category: string;
       helperCount: number;
@@ -584,6 +583,9 @@ export interface AnalyticsOverview {
       categorizedHelpers: number;
       uncategorizedHelpers: number;
     };
+  };
+  Partners: {
+    aadhaarVerified?: number;
   };
   tasks: {
     total: number;

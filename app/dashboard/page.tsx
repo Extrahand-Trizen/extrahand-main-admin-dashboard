@@ -112,13 +112,13 @@ export default function DashboardPage() {
       permission: 'task.list',
     },
     {
-      title: 'Helpers Aadhaar Verified',
-      value: analyticsOverviewData?.data?.Helpers?.aadhaarVerified ?? 0,
-      subtitle: 'Helper profiles only',
+      title: 'Partners Aadhaar Verified',
+      value: analyticsOverviewData?.data?.Partners?.aadhaarVerified ?? 0,
+      subtitle: 'Partner profiles only',
       icon: Users,
       color: 'text-emerald-700',
       bg: 'bg-emerald-50',
-      href: '/analytics',
+      href: '/users?role=partner&aadhaar=verified',
       permission: 'analytics.view',
     },
   ];
