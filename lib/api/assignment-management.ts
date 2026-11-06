@@ -66,6 +66,12 @@ export async function getEligibleAssignmentPartners(
   );
 }
 
+export async function getEligiblePartnerAreaData(): Promise<ApiResponse<PartnerSearchResult[]>> {
+  return apiRequest<ApiResponse<PartnerSearchResult[]>>(
+    '/api/v1/assignment-management/eligible-partner-area-data',
+  );
+}
+
 export async function searchAssignmentPartners(query: string): Promise<ApiResponse<PartnerSearchResult[]>> {
   return apiRequest<ApiResponse<PartnerSearchResult[]>>(
     `/api/v1/users/helpers/search?q=${encodeURIComponent(query)}`,

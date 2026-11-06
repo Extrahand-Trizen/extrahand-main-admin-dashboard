@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Ban, Check, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import {
   addExcludedPhone,
   addPreferredPartner,
   getEligibleAssignmentPartners,
+  getEligiblePartnerAreaData,
   getAssignmentRules,
   PartnerSearchResult,
   removeExcludedPhone,
@@ -44,29 +45,29 @@ function normalizePhone(value: string | undefined): string {
   return (value || "").replace(/\D/g, "").slice(-10);
 }
 
-async function listAllEligiblePartners(): Promise<PartnerSearchResult[]> {
-  const firstPage = await getEligibleAssignmentPartners();
-  if (!firstPage.success || !Array.isArray(firstPage.data) || !firstPage.pagination) {
-    throw new Error(firstPage.error || "Failed to load eligible partners");
-  }
+type CachedAreaSummary = {
+  area: string;
+  partnerCount: number;
+};
 
-  const partners = [...firstPage.data];
-  const totalPages = firstPage.pagination.pages;
-  if (totalPages > 100) {
-    throw new Error("The partner list exceeds the maximum number of pages supported.");
-  }
-  for (let page = 2; page <= totalPages; page += 1) {
-    const response = await getEligibleAssignmentPartners(undefined, page);
-    if (
-      !response.success ||
-      !Array.isArray(response.data) ||
-      response.pagination?.total !== firstPage.pagination.total
-    ) {
-      throw new Error(response.error || `Failed to load eligible partners on page ${page}`);
-    }
-    partners.push(...response.data);
-  }
-  return partners;
+const AREA_SUMMARY_CACHE_KEY = "assignment-management-area-summary";
+
+function createAreaSummary(partners: PartnerSearchResult[]): CachedAreaSummary[] {
+  const areas = Array.from(new Set(
+    partners.flatMap((partner) => partner.partnerProfile?.workAreas || partner.workAreas || []).filter(Boolean),
+  ));
+  return areas.map((area) => {
+    const normalizedArea = normalizeArea(area);
+    const partnerCount = partners.filter((partner) =>
+      (partner.partnerProfile?.workAreas || partner.workAreas || []).some((partnerArea) => {
+        const normalizedPartnerArea = normalizeArea(partnerArea);
+        return normalizedPartnerArea === normalizedArea ||
+          normalizedPartnerArea.includes(normalizedArea) ||
+          normalizedArea.includes(normalizedPartnerArea);
+      }),
+    ).length;
+    return { area, partnerCount };
+  });
 }
 
 export function AssignmentManagementPage({
@@ -90,8 +91,33 @@ export function AssignmentManagementPage({
   const [areaSearch, setAreaSearch] = useState("");
   const [areaWorkTypeFilter, setAreaWorkTypeFilter] = useState("hourly");
   const [areaCategoryFilter, setAreaCategoryFilter] = useState("all");
+  const [cachedAreaSummary, setCachedAreaSummary] = useState<CachedAreaSummary[]>([]);
   const [areaEditorOpen, setAreaEditorOpen] = useState(false);
   const [areaDropdownOpen, setAreaDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      const cached = window.localStorage.getItem(AREA_SUMMARY_CACHE_KEY);
+      if (!cached) return;
+      const parsed: unknown = JSON.parse(cached);
+      if (
+        Array.isArray(parsed) &&
+        parsed.every((item) =>
+          item &&
+          typeof item.area === "string" &&
+          Number.isInteger(item.partnerCount) &&
+          item.partnerCount >= 0,
+        )
+      ) {
+        const timer = window.setTimeout(() => setCachedAreaSummary(parsed), 0);
+        return () => window.clearTimeout(timer);
+      } else {
+        console.error("Invalid cached assignment area summary.");
+      }
+    } catch (error) {
+      console.error("Failed to load cached assignment area summary:", error);
+    }
+  }, []);
 
   const rulesQuery = useQuery({
     queryKey: ["assignment-management-rules"],
@@ -114,10 +140,30 @@ export function AssignmentManagementPage({
   });
   const approvedPartnersQuery = useQuery({
     queryKey: ["assignment-management-approved-partners"],
-    queryFn: listAllEligiblePartners,
+    queryFn: async () => {
+      const response = await getEligiblePartnerAreaData();
+      if (!response.success || !Array.isArray(response.data)) {
+        throw new Error(response.error || "Failed to load approved partner areas");
+      }
+      const summary = createAreaSummary(response.data);
+      try {
+        window.localStorage.setItem(AREA_SUMMARY_CACHE_KEY, JSON.stringify(summary));
+      } catch (error) {
+        console.error("Failed to cache assignment area summary:", error);
+      }
+      return response.data;
+    },
+    staleTime: 5 * 60 * 1000,
   });
 
+  useEffect(() => {
+    if (approvedPartnersQuery.isError) {
+      toast.error(approvedPartnersQuery.error.message || "Failed to refresh approved partner areas");
+    }
+  }, [approvedPartnersQuery.isError, approvedPartnersQuery.error]);
+
   const rules = rulesQuery.data?.data;
+  const isLoadingAreaRules = rulesQuery.isPending && cachedAreaSummary.length === 0;
   const preferredPartners = rules?.preferredPartners || [];
   const approvedAreaPartners = (approvedPartnersQuery.data || []).map((partner) => ({
     profileId: String(partner._id || partner.profileId || partner.userId),
@@ -132,6 +178,7 @@ export function AssignmentManagementPage({
   const areaCategories = Array.from(new Set(approvedAreaPartners.flatMap((partner) => partner.categories || []).filter(Boolean))).sort();
   const areaNames = Array.from(new Set([
     ...approvedAreaPartners.flatMap((partner) => partner.areas || []).filter(Boolean),
+    ...cachedAreaSummary.map((summary) => summary.area),
     ...(rules?.areaRules || []).map((rule) => rule.area).filter(Boolean),
   ])).sort();
   const areaPartnerSource = approvedAreaPartners.filter((partner) =>
@@ -158,12 +205,13 @@ export function AssignmentManagementPage({
     }))
     .filter((partner) => !excludedPhoneSet.has(normalizePhone(partner.phone)));
   const defaultAreaNames = Array.from(new Set(
-    areaPartnerSource.flatMap((partner) => partner.areas || []).filter(Boolean),
+    approvedPartnersQuery.data
+      ? areaPartnerSource.flatMap((partner) => partner.areas || []).filter(Boolean)
+      : cachedAreaSummary.map((summary) => summary.area),
   ));
-  console.info("[AssignmentManagement] Areas derived", {
-    approvedPartners: areaPartnerSource.length,
-    areas: defaultAreaNames,
-  });
+  const cachedPartnerCountByArea = new Map(
+    cachedAreaSummary.map((summary) => [normalizeArea(summary.area), summary.partnerCount]),
+  );
   const defaultAreaRules: AreaAssignmentRule[] = defaultAreaNames.map((area) => ({
     area,
     zone: "Default Zone",
@@ -177,7 +225,11 @@ export function AssignmentManagementPage({
     ...defaultAreaRules.filter((defaultRule) => !areaRules.some((rule) => normalizeArea(rule.area) === normalizeArea(defaultRule.area))),
   ].filter((rule) => normalizeArea(rule.area).length > 0);
   const availableAreaRules = allAreaRules.filter((rule) => {
-    const hasEligiblePartner = Math.max(getEligiblePartnersForArea(rule.area).length, getRuleEligiblePartners(rule).length) >= 1;
+    const hasEligiblePartner = Math.max(
+      getEligiblePartnersForArea(rule.area).length,
+      getRuleEligiblePartners(rule).length,
+      approvedPartnersQuery.data ? 0 : cachedPartnerCountByArea.get(normalizeArea(rule.area)) || 0,
+    ) >= 1;
     const matchesWorkType = (rule.workTypes || []).includes(areaWorkTypeFilter);
     const matchesCategory = areaWorkTypeFilter !== "book_now" || areaCategoryFilter === "all" || rule.category?.toLowerCase() === areaCategoryFilter.toLowerCase();
     return hasEligiblePartner && matchesWorkType && matchesCategory;
@@ -353,7 +405,7 @@ export function AssignmentManagementPage({
           <div className={areaEditorOpen ? "grid items-start gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(340px,0.75fr)]" : ""}>
           <Card className="min-w-0">
             <CardHeader className="border-b bg-white pb-5"><div className="flex items-center justify-between"><h3 className="text-lg font-semibold text-gray-900">Filters</h3><Button className="h-10" onClick={() => openAreaEditor()}><Plus className="mr-2 h-4 w-4" />Add Area Rule</Button></div><div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2 xl:grid-cols-3"><label className="space-y-1.5"><span className="text-xs font-medium uppercase tracking-wide text-gray-500">Search</span><Input className="h-10 w-full bg-white" value={areaSearch} onChange={(event) => setAreaSearch(event.target.value)} placeholder="Search area..." /></label><label className="space-y-1.5"><span className="text-xs font-medium uppercase tracking-wide text-gray-500">Work type</span><select className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm" value={areaWorkTypeFilter} onChange={(event) => { setAreaWorkTypeFilter(event.target.value); if (event.target.value === "hourly") setAreaCategoryFilter("all"); }} aria-label="Filter areas by work type"><option value="hourly">Hourly</option><option value="book_now">Book Now</option></select></label>{areaWorkTypeFilter === "book_now" && <label className="space-y-1.5"><span className="text-xs font-medium uppercase tracking-wide text-gray-500">Category</span><select className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm" value={areaCategoryFilter} onChange={(event) => setAreaCategoryFilter(event.target.value)} aria-label="Filter Book Now areas by category"><option value="all">All categories</option>{areaCategories.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>}</div><div className="mt-4"><Button variant="outline" onClick={() => { setAreaSearch(""); setAreaWorkTypeFilter("hourly"); setAreaCategoryFilter("all"); }}>Reset</Button></div></CardHeader>
-            <CardContent className="p-4 sm:p-5"><div className="overflow-x-auto rounded-lg border border-gray-200"><table className="w-full min-w-[620px] text-left text-sm"><thead className="border-b bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500"><tr><th className="px-4 py-3">#</th><th className="px-4 py-3">Area</th><th className="px-4 py-3">Work Type</th>{areaWorkTypeFilter === "book_now" && <th className="px-4 py-3">Category</th>}<th className="px-4 py-3">Preferred Partners</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Actions</th></tr></thead><tbody>{visibleAreaRules.map((rule, index) => <tr key={rule.area || `area-${index}`} className="border-b transition-colors last:border-0 hover:bg-amber-50/40"><td className="px-4 py-3 text-gray-400">{index + 1}</td><td className="px-4 py-3 font-medium text-gray-900">{rule.area || "Unnamed area"}</td><td className="px-4 py-3 text-gray-600">{(rule.workTypes || []).join(", ") || "-"}</td>{areaWorkTypeFilter === "book_now" && <td className="px-4 py-3 text-gray-600">{rule.category || "-"}</td>}<td className="px-4 py-3 text-gray-600">{getRuleEligiblePartners(rule).length || "-"}</td><td className="px-4 py-3"><Badge variant="success">Active</Badge></td><td className="px-4 py-3 text-right"><Button size="sm" variant="outline" onClick={() => openAreaEditor(rule)}>Edit</Button></td></tr>)}</tbody></table></div>{visibleAreaRules.length === 0 && <p className="py-10 text-center text-sm text-gray-500">No area rules configured yet.</p>}</CardContent>
+            <CardContent className="p-4 sm:p-5">{isLoadingAreaRules ? <div className="flex items-center justify-center gap-2 py-10 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" />Loading area rules...</div> : <><div className="overflow-x-auto rounded-lg border border-gray-200"><table className="w-full min-w-[620px] text-left text-sm"><thead className="border-b bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500"><tr><th className="px-4 py-3">#</th><th className="px-4 py-3">Area</th><th className="px-4 py-3">Work Type</th>{areaWorkTypeFilter === "book_now" && <th className="px-4 py-3">Category</th>}<th className="px-4 py-3">Preferred Partners</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Actions</th></tr></thead><tbody>{visibleAreaRules.map((rule, index) => <tr key={rule.area || `area-${index}`} className="border-b transition-colors last:border-0 hover:bg-amber-50/40"><td className="px-4 py-3 text-gray-400">{index + 1}</td><td className="px-4 py-3 font-medium text-gray-900">{rule.area || "Unnamed area"}</td><td className="px-4 py-3 text-gray-600">{(rule.workTypes || []).join(", ") || "-"}</td>{areaWorkTypeFilter === "book_now" && <td className="px-4 py-3 text-gray-600">{rule.category || "-"}</td>}<td className="px-4 py-3 text-gray-600">{Math.max(getRuleEligiblePartners(rule).length, getEligiblePartnersForArea(rule.area).length, approvedPartnersQuery.data ? 0 : cachedPartnerCountByArea.get(normalizeArea(rule.area)) || 0) || "-"}</td><td className="px-4 py-3"><Badge variant="success">Active</Badge></td><td className="px-4 py-3 text-right"><Button size="sm" variant="outline" disabled={approvedPartnersQuery.isPending && rule.preferredPartners.length === 0} onClick={() => openAreaEditor(rule)}>Edit</Button></td></tr>)}</tbody></table></div>{visibleAreaRules.length === 0 && <p className="py-10 text-center text-sm text-gray-500">{approvedPartnersQuery.isPending ? "Loading available areas..." : "No area rules configured yet."}</p>}</>}</CardContent>
           </Card>
           {areaEditorOpen && <Card className="min-w-0">
             <CardHeader>
@@ -372,7 +424,7 @@ export function AssignmentManagementPage({
                 <div className="space-y-1"><p className="text-xs font-medium uppercase tracking-wide text-gray-500">Added partners</p>{selectedAreaPartners.length === 0 && <p className="text-sm text-gray-500">No partners added yet.</p>}{selectedAreaPartners.map((partner) => <div key={partnerId(partner)} className="flex items-center justify-between rounded bg-gray-50 px-3 py-2 text-sm"><span>{partnerName(partner)} <span className="text-xs text-gray-500">{partner.phone || partner.phoneNumber || partnerUid(partner)}</span></span><button type="button" className="text-xs text-red-600 hover:underline" onClick={() => { const id = partnerId(partner); setAreaPartnerIds((current) => current.filter((item) => item !== id)); setAreaAddedPartners((current) => current.filter((item) => partnerId(item) !== id)); }}>Remove</button></div>)}</div>
                 {areaName && matchingAreaPartners.length > 0 && <p className="text-xs text-gray-500">Approved partners already matching this area are available to add.</p>}
               </div>
-              <Button className="w-full" onClick={() => saveAreaRuleMutation.mutate()} disabled={saveAreaRuleMutation.isPending || !areaName.trim() || (areaRuleWorkType === "book_now" && !areaRuleCategory) || areaPartnerIds.length === 0}>
+              <Button className="w-full" onClick={() => saveAreaRuleMutation.mutate()} disabled={saveAreaRuleMutation.isPending || !areaName.trim() || (areaRuleWorkType === "book_now" && !areaRuleCategory)}>
                 {saveAreaRuleMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}Save Area Rule
               </Button>
             </CardContent>

@@ -362,10 +362,17 @@ export default function UsersPage() {
     retry: false,
   });
   const cities = locationCatalogData?.data?.cities ?? [];
+  const userFilterCities = cities.some(
+    (city) => city.name.trim().toLowerCase() === "rajagopalpet",
+  )
+    ? cities
+    : [...cities, { id: "rajagopalpet", name: "Rajagopalpet", enabled: true }];
   const selectedCityFilter =
     locationCatalogData &&
     cityFilter !== "all" &&
-    !cities.some((city) => city.name === cityFilter)
+    !userFilterCities.some(
+      (city) => city.name.trim().toLowerCase() === cityFilter.trim().toLowerCase(),
+    )
       ? "all"
       : cityFilter;
   const isHyderabadSelected =
@@ -844,7 +851,7 @@ export default function UsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Cities</SelectItem>
-                  {cities.map((city) => (
+                  {userFilterCities.map((city) => (
                     <SelectItem key={city.id} value={city.name}>
                       {city.name}
                     </SelectItem>
