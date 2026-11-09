@@ -17,7 +17,10 @@ import {
   getTaskPostedEmailSettings,
   getRoundRobinTeamSettings,
   getWhatsAppNotificationSettings,
+  listInvites,
   listUsers,
+  AdminInvite,
+  AdminUser,
   RoundRobinMember,
   RoundRobinTeamSettingsData,
   TaskPostedEmailSettings,
@@ -50,16 +53,29 @@ function RoundRobinTeamEditor({
   const teamQuery = useQuery({
     queryKey: [queryKey],
     queryFn: getSettings,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
   });
 
   const teamMembers = teamMembersOverride ?? teamQuery.data?.teamMembers ?? [];
 
   const saveMutation = useMutation({
-    mutationFn: updateSettings,
+    mutationFn: async (emails: string[]) => {
+      await updateSettings(emails);
+      const savedSettings = await getSettings();
+      const savedEmails = savedSettings.teamMembers.map((member) => member.email.trim().toLowerCase());
+      const requestedEmails = emails.map((email) => email.trim().toLowerCase());
+      if (
+        savedEmails.length !== requestedEmails.length ||
+        savedEmails.some((email, index) => email !== requestedEmails[index])
+      ) {
+        throw new Error(`The ${title.toLowerCase()} order was not saved correctly. Please try again.`);
+      }
+      return savedSettings;
+    },
     onSuccess: (data) => {
       queryClient.setQueryData([queryKey], data);
-      setTeamMembersOverride(null);
-      queryClient.invalidateQueries({ queryKey: [queryKey] });
+      setTeamMembersOverride(data.teamMembers);
       toast.success(`${title} assignment order saved`);
     },
     onError: (error: Error) => {
@@ -93,7 +109,7 @@ function RoundRobinTeamEditor({
     );
     if (!adminToAdd) return;
 
-    setTeamMembersOverride([...teamMembers, adminToAdd]);
+    saveMutation.mutate([...teamMembers.map((member) => member.email), adminToAdd.email]);
     setSelectedNewAdminEmail("");
   };
 
@@ -189,9 +205,9 @@ function RoundRobinTeamEditor({
               </option>
             ))}
           </select>
-          <Button type="button" variant="outline" onClick={addTeamMember} disabled={!selectedNewAdminEmail} className="flex items-center gap-1.5">
+          <Button type="button" variant="outline" onClick={addTeamMember} disabled={!selectedNewAdminEmail || saveMutation.isPending} className="flex items-center gap-1.5">
             <Plus className="h-4 w-4" />
-            Add member
+            {saveMutation.isPending ? "Saving..." : "Add & save member"}
           </Button>
         </div>
         {availableOpsAdminsToAdd.length === 0 && !teamQuery.isLoading && !teamQuery.isError && (
@@ -224,7 +240,36 @@ export default function AdminSettingsPage() {
     });
     const adminsQuery = useQuery({
       queryKey: ["task-posted-email-admin-users"],
-      queryFn: () => listUsers({ limit: 100, dashboardType: "main_admin", status: "active" }),
+      queryFn: async () => {
+        const [firstUsersPage, firstInvitesPage] = await Promise.all([
+          listUsers({ page: 1, limit: 100, status: "active" }),
+          listInvites({ page: 1, limit: 100, status: "accepted" }),
+        ]);
+        if (!firstUsersPage || !firstInvitesPage) {
+          throw new Error("Failed to load admin users and accepted invitations");
+        }
+
+        const userPageNumbers = Array.from(
+          { length: Math.max(0, firstUsersPage.pagination.pages - 1) },
+          (_, index) => index + 2,
+        );
+        const invitePageNumbers = Array.from(
+          { length: Math.max(0, firstInvitesPage.pagination.pages - 1) },
+          (_, index) => index + 2,
+        );
+        const [userPages, invitePages] = await Promise.all([
+          Promise.all(userPageNumbers.map((page) => listUsers({ page, limit: 100, status: "active" }))),
+          Promise.all(invitePageNumbers.map((page) => listInvites({ page, limit: 100, status: "accepted" }))),
+        ]);
+        if (userPages.some((page) => !page) || invitePages.some((page) => !page)) {
+          throw new Error("Failed to load all admin users and accepted invitations");
+        }
+
+        return {
+          users: [firstUsersPage, ...userPages].flatMap((page) => page?.users ?? []),
+          acceptedInvites: [firstInvitesPage, ...invitePages].flatMap((page) => page?.invites ?? []),
+        };
+      },
     });
     const whatsappSettingsQuery = useQuery({
       queryKey: ["whatsapp-notification-settings"],
@@ -258,8 +303,17 @@ export default function AdminSettingsPage() {
         toast.error(error?.message || "Failed to update WhatsApp notifications"),
     });
 
-    const adminUsers = adminsQuery.data?.users || [];
-    const availableAdmins = adminUsers.filter((admin) => !settings.recipients.includes(admin.email));
+    const recipientCandidates = new Map<string, Pick<AdminUser, "userId" | "email" | "name">>();
+    (adminsQuery.data?.acceptedInvites || []).forEach((invite: AdminInvite) => {
+      const email = invite.email.trim().toLowerCase();
+      recipientCandidates.set(email, { userId: invite.inviteId, email, name: email });
+    });
+    (adminsQuery.data?.users || []).forEach((admin: AdminUser) => {
+      recipientCandidates.set(admin.email.trim().toLowerCase(), admin);
+    });
+    const availableAdmins = Array.from(recipientCandidates.values()).filter(
+      (admin) => !settings.recipients.some((email) => email.toLowerCase() === admin.email.toLowerCase()),
+    );
 
     const addRecipient = () => {
       if (!selectedAdminEmail) return;
@@ -387,7 +441,7 @@ export default function AdminSettingsPage() {
             <section className="space-y-3">
               <div>
                 <Label>Recipients</Label>
-                <p className="text-sm text-gray-500">Select recipients from active main-admin users.</p>
+                <p className="text-sm text-gray-500">Select from active admin users and admins who accepted an invitation.</p>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <select
