@@ -195,13 +195,6 @@ export function AssignmentManagementPage({
     }))
     .filter((partner) => workType !== "book_now" || category === "all" || (partner.categories || []).some((item) => item.toLowerCase() === category.toLowerCase()))
     .filter((partner) => !excludedPhoneSet.has(normalizePhone(partner.phone)));
-  const getAreaPartnerCount = (
-    area: string,
-    workType = areaWorkTypeFilter,
-    category = areaCategoryFilter,
-  ) => {
-    return getSavedAreaPartners(area, workType, category).length;
-  };
   const getDisplayedAreaPartnerCount = (
     area: string,
     workType = areaWorkTypeFilter,
@@ -216,7 +209,7 @@ export function AssignmentManagementPage({
   };
   const matchesPartnerAssignment = (area: string) => {
     if (partnerAssignmentFilter === "all") return true;
-    const hasPartners = getAreaPartnerCount(area) > 0;
+    const hasPartners = getDisplayedAreaPartnerCount(area) > 0;
     return partnerAssignmentFilter === "with" ? hasPartners : !hasPartners;
   };
   const visibleCities = locationCities.filter((city) =>
@@ -224,9 +217,8 @@ export function AssignmentManagementPage({
       city.name.toLowerCase().includes(areaSearch.toLowerCase()) ||
       cityAreas(city).some((area) => area.name.toLowerCase().includes(areaSearch.toLowerCase()))) &&
     (partnerAssignmentFilter === "all" ||
-      (cityAreas(city).length
-        ? cityAreas(city).some((area) => matchesPartnerAssignment(area.name))
-        : matchesPartnerAssignment(city.name))),
+      matchesPartnerAssignment(city.name) ||
+      cityAreas(city).some((area) => matchesPartnerAssignment(area.name))),
   );
   const selectedCity = visibleCities.find((city) => city.id === selectedCityId) || visibleCities[0];
   const selectedCityAreas = selectedCity ? cityAreas(selectedCity) : [];
