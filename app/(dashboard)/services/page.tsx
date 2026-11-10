@@ -130,7 +130,12 @@ function parseScopeItems(value: string) {
 }
 
 function usesCategoryScope(categorySlug: string) {
-  return ['hourly-helper', 'personal-assistant', 'personal-assistance'].includes(
+  return [
+    'hourly-helper',
+    'personal-assistant',
+    'personal-assistances',
+    'personal-assistance',
+  ].includes(
     categorySlug.trim().toLowerCase(),
   );
 }

@@ -104,7 +104,7 @@ const POST_COMPARE_DEFAULTS: Target[] = [
   ["marketing-design", "Marketing & Design"], ["ac-repair", "AC Repair & Service"],
   ["appliance-repair", "Appliance Repair"], ["beauty-services", "Beauty Services"],
   ["car-washing", "Car Washing / Car Cleaning"], ["roadside-assistance", "Roadside Assistance"],
-  ["maid", "Maid"], ["personal-assistance", "Personal Assistance"], ["carpenter", "Carpenter"],
+  ["maid", "Maid"], ["personal-assistances", "Personal Assistance"], ["carpenter", "Carpenter"],
   ["cooking-home-chef", "Cooking / Home Chef"], ["deep-cleaning", "Deep Cleaning"],
   ["delivery-pickup-services", "Delivery / Pickup Services"], ["driver-chauffeur", "Driver / Chauffeur"],
   ["electrical", "Electrical"], ["event-services", "Event Services"], ["fitness-trainers", "Fitness Trainers"],
