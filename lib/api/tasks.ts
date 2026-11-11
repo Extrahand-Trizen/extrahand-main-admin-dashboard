@@ -15,7 +15,6 @@ export async function listTasks(filters?: TaskFilters): Promise<ApiResponse<Task
   if (filters?.customerId) params.append('customerId', filters.customerId);
   if (filters?.assigneeId) params.append('assigneeId', filters.assigneeId);
   if (filters?.assignedTo && filters.assignedTo !== 'all') params.append('assignedTo', filters.assignedTo);
-  if (filters?.postedBy) params.append('postedBy', filters.postedBy);
   if (filters?.bookingSource) params.append('bookingSource', filters.bookingSource);
   if (filters?.paymentType && filters.paymentType !== 'all') params.append('paymentType', filters.paymentType);
   if (filters?.scheduledDateFrom) params.append('scheduledDateFrom', filters.scheduledDateFrom);
@@ -26,7 +25,15 @@ export async function listTasks(filters?: TaskFilters): Promise<ApiResponse<Task
   if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
 
   const query = params.toString();
-  return apiRequest<ApiResponse<Task[]>>(`/api/v1/tasks${query ? `?${query}` : ''}`);
+  const route =
+    filters?.postedBy === 'team'
+      ? '/api/v1/tasks'
+      : filters?.postedBy === 'customer'
+        ? '/api/v1/tasks-postedBy-customer'
+        : '/api/v1/tasks-allworks';
+  const endpoint = `${route}${query ? `?${query}` : ''}`;
+  console.info(`[work-list] GET ${process.env.NEXT_PUBLIC_API_URL}${endpoint}`);
+  return apiRequest<ApiResponse<Task[]>>(endpoint);
 }
 
 export async function listApplications(filters?: {
