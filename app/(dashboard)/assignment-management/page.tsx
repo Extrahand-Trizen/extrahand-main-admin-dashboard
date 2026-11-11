@@ -160,7 +160,11 @@ export function AssignmentManagementPage({
     category = areaCategoryFilter,
   ) => {
     const matchingRules = getAreaRules(area, workType);
-    if (workType === "book_now" && category === "all") return matchingRules[0];
+    if (workType === "book_now" && category === "all") {
+      return [...matchingRules].sort((first, second) =>
+        second.preferredPartners.length - first.preferredPartners.length,
+      )[0];
+    }
     const categoryKey = workType === "hourly" ? "" : category;
     return matchingRules.find((rule) =>
       String(rule.category || "").toLowerCase() === categoryKey.toLowerCase(),
@@ -206,6 +210,16 @@ export function AssignmentManagementPage({
       String(rule.category || "").toLowerCase() === category.toLowerCase(),
     )) return getSavedAreaPartners(area, workType, category).length;
     return getEligiblePartnersForArea(area, workType, category).length;
+  };
+  const getPreferredBookNowCategory = (area: string) => {
+    const savedRules = [...getAreaRules(area, "book_now")].sort(
+      (first, second) => second.preferredPartners.length - first.preferredPartners.length,
+    );
+    if (savedRules[0]?.category) return savedRules[0].category;
+    return [...areaCategories].sort((first, second) =>
+      getEligiblePartnersForArea(area, "book_now", second).length -
+      getEligiblePartnersForArea(area, "book_now", first).length,
+    )[0] || areaCategories[0] || "";
   };
   const matchesPartnerAssignment = (area: string) => {
     if (partnerAssignmentFilter === "all") return true;
@@ -365,14 +379,14 @@ export function AssignmentManagementPage({
     category = areaCategoryFilter,
   ) => {
     const targetArea = locationName || rule?.area || "";
-    const matchingRules = targetArea ? getAreaRules(targetArea, workType) : [];
     const selectedRule = rule && (rule.workTypes || []).includes(workType)
       ? rule
       : getAreaRule(targetArea, workType, category);
     const selectedCategory = workType === "book_now"
       ? category !== "all"
         ? category
-        : selectedRule?.category || matchingRules[0]?.category || areaCategories[0] || ""
+        : selectedRule?.category ||
+          getPreferredBookNowCategory(targetArea)
       : "";
     const savedRule = selectedRule || (targetArea && selectedCategory
       ? getAreaRule(targetArea, workType, selectedCategory)
