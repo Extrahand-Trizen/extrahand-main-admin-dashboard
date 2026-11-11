@@ -134,6 +134,7 @@ export default function PartnerRegistrationsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [cityFilter, setCityFilter] = useState("all");
+  const [aadhaarVerificationFilter, setAadhaarVerificationFilter] = useState("all");
   const [workAreaFilter, setWorkAreaFilter] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
@@ -215,6 +216,7 @@ export default function PartnerRegistrationsPage() {
       statusFilter,
       categoryFilter,
       selectedCityFilter,
+      aadhaarVerificationFilter,
       workAreaFilter,
       page,
       limit,
@@ -226,6 +228,10 @@ export default function PartnerRegistrationsPage() {
         status: statusFilter !== "all" ? statusFilter : undefined,
         category: categoryFilter !== "all" ? categoryFilter : undefined,
         city: selectedCityFilter !== "all" ? selectedCityFilter : undefined,
+        isAadhaarVerified:
+          aadhaarVerificationFilter === "all"
+            ? undefined
+            : aadhaarVerificationFilter === "verified",
         workArea: workAreaFilter || undefined,
         page,
         limit,
@@ -306,7 +312,7 @@ export default function PartnerRegistrationsPage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Partner Registrations</h1>
         <p className="mt-2 text-sm text-gray-600">
-          View all partner registrants and filter by approval status, category and work area.
+          View all partner registrants and filter by approval status, category, work area and Aadhaar verification.
         </p>
       </div>
 
@@ -315,7 +321,7 @@ export default function PartnerRegistrationsPage() {
           <CardTitle className="text-lg">Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
+          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
             <div className="space-y-2">
               <Label htmlFor="search">Search</Label>
               <div className="relative">
@@ -402,6 +408,26 @@ export default function PartnerRegistrationsPage() {
               </Select>
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="aadhaarVerification">Aadhaar verification</Label>
+              <Select
+                value={aadhaarVerificationFilter}
+                onValueChange={(value) => {
+                  setAadhaarVerificationFilter(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger id="aadhaarVerification">
+                  <SelectValue placeholder="All verification statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="verified">Verified</SelectItem>
+                  <SelectItem value="not_verified">Not verified</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {isHyderabadSelected && (
               <div className="space-y-2">
                 <Label htmlFor="workArea">Work area</Label>
@@ -437,6 +463,7 @@ export default function PartnerRegistrationsPage() {
                   setStatusFilter("all");
                   setCategoryFilter("all");
                   setCityFilter("all");
+                  setAadhaarVerificationFilter("all");
                   setWorkAreaFilter("");
                   setPage(1);
                 }}

@@ -300,7 +300,12 @@ export default function UsersPage() {
         const parsed = JSON.parse(saved);
         if (parsed.search !== undefined) setSearch(parsed.search);
         if (parsed.statusFilter !== undefined) setStatusFilter(parsed.statusFilter);
-        if (parsed.roleFilter !== undefined) setRoleFilter(parsed.roleFilter);
+        if (
+          parsed.roleFilter !== undefined &&
+          ["all", "customer", "partner"].includes(parsed.roleFilter)
+        ) {
+          setRoleFilter(parsed.roleFilter);
+        }
         if (parsed.aadhaarFilter !== undefined) setAadhaarFilter(parsed.aadhaarFilter);
         if (parsed.certifiedFilter !== undefined) setCertifiedFilter(parsed.certifiedFilter);
         if (parsed.categoryFilter !== undefined) setCategoryFilter(parsed.categoryFilter);
@@ -317,7 +322,7 @@ export default function UsersPage() {
 
     const roleParam = params.get("role");
     const aadhaarParam = params.get("aadhaar");
-    if (roleParam && ["all", "customer", "helper", "partner"].includes(roleParam)) {
+    if (roleParam && ["all", "customer", "partner"].includes(roleParam)) {
       setRoleFilter(roleParam);
     }
     if (aadhaarParam && ["all", "verified", "not_verified"].includes(aadhaarParam)) {
@@ -763,7 +768,6 @@ export default function UsersPage() {
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="customer">Customer</SelectItem>
-                  <SelectItem value="helper">Helper</SelectItem>
                   <SelectItem value="partner">Partner</SelectItem>
                 </SelectContent>
               </Select>
