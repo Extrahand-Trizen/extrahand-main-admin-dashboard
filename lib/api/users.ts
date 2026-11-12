@@ -21,6 +21,9 @@ export async function listUsers(filters?: UserFilters): Promise<ApiResponse<User
   if (typeof filters?.isAadhaarVerified === 'boolean') {
     params.append('isAadhaarVerified', String(filters.isAadhaarVerified));
   }
+  if (filters?.registrationCompletion) {
+    params.append('registrationCompletion', filters.registrationCompletion);
+  }
   if (typeof filters?.isCertified === 'boolean') {
     params.append('isCertified', String(filters.isCertified));
   }

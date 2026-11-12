@@ -182,6 +182,9 @@ export default function UserDetailsPage() {
         : [],
     }))
     .filter((group) => group.skills.length > 0);
+  const partnerWorkAreas = (user?.partnerProfile?.workAreas ?? []).filter(
+    (area) => typeof area === "string" && area.trim().length > 0,
+  );
 
   const isPartnerUser =
     user?.role === "Partner" ||
@@ -1025,6 +1028,21 @@ export default function UserDetailsPage() {
                   </div>
                 )}
 
+                {partnerWorkAreas.length > 0 && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                      Partner Work Areas
+                    </Label>
+                    <div className="flex flex-wrap gap-2">
+                      {partnerWorkAreas.map((area, index) => (
+                        <Badge key={`${area}-${index}`} variant="outline">
+                          {formatSkillLabel(area)}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {user.savedAddresses && user.savedAddresses.length > 0 && (
                   <div>
                     <Label className="text-sm font-medium text-gray-700 mb-2 block">
@@ -1079,7 +1097,8 @@ export default function UserDetailsPage() {
 
                 {!user.location &&
                   (!user.savedAddresses ||
-                    user.savedAddresses.length === 0) && (
+                    user.savedAddresses.length === 0) &&
+                  partnerWorkAreas.length === 0 && (
                     <p className="text-sm text-gray-500 text-center py-4">
                       No location or addresses available
                     </p>

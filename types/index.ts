@@ -26,6 +26,7 @@ export interface User {
     type: 'Point';
     coordinates: [number, number]; // [longitude, latitude]
     address?: string;
+    city?: string;
     addressDetails?: {
       doorNo?: string;
       area?: string;
@@ -40,6 +41,7 @@ export interface User {
     type: 'Point';
     coordinates: [number, number];
     address?: string;
+    city?: string;
     addressDetails?: {
       doorNo?: string;
       area?: string;
@@ -620,6 +622,7 @@ export interface UserFilters {
   area?: string;
   includeSummary?: boolean;
   isAadhaarVerified?: boolean;
+  registrationCompletion?: 'complete' | 'incomplete';
   isCertified?: boolean;
   isPaymentTester?: boolean;
   createdFrom?: string;

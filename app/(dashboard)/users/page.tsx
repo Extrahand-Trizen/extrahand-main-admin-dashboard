@@ -151,67 +151,71 @@ const getPrimarySkillCategories = (user: User) => {
   ).join(", ");
 };
 
-const deriveAreaFromAddress = (address?: string, city?: string) => {
-  if (!address) return null;
-  const cityLower = city?.trim().toLowerCase();
-  const parts = address
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean);
+const formatSkillLabel = (value: string) =>
+  value.replace(/[_-]+/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 
-  if (parts.length === 0) return null;
+const getPartnerSkillsLabel = (user: User) => {
+  const groups = new Map<string, { label: string; skills: Map<string, string> }>();
+  const ungroupedSkills = new Map<string, string>();
+  const normalize = (value: string) =>
+    value.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
 
-  if (cityLower) {
-    for (let i = parts.length - 1; i >= 0; i -= 1) {
-      const part = parts[i].toLowerCase();
-      if (part.includes(cityLower)) {
-        for (let j = i - 1; j >= 0; j -= 1) {
-          const candidate = parts[j];
-          if (candidate && !candidate.toLowerCase().includes(cityLower)) {
-            return candidate;
-          }
-        }
-        break;
+  const addSkill = (category?: string, skill?: string) => {
+    const trimmedCategory = category?.trim();
+    const trimmedSkill = skill?.trim();
+
+    if (trimmedCategory) {
+      const key = normalize(trimmedCategory);
+      let group = groups.get(key);
+      if (!group) {
+        group = { label: formatSkillLabel(trimmedCategory), skills: new Map() };
+        groups.set(key, group);
       }
+      if (trimmedSkill) {
+        group.skills.set(normalize(trimmedSkill), formatSkillLabel(trimmedSkill));
+      }
+    } else if (trimmedSkill) {
+      ungroupedSkills.set(normalize(trimmedSkill), formatSkillLabel(trimmedSkill));
     }
-  }
+  };
 
-  for (let i = parts.length - 1; i >= 0; i -= 1) {
-    const candidate = parts[i];
-    if (!candidate.toLowerCase().includes('hyderabad')) {
-      return candidate;
-    }
-  }
+  (user.partnerProfile?.categories ?? []).forEach((category) =>
+    addSkill(category),
+  );
+  Object.entries(user.partnerProfile?.skills ?? {}).forEach(
+    ([category, skills]) => {
+      if (Array.isArray(skills)) {
+        skills.forEach((skill) => {
+          if (typeof skill === "string") addSkill(category, skill);
+        });
+      } else {
+        addSkill(category);
+      }
+    },
+  );
+  addSkill(user.skills?.primaryCategory);
+  (user.skills?.list ?? []).forEach((skill) =>
+    addSkill(skill.category, skill.name),
+  );
 
-  return parts[parts.length - 1];
+  return [
+    ...Array.from(groups.values()).map(({ label, skills }) =>
+      skills.size > 0 ? `${label}: ${Array.from(skills.values()).join(", ")}` : label,
+    ),
+    ...Array.from(ungroupedSkills.values()),
+  ].join("; ");
 };
 
-const getUserAreaLabel = (user: User) => {
-  const locationAddressDetails = user.location?.addressDetails;
-  const homeLocationAddressDetails = (user as any).homeLocation?.addressDetails;
-  const address =
-    user.location?.address || (user as any).homeLocation?.address || undefined;
-
-  const areaFromDetails =
-    locationAddressDetails?.area?.trim() ||
-    homeLocationAddressDetails?.area?.trim();
+const getUserCityLabel = (user: User) => {
   const city =
-    locationAddressDetails?.city?.trim() ||
-    homeLocationAddressDetails?.city?.trim() ||
-    (user.location as { city?: string } | undefined)?.city?.trim() ||
-    (user as any).homeLocation?.city?.trim();
-  const areaFromAddress = deriveAreaFromAddress(address, city);
+    user.location?.addressDetails?.city?.trim() ||
+    user.location?.city?.trim() ||
+    user.homeLocation?.addressDetails?.city?.trim() ||
+    user.homeLocation?.city?.trim() ||
+    user.savedAddresses?.find((address) => address.isDefault)?.city?.trim() ||
+    user.savedAddresses?.[0]?.city?.trim();
 
-  const normalizedCity = city?.toLowerCase();
-  const isGenericArea =
-    !!areaFromDetails && normalizedCity && areaFromDetails.toLowerCase() === normalizedCity;
-
-  const area = isGenericArea ? areaFromAddress || areaFromDetails : areaFromDetails || areaFromAddress;
-
-  if (area && city) return `${area}, ${city}`;
-  if (area) return area;
-  if (city) return city;
-  return '—';
+  return city || '—';
 };
 
 const getUserAddress = (user: User) => {
@@ -269,7 +273,9 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [aadhaarFilter, setAadhaarFilter] = useState<string>("all");
-  const [certifiedFilter, setCertifiedFilter] = useState<string>("all");
+  const [registrationFilter, setRegistrationFilter] = useState<
+    "all" | "complete" | "incomplete"
+  >("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [cityFilter, setCityFilter] = useState<string>("all");
   const [areaFilter, setAreaFilter] = useState<string>("all");
@@ -307,7 +313,12 @@ export default function UsersPage() {
           setRoleFilter(parsed.roleFilter);
         }
         if (parsed.aadhaarFilter !== undefined) setAadhaarFilter(parsed.aadhaarFilter);
-        if (parsed.certifiedFilter !== undefined) setCertifiedFilter(parsed.certifiedFilter);
+        if (
+          parsed.registrationFilter !== undefined &&
+          ["all", "complete", "incomplete"].includes(parsed.registrationFilter)
+        ) {
+          setRegistrationFilter(parsed.registrationFilter);
+        }
         if (parsed.categoryFilter !== undefined) setCategoryFilter(parsed.categoryFilter);
         if (parsed.cityFilter !== undefined) setCityFilter(parsed.cityFilter);
         if (parsed.areaFilter !== undefined) setAreaFilter(parsed.areaFilter);
@@ -342,7 +353,7 @@ export default function UsersPage() {
         statusFilter,
         roleFilter,
         aadhaarFilter,
-        certifiedFilter,
+        registrationFilter,
         categoryFilter,
         cityFilter,
         areaFilter,
@@ -354,7 +365,7 @@ export default function UsersPage() {
     } catch (e) {
       console.error("Error saving filters to sessionStorage", e);
     }
-  }, [search, statusFilter, roleFilter, aadhaarFilter, certifiedFilter, categoryFilter, cityFilter, areaFilter, createdFrom, createdTo, page, limit, isLoaded]);
+  }, [search, statusFilter, roleFilter, aadhaarFilter, registrationFilter, categoryFilter, cityFilter, areaFilter, createdFrom, createdTo, page, limit, isLoaded]);
 
   const {
     data: locationCatalogData,
@@ -399,12 +410,8 @@ export default function UsersPage() {
         : aadhaarFilter === "not_verified"
           ? false
           : undefined,
-    isCertified:
-      certifiedFilter === "certified"
-        ? true
-        : certifiedFilter === "not_certified"
-          ? false
-          : undefined,
+    registrationCompletion:
+      registrationFilter === "all" ? undefined : registrationFilter,
     createdFrom: createdFrom || undefined,
     createdTo: createdTo || undefined,
   };
@@ -441,7 +448,7 @@ export default function UsersPage() {
       statusFilter,
       roleFilter,
       aadhaarFilter,
-      certifiedFilter,
+      registrationFilter,
       categoryFilter,
       selectedCityFilter,
       areaFilter,
@@ -559,25 +566,10 @@ export default function UsersPage() {
   };
 
   const { data: registeredCountData } = useQuery({
-    queryKey: [
-      "users-registered-count",
-      roleFilter,
-      selectedCityFilter,
-      areaFilter,
-      createdFrom,
-      createdTo,
-    ],
+    queryKey: ["users-registered-count", activeUserFilters],
     queryFn: () =>
       listUsers({
-        role: roleFilter !== "all" ? roleFilter : undefined,
-        city: selectedCityFilter !== "all" ? selectedCityFilter : undefined,
-        area:
-          selectedCityFilter.trim().toLowerCase() === "hyderabad" &&
-          areaFilter !== "all"
-            ? areaFilter
-            : undefined,
-        createdFrom: createdFrom || undefined,
-        createdTo: createdTo || undefined,
+        ...activeUserFilters,
         page: 1,
         limit: 1,
       }),
@@ -634,8 +626,7 @@ export default function UsersPage() {
         "Mobile Number",
         "Email",
         "Roles",
-        "Primary Skill Category",
-        "Category",
+        "Partner Skills",
         "Address",
         "Account Status",
         "Registration Date",
@@ -647,16 +638,7 @@ export default function UsersPage() {
         user.phone,
         user.email,
         getRoleLabel(user),
-        user.skills?.primaryCategory?.replace(/_/g, " "),
-        Array.from(
-          new Set(
-            (user.skills?.list ?? [])
-              .map((skill) => skill.category?.trim())
-              .filter((category): category is string => Boolean(category)),
-          ),
-        )
-          .map((category) => category.replace(/_/g, " "))
-          .join("; "),
+        getPartnerSkillsLabel(user),
         getUserAddress(user),
         user.status || (user.isActive === false ? "inactive" : "active"),
         formatRegistrationDate(user.createdAt),
@@ -792,21 +774,28 @@ export default function UsersPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="certified">Certified</Label>
+              <Label htmlFor="registration">Registration</Label>
               <Select
-                value={certifiedFilter}
+                value={registrationFilter}
                 onValueChange={(value) => {
-                  setCertifiedFilter(value);
+                  if (
+                    value !== "all" &&
+                    value !== "complete" &&
+                    value !== "incomplete"
+                  ) {
+                    return;
+                  }
+                  setRegistrationFilter(value);
                   setPage(1);
                 }}
               >
-                <SelectTrigger id="certified">
-                  <SelectValue placeholder="All users" />
+                <SelectTrigger id="registration">
+                  <SelectValue placeholder="All registrations" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All users</SelectItem>
-                  <SelectItem value="certified">Certified only</SelectItem>
-                  <SelectItem value="not_certified">Not certified</SelectItem>
+                  <SelectItem value="all">All registrations</SelectItem>
+                  <SelectItem value="complete">Complete</SelectItem>
+                  <SelectItem value="incomplete">Incomplete</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -941,7 +930,7 @@ export default function UsersPage() {
                   setStatusFilter("all");
                   setRoleFilter("all");
                   setAadhaarFilter("all");
-                  setCertifiedFilter("all");
+                  setRegistrationFilter("all");
                   setCategoryFilter("all");
                   setCityFilter("all");
                   setAreaFilter("all");
@@ -1025,7 +1014,7 @@ export default function UsersPage() {
                         Primary Skill
                       </TableHead>
                       <TableHead className="hidden md:table-cell">
-                        Area
+                        City / District
                       </TableHead>
                       <TableHead className="hidden lg:table-cell">
                         Status
@@ -1078,7 +1067,7 @@ export default function UsersPage() {
                           </span>
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-sm text-gray-500">
-                          {getUserAreaLabel(user)}
+                          {getUserCityLabel(user)}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
                           <Badge variant={statusColors[user.status] as any}>
