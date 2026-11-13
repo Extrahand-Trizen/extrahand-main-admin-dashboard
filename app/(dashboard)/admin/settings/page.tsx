@@ -5,13 +5,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Shield, Settings, Wrench, Users, GripVertical, CheckCircle2, ArrowUp, ArrowDown, MessageCircle } from "lucide-react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Mail, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { AppLogoSettings } from "@/components/admin/AppLogoSettings";
+import { listUsers as listPlatformUsers } from "@/lib/api/users";
 import {
   getAadhaarRoundRobinTeamSettings,
   getTaskPostedEmailSettings,
@@ -238,6 +239,13 @@ export default function AdminSettingsPage() {
       queryKey: ["task-posted-email-settings"],
       queryFn: getTaskPostedEmailSettings,
     });
+    const excludedPhoneQueries = useQueries({
+      queries: settings.excludedPhones.map((phone) => ({
+        queryKey: ["task-posted-email-excluded-user", phone],
+        queryFn: () => listPlatformUsers({ search: phone, limit: 10 }),
+        enabled: phone.replace(/\D/g, "").length >= 2,
+      })),
+    });
     const adminsQuery = useQuery({
       queryKey: ["task-posted-email-admin-users"],
       queryFn: async () => {
@@ -314,6 +322,15 @@ export default function AdminSettingsPage() {
     const availableAdmins = Array.from(recipientCandidates.values()).filter(
       (admin) => !settings.recipients.some((email) => email.toLowerCase() === admin.email.toLowerCase()),
     );
+    const excludedPhonesWithNames = settings.excludedPhones.map((phone, index) => {
+      const normalizedPhone = phone.replace(/\D/g, "");
+      const matchingUser = excludedPhoneQueries[index]?.data?.data?.find((user) => {
+        const userPhone = (user.phone || "").replace(/\D/g, "");
+        return userPhone &&
+          (userPhone === normalizedPhone || userPhone.slice(-10) === normalizedPhone.slice(-10));
+      });
+      return { phone, name: matchingUser?.name || "Customer" };
+    });
 
     const addRecipient = () => {
       if (!selectedAdminEmail) return;
@@ -491,9 +508,13 @@ export default function AdminSettingsPage() {
                 <Button type="button" variant="outline" onClick={addPhone} disabled={!phoneInput.trim()}><Plus />Add exclusion</Button>
               </div>
               <div className="space-y-2">
-                {settings.excludedPhones.map((phone) => (
-                  <div key={phone} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                    <span>{phone}</span>
+                {excludedPhonesWithNames.map(({ phone, name }, index) => (
+                  <div key={phone} className="flex items-center gap-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2">
+                    <span className="w-6 text-sm font-semibold text-gray-500">{index + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-gray-900">{name}</p>
+                      <p className="text-xs text-gray-600">{phone}</p>
+                    </div>
                     <Button type="button" size="icon" variant="ghost" aria-label={`Remove ${phone}`} onClick={() => setSettings((current) => ({ ...current, excludedPhones: current.excludedPhones.filter((item) => item !== phone) }))}><Trash2 className="text-red-600" /></Button>
                   </div>
                 ))}

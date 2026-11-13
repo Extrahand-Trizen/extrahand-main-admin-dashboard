@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, ListFilter, Send, ShieldCheck, ShieldX, MessageCircle } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -23,19 +23,14 @@ const GENDER_ICON: Record<string, string> = { male: "♂", female: "♀" };
 const GENDER_LABEL: Record<string, string> = { male: "Male", female: "Female", any: "Any" };
 const STAGES = [
   {
-    key: "preferred",
-    label: "Preferred / hired partners",
-    description: "Preferred partners get the first offer. It remains active when later groups are invited.",
-  },
-  {
     key: "area_rule",
-    label: "Area-rule partners",
-    description: "Area-rule partners are invited 30 minutes later; preferred-partner offers remain active.",
+    label: "Preferred partners",
+    description: "Preferred partners receive the first offer.",
   },
   {
     key: "all",
     label: "Other eligible partners",
-    description: "Other eligible partners are invited 30 minutes later; all prior offers remain active.",
+    description: "Other eligible partners are invited 45 minutes later if no preferred partner accepts.",
   },
 ] as const;
 
@@ -134,6 +129,7 @@ function AreaCandidates({
   getWhatsAppStatus,
   onResendWhatsApp,
   resendPending,
+  canResendWhatsApp,
 }: {
   area: DispatchAreaLog;
   candidates: DispatchCandidateLog[];
@@ -142,6 +138,7 @@ function AreaCandidates({
   getWhatsAppStatus: (partnerUid?: string) => WorkWhatsAppDispatchStatus | undefined;
   onResendWhatsApp: (candidate: DispatchCandidateLog, stage: "preferred" | "area_rule" | "all") => void;
   resendPending: boolean;
+  canResendWhatsApp: boolean;
 }) {
   const counts = {
     eligible: candidates.filter((candidate) => candidate.status !== "ineligible").length,
@@ -226,7 +223,12 @@ function AreaCandidates({
                     variant="outline"
                     size="sm"
                     className="ml-auto h-7 gap-1 px-2 text-[11px]"
-                    disabled={ineligible || resendPending}
+                    disabled={ineligible || resendPending || (stage === "all" && !canResendWhatsApp)}
+                    title={
+                      stage === "all" && !canResendWhatsApp
+                        ? "Other eligible partners can only be notified after the preferred-partner window ends without an acceptance."
+                        : undefined
+                    }
                     onClick={() => onResendWhatsApp(candidate, stage)}
                   >
                     <MessageCircle className="h-3 w-3 text-emerald-600" />
@@ -254,6 +256,11 @@ function AreaCandidates({
 
 export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
   const [isOpen, setIsOpen] = useState(true);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const queryClient = useQueryClient();
   const dispatchLogs = task.dispatchLogs || [];
   const { data: whatsappStatusResponse } = useQuery({
@@ -282,10 +289,33 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
       task.assignedHelperName,
   );
   const canNotifyImmediately =
-    task.bookingSource === "book_now" &&
+    (task.bookingSource === "book_now" ||
+      task.isHourly === true ||
+      task.budgetType === "hourly" ||
+      task.categorySlug === "hourly-helper" ||
+      task.categorySlug === "hourly-based") &&
     task.status === "open" &&
     !isAssigned &&
     progress?.currentStage !== "assigned";
+  const preferredProgress = progress?.stages.find((stage) => stage.stage === "area_rule");
+  const preferredCandidates = dispatchLogs.flatMap((area) =>
+    (area.candidates || []).filter((candidate) => candidate.dispatchStage === "area_rule"),
+  );
+  const hasEligiblePreferredPartners =
+    preferredCandidates.some((candidate) => candidate.status !== "ineligible") ||
+    (preferredProgress?.eligibleCount || 0) > 0;
+  const hasAcceptedPreferredPartner =
+    preferredCandidates.some((candidate) => candidate.responseStatus === "accepted") ||
+    (preferredProgress?.acceptedCount || 0) > 0;
+  const preferredExpiry =
+    task.assignmentOffer?.stage === "area_rule"
+    ? task.assignmentOffer.expiresAt
+    : preferredProgress?.expiresAt;
+  const preferredWindowExpired =
+    preferredExpiry ? Date.parse(preferredExpiry) <= now : false;
+  const canStartOtherStage =
+    !hasEligiblePreferredPartners ||
+    (!hasAcceptedPreferredPartner && preferredWindowExpired);
   const notifyStageMutation = useMutation({
     mutationFn: (stage: "area_rule" | "all") =>
       notifyBookNowDispatchStage(task.taskId, stage),
@@ -372,7 +402,7 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
         <CardContent className="p-4 pt-3 space-y-5">
           {isTeamPosted ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
-              Team-posted work: only team partners whose phone numbers are in the Exclusions list will receive notifications. Other qualified partners remain visible in the logs but will not be notified.
+              Team-posted work: only eligible partners whose phone numbers are in the Task Posted Email exclusions list receive notifications. Other qualified partners remain visible in the logs but will not be notified.
             </div>
           ) : null}
 
@@ -398,7 +428,7 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
           {progress ? (
             <section className="rounded-lg border border-gray-200 p-3 space-y-3">
               <p className="text-xs text-gray-600">
-                Offers are sent in stages 30 minutes apart. Each sent offer remains available until someone accepts, the work is cancelled, or its scheduled start time arrives. “Push sent” is recorded only when the notification service confirms a device send.
+                Preferred partners are notified first. Other eligible partners are notified after 45 minutes if no one accepts. Each sent offer remains available until someone accepts, the work is cancelled, or its scheduled start time arrives. “Push sent” is recorded only when the notification service confirms a device send.
               </p>
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
@@ -409,11 +439,11 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                   </p>
                 </div>
               </div>
-              <div className="grid gap-2 sm:grid-cols-3">
-                {progress.stages.map((stage) => (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {progress.stages.filter((stage) => stage.stage !== "preferred").map((stage) => (
                   <div key={stage.stage} className="rounded-md bg-gray-50 p-2">
                     <p className="text-xs font-medium text-gray-800">
-                      {stage.stage === "preferred" ? "Preferred / hired" : stage.stage === "area_rule" ? "Same-area partners" : "Remaining eligible"}
+                      {stage.stage === "area_rule" ? "Preferred partners" : "Other eligible partners"}
                     </p>
                     <p className="text-[11px] text-gray-600">
                       {stageStatusLabel(stage.status)} · {stage.eligibleCount} eligible · {stage.notifiedCount} push sent
@@ -468,37 +498,45 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                 .filter((candidate) => candidate.status !== "ineligible" && candidate.partnerUid)
                 .map((candidate) => candidate.partnerUid as string),
             ));
+            const canNotifyThisStage =
+              canNotifyImmediately && (stage.key !== "all" || canStartOtherStage);
 
             return (
               <section key={stage.key} className="space-y-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <h3 className="text-sm font-semibold text-gray-900">{stage.label}</h3>
                   <div className="flex flex-wrap items-center gap-2">
-                    {stage.key !== "preferred" ? (
-                      <Button
+                    <Button
                         type="button"
                         variant="outline"
                         size="sm"
                         className="h-7 gap-1.5 px-2 text-xs"
-                        disabled={!canNotifyImmediately || notifyStageMutation.isPending}
+                        disabled={!canNotifyThisStage || notifyStageMutation.isPending}
                         title={
-                          canNotifyImmediately
+                          canNotifyThisStage
                             ? `Send a push notification now to eligible ${stage.label.toLowerCase()}`
-                            : "Notifications are unavailable for assigned or closed work"
+                            : stage.key === "all" && hasAcceptedPreferredPartner
+                              ? "A preferred partner has accepted this work."
+                              : stage.key === "all" && hasEligiblePreferredPartners
+                                ? "Other eligible partners can be notified after the 45-minute preferred-partner window ends."
+                                : "Notifications are unavailable for assigned or closed work"
                         }
                         onClick={() => notifyStageMutation.mutate(stage.key)}
                       >
                         <Send className="h-3 w-3" />
                         Notify immediately
-                      </Button>
-                    ) : null}
+                    </Button>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       className="h-7 gap-1.5 border-emerald-200 px-2 text-xs text-emerald-700 hover:bg-emerald-50"
-                      disabled={whatsappMutation.isPending || !canNotifyImmediately || eligibleUids.length === 0}
-                      title="Send WhatsApp to all eligible partners in this dispatch stage"
+                      disabled={whatsappMutation.isPending || !canNotifyThisStage || eligibleUids.length === 0}
+                      title={
+                        stage.key === "all" && !canStartOtherStage
+                          ? "Other eligible partners can be notified after the 45-minute preferred-partner window ends without an acceptance."
+                          : "Send WhatsApp to all eligible partners in this dispatch stage"
+                      }
                       onClick={() => {
                         whatsappMutation.mutate({ stage: stage.key, recipientUids: eligibleUids });
                       }}
@@ -514,7 +552,7 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                 </div>
                 <p className="text-xs text-gray-500">
                   {isTeamPosted
-                    ? "For team-posted work, notifications go only to eligible partners whose phone numbers are in the Exclusions list. Other qualified partners remain visible here without being notified."
+                    ? "For team-posted work, notifications go only to eligible partners whose phone numbers are in the Task Posted Email exclusions list. Other qualified partners remain visible here without being notified."
                     : stage.description}
                 </p>
                 {areaRows.length ? (
@@ -530,6 +568,7 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                     onResendWhatsApp={(candidate, candidateStage) =>
                       resendMutation.mutate({ candidate, stage: candidateStage })}
                     resendPending={resendMutation.isPending}
+                    canResendWhatsApp={canNotifyImmediately && canStartOtherStage}
                   />
                   ))
                 ) : (

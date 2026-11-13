@@ -1,8 +1,9 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Ban, Building2, Check, ChevronDown, ChevronRight, Loader2, Plus, Search, Trash2, X } from "lucide-react";
+import { Building2, ChevronDown, ChevronRight, Loader2, Plus, X } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,16 +11,12 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { listUsers } from "@/lib/api/users";
 import { getLocationCatalog, ManagedLocation } from "@/lib/api/locations";
+import { getTaskPostedEmailSettings } from "@/lib/api/admin";
 import {
-  addExcludedPhone,
-  addPreferredPartner,
   getEligibleAssignmentPartners,
   getEligiblePartnerAreaData,
   getAssignmentRules,
   PartnerSearchResult,
-  removeExcludedPhone,
-  removePreferredPartner,
-  reorderPreferredPartner,
   AreaAssignmentRule,
   removeAreaRule,
   reorderAreaRulePartner,
@@ -51,17 +48,8 @@ function cityAreas(city: ManagedLocation): ManagedLocation[] {
   return (city.zones || []).flatMap((zone) => zone.areas || []);
 }
 
-export function AssignmentManagementPage({
-  initialTab = "preferred",
-  showTabs = true,
-}: {
-  initialTab?: "preferred" | "areas";
-  showTabs?: boolean;
-}) {
+export function AssignmentManagementPage() {
   const queryClient = useQueryClient();
-  const [partnerSearch, setPartnerSearch] = useState("");
-  const [phoneSearch, setPhoneSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"preferred" | "areas">(initialTab);
   const [areaName, setAreaName] = useState("");
   const [areaRuleCategory, setAreaRuleCategory] = useState("");
   const [areaRuleWorkType, setAreaRuleWorkType] = useState("hourly");
@@ -81,6 +69,10 @@ export function AssignmentManagementPage({
     queryKey: ["assignment-management-rules"],
     queryFn: getAssignmentRules,
   });
+  const taskPostedEmailSettingsQuery = useQuery({
+    queryKey: ["task-posted-email-settings"],
+    queryFn: getTaskPostedEmailSettings,
+  });
   const locationCatalogQuery = useQuery({
     queryKey: ["assignment-management-location-catalog"],
     queryFn: async () => {
@@ -91,20 +83,10 @@ export function AssignmentManagementPage({
       return response.data.cities;
     },
   });
-  const partnerQuery = useQuery({
-    queryKey: ["assignment-management-partners", partnerSearch],
-    queryFn: () => getEligibleAssignmentPartners(partnerSearch),
-    enabled: partnerSearch.trim().length >= 2,
-  });
   const areaPartnerQuery = useQuery({
     queryKey: ["assignment-management-area-partners", areaPartnerSearch],
     queryFn: () => getEligibleAssignmentPartners(areaPartnerSearch),
     enabled: areaPartnerSearchOpen && areaPartnerSearch.trim().length >= 2,
-  });
-  const customerQuery = useQuery({
-    queryKey: ["assignment-management-customers", phoneSearch],
-    queryFn: () => listUsers({ search: phoneSearch, role: "Customer", limit: 10 }),
-    enabled: phoneSearch.trim().length >= 2,
   });
   const approvedPartnersQuery = useQuery({
     queryKey: ["assignment-management-approved-partners"],
@@ -130,11 +112,16 @@ export function AssignmentManagementPage({
     }
   }, [locationCatalogQuery.isError, locationCatalogQuery.error]);
 
+  useEffect(() => {
+    if (taskPostedEmailSettingsQuery.isError) {
+      toast.error(taskPostedEmailSettingsQuery.error.message || "Failed to load task-posted exclusions");
+    }
+  }, [taskPostedEmailSettingsQuery.isError, taskPostedEmailSettingsQuery.error]);
+
   const locationCities = useMemo(() => locationCatalogQuery.data || [], [locationCatalogQuery.data]);
 
   const rules = rulesQuery.data?.data;
   const isLoadingAreaRules = rulesQuery.isPending || locationCatalogQuery.isPending;
-  const preferredPartners = rules?.preferredPartners || [];
   const approvedAreaPartners = (approvedPartnersQuery.data || []).map((partner) => ({
     profileId: String(partner._id || partner.profileId || partner.userId),
     uid: String(partner.uid || partner.userId),
@@ -185,7 +172,7 @@ export function AssignmentManagementPage({
         .map((partner) => [partner.profileId, partner]),
     ).values());
   };
-  const allExcludedPhones = rules?.excludedPhones || [];
+  const allExcludedPhones = taskPostedEmailSettingsQuery.data?.excludedPhones || [];
   const excludedPhoneSet = new Set(allExcludedPhones.map(normalizePhone).filter(Boolean));
   const getEligiblePartnersForArea = (
     area: string,
@@ -256,14 +243,10 @@ export function AssignmentManagementPage({
   const selectedAreaPartners = areaPartnerIds
     .map((id) => areaAddedPartners.find((partner) => partnerId(partner) === id) || approvedAreaPartners.find((partner) => partner.profileId === id))
     .filter(Boolean) as PartnerSearchResult[];
-  const excludedPhones = allExcludedPhones.filter((phone) =>
-    phone.includes(phoneSearch.replace(/\D/g, "")),
-  );
-  const customerResults = customerQuery.data?.data || [];
   const excludedCustomerQueries = useQueries({
     queries: allExcludedPhones.map((phone) => ({
-      queryKey: ["assignment-management-excluded-customer", phone],
-      queryFn: () => listUsers({ search: phone, role: "Customer", limit: 10 }),
+      queryKey: ["task-posted-email-excluded-user", phone],
+      queryFn: () => listUsers({ search: phone, limit: 10 }),
       enabled: phone.length >= 2,
     })),
   });
@@ -274,66 +257,11 @@ export function AssignmentManagementPage({
       (customer.phone || "").replace(/\D/g, "").slice(-10) === phone.replace(/\D/g, "").slice(-10),
     )?.name || "Customer",
   }));
-  const searchResults = partnerQuery.data?.data || [];
-
   const refreshRules = (data: { data?: unknown }) => {
     queryClient.setQueryData(["assignment-management-rules"], data);
     void queryClient.invalidateQueries({ queryKey: ["assignment-management-approved-partners"] });
-    void queryClient.invalidateQueries({ queryKey: ["assignment-management-partners"] });
     void queryClient.invalidateQueries({ queryKey: ["assignment-management-area-partners"] });
-    setPartnerSearch("");
   };
-
-  const addPartnerMutation = useMutation({
-    mutationFn: (partner: PartnerSearchResult) => addPreferredPartner({
-      profileId: partnerId(partner),
-      uid: partnerUid(partner),
-      name: partnerName(partner),
-      phone: partner.phone || partner.phoneNumber,
-      categories: partner.categories || partner.partnerProfile?.categories || [],
-      areas: partner.workAreas || partner.partnerProfile?.workAreas || [],
-    }),
-    onSuccess: (data) => {
-      refreshRules(data);
-      toast.success("Partner added to preferred list");
-    },
-    onError: (error: Error) => toast.error(error.message || "Failed to add partner"),
-  });
-
-  const removePartnerMutation = useMutation({
-    mutationFn: removePreferredPartner,
-    onSuccess: (data) => {
-      refreshRules(data);
-      toast.success("Partner removed from preferred list");
-    },
-    onError: (error: Error) => toast.error(error.message || "Failed to remove partner"),
-  });
-
-  const reorderPartnerMutation = useMutation({
-    mutationFn: ({ profileId, direction }: { profileId: string; direction: "up" | "down" }) =>
-      reorderPreferredPartner(profileId, direction),
-    onSuccess: (data) => refreshRules(data),
-    onError: (error: Error) => toast.error(error.message || "Failed to reorder partners"),
-  });
-
-  const addPhoneMutation = useMutation({
-    mutationFn: addExcludedPhone,
-    onSuccess: (data) => {
-      refreshRules(data);
-      setPhoneSearch("");
-      toast.success("Phone number added to exclusions");
-    },
-    onError: (error: Error) => toast.error(error.message || "Failed to add phone number"),
-  });
-
-  const removePhoneMutation = useMutation({
-    mutationFn: removeExcludedPhone,
-    onSuccess: (data) => {
-      refreshRules(data);
-      toast.success("Phone number removed from exclusions");
-    },
-    onError: (error: Error) => toast.error(error.message || "Failed to remove phone number"),
-  });
 
   const saveAreaRuleMutation = useMutation({
     mutationFn: () => saveAreaRule({
@@ -428,7 +356,7 @@ export function AssignmentManagementPage({
         {areaRuleWorkType === "book_now" && <label className="space-y-1.5"><span className="text-xs font-medium uppercase tracking-wide text-gray-500">Category</span><select className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm" value={areaRuleCategory} onChange={(event) => { setAreaRuleCategory(event.target.value); loadEditorPartnersFor("book_now", event.target.value); }} aria-label="Select area category"><option value="">Select category</option>{areaCategories.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>}
       </div>
       <div className="space-y-3 rounded-lg border p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-medium text-gray-700">Preferred Partners ({selectedAreaPartners.length})</p>{(areaRuleWorkType === "hourly" || areaRuleCategory) && <Button type="button" size="sm" variant="outline" onClick={() => setAreaPartnerSearchOpen((open) => !open)}><Plus className="mr-1 h-3 w-3" />Add Partner</Button>}</div>
+        <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-medium text-gray-700">Preferred partners ({selectedAreaPartners.length})</p>{(areaRuleWorkType === "hourly" || areaRuleCategory) && <Button type="button" size="sm" variant="outline" onClick={() => setAreaPartnerSearchOpen((open) => !open)}><Plus className="mr-1 h-3 w-3" />Add Partner</Button>}</div>
         {areaPartnerSearchOpen && <div className="relative"><Input value={areaPartnerSearch} onChange={(event) => setAreaPartnerSearch(event.target.value)} placeholder="Search by name or phone..." autoFocus />{(areaPartnerQuery.isFetching || areaPartnerSearch.trim().length >= 2) && <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-md border border-gray-300 bg-white p-1 shadow-lg">{areaPartnerQuery.isFetching && <p className="px-3 py-2 text-xs text-gray-500">Searching...</p>}{(areaPartnerQuery.data?.data || []).map((partner) => { const id = partnerId(partner); const added = areaPartnerIds.includes(id); return <button type="button" key={id} disabled={added} className="flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm hover:bg-amber-50 disabled:opacity-60" onClick={() => { setAreaPartnerIds((current) => current.includes(id) ? current : [...current, id]); setAreaAddedPartners((current) => current.some((item) => partnerId(item) === id) ? current : [...current, partner]); setAreaPartnerSearch(""); }}><span>{partnerName(partner)} <span className="text-xs text-gray-500">{partner.phone || partner.phoneNumber || partnerUid(partner)}</span></span><span className="text-xs font-medium text-amber-700">{added ? "Added" : "Add"}</span></button>; })}</div>}</div>}
         <div className="max-h-80 space-y-1 overflow-y-auto">{selectedAreaPartners.length === 0 && <p className="text-sm text-gray-500">No partners added yet.</p>}{selectedAreaPartners.map((partner) => <div key={partnerId(partner)} className="flex items-center justify-between rounded bg-gray-50 px-3 py-2 text-sm"><span>{partnerName(partner)} <span className="text-xs text-gray-500">{partner.phone || partner.phoneNumber || partnerUid(partner)}</span></span><button type="button" className="text-xs text-red-600 hover:underline" onClick={() => { const id = partnerId(partner); setAreaPartnerIds((current) => current.filter((item) => item !== id)); setAreaAddedPartners((current) => current.filter((item) => partnerId(item) !== id)); }}>Remove</button></div>)}</div>
         {matchingAreaPartners.length > 0 && <p className="text-xs text-gray-500">Approved partners matching this location are available to add.</p>}
@@ -441,20 +369,11 @@ export function AssignmentManagementPage({
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">{initialTab === "areas" ? "Area Rules" : "Preferred Partners"}</h1>
-          <p className="mt-1 text-sm text-gray-600">{initialTab === "areas" ? "Manage area and category assignments for approved partners." : "Manage preferred partners and exclusions for automatic work assignment."}</p>
+          <h1 className="text-3xl font-bold text-gray-900">Preferred Partners</h1>
+          <p className="mt-1 text-sm text-gray-600">Manage preferred partner assignments for approved partners.</p>
         </div>
       </div>
 
-      {showTabs && <div className="grid grid-cols-2 overflow-hidden rounded-lg border bg-white">
-        {([['preferred', 'Preferred Partners'], ['areas', 'Area Rules']] as const).map(([value, label]) => (
-          <button key={value} type="button" onClick={() => setActiveTab(value)} className={`border-r px-4 py-3 text-sm font-medium last:border-r-0 ${activeTab === value ? "bg-amber-50 text-amber-700" : "text-gray-600 hover:bg-gray-50"}`}>
-            {label}
-          </button>
-        ))}
-      </div>}
-
-      {activeTab === "areas" && (
         <div className="space-y-6">
             <div className="grid items-start gap-6 xl:grid-cols-[minmax(220px,0.6fr)_minmax(0,1.4fr)]">
           <Card className="min-w-0 xl:col-span-full">
@@ -504,7 +423,7 @@ export function AssignmentManagementPage({
                   return <div className="space-y-4">
                     <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">This city has no areas. Preferred partners added here apply to the entire city.</div>
                     {!areaEditorOpen && <div className="rounded-lg border p-4">
-                      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold text-gray-900">Preferred Partners ({getDisplayedAreaPartnerCount(selectedCity.name)})</h3><Button size="sm" variant="outline" onClick={() => openAreaEditor(cityRule, selectedCity.name)}><Plus className="mr-1 h-4 w-4" />{getDisplayedAreaPartnerCount(selectedCity.name) ? "Edit Partners" : "Add Partner"}</Button></div>
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold text-gray-900">Preferred partners ({getDisplayedAreaPartnerCount(selectedCity.name)})</h3><Button size="sm" variant="outline" onClick={() => openAreaEditor(cityRule, selectedCity.name)}><Plus className="mr-1 h-4 w-4" />{getDisplayedAreaPartnerCount(selectedCity.name) ? "Edit Partners" : "Add Partner"}</Button></div>
                       {partners.length ? <div className="space-y-2">{partners.map((partner) => <div key={partner.profileId} className="rounded-md bg-gray-50 px-3 py-2 text-sm"><span className="font-medium">{partner.name}</span><span className="ml-2 text-xs text-gray-500">{partner.phone || partner.uid}</span></div>)}</div> : <p className="text-sm text-gray-500">No preferred partners configured for this city yet.</p>}
                     </div>}
                     {areaEditorOpen && normalizeArea(areaName) === normalizeArea(selectedCity.name) && renderAreaPartnerEditor()}
@@ -512,7 +431,7 @@ export function AssignmentManagementPage({
                 })() : selectedCity.areas?.length ? <div className="space-y-3">
                   <div className="flex items-center justify-between"><h3 className="font-semibold text-gray-900">Areas in {selectedCity.name}</h3><span className="text-xs text-gray-500">{visibleCityAreas.length} shown</span></div>
                   <div className="overflow-x-auto rounded-lg border">
-                    <table className="w-full min-w-[480px] text-left text-sm"><thead className="border-b bg-gray-50 text-xs uppercase text-gray-500"><tr><th className="px-3 py-2">Area</th><th className="px-3 py-2">Preferred Partners</th><th className="px-3 py-2 text-right">Actions</th></tr></thead>
+                    <table className="w-full min-w-[480px] text-left text-sm"><thead className="border-b bg-gray-50 text-xs uppercase text-gray-500"><tr><th className="px-3 py-2">Area</th><th className="px-3 py-2">Partners</th><th className="px-3 py-2 text-right">Actions</th></tr></thead>
                       <tbody>{(selectedCity.areas || []).filter((area) => areaMatchesFilters(area, selectedCity.name)).map((area) => {
                         const rule = getAreaRule(area.name);
                         const partnerCount = getDisplayedAreaPartnerCount(area.name);
@@ -532,7 +451,7 @@ export function AssignmentManagementPage({
                       })} className="flex w-full items-center justify-between bg-gray-50 px-4 py-3 text-left hover:bg-gray-100">
                         <span className="flex items-center gap-2 font-semibold text-gray-900">{isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}{zone.name}{zone.enabled === false && <Badge variant="secondary">Disabled</Badge>}</span><span className="text-xs text-gray-500">{zone.areas?.length || 0} Areas</span>
                       </button>
-                      {isExpanded && <div className="overflow-x-auto"><table className="w-full min-w-[480px] text-left text-sm"><thead className="border-b text-xs uppercase text-gray-500"><tr><th className="px-3 py-2">Area</th><th className="px-3 py-2">Preferred Partners</th><th className="px-3 py-2 text-right">Actions</th></tr></thead><tbody>{zoneAreas.map((area) => {
+                      {isExpanded && <div className="overflow-x-auto"><table className="w-full min-w-[480px] text-left text-sm"><thead className="border-b text-xs uppercase text-gray-500"><tr><th className="px-3 py-2">Area</th><th className="px-3 py-2">Partners</th><th className="px-3 py-2 text-right">Actions</th></tr></thead><tbody>{zoneAreas.map((area) => {
                         const rule = getAreaRule(area.name);
                         const partnerCount = getDisplayedAreaPartnerCount(area.name);
                         return <Fragment key={area.id}><tr className="border-b"><td className="px-3 py-3 font-medium">{area.name}{area.enabled === false && <Badge className="ml-2" variant="secondary">Disabled</Badge>}</td><td className="px-3 py-3">{partnerCount || "—"}</td><td className="px-3 py-2 text-right"><Button size="sm" variant="outline" onClick={() => openAreaEditor(rule, area.name)}><Plus className="mr-1 h-3 w-3" />{partnerCount ? "Edit" : "Add Partners"}</Button></td></tr>{areaEditorOpen && normalizeArea(areaName) === normalizeArea(area.name) && <tr><td colSpan={3} className="border-b p-0">{renderAreaPartnerEditor()}</td></tr>}</Fragment>;
@@ -546,92 +465,38 @@ export function AssignmentManagementPage({
           </Card>
           </div>
         </div>
-      )}
-
-      {activeTab === "preferred" && <>
-        <div className="grid gap-6 xl:grid-cols-2">
-        <Card>
-          <CardHeader><CardTitle>Search and add partners</CardTitle><CardDescription>Search by partner name, phone number, or partner ID.</CardDescription></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" /><Input className="pl-9" value={partnerSearch} onChange={(event) => setPartnerSearch(event.target.value)} placeholder="Search partners..." /></div>
-            {partnerQuery.isFetching && <p className="text-sm text-gray-500">Searching...</p>}
-            <div className="space-y-2">{searchResults.map((partner) => { const alreadyAdded = preferredPartners.some((item) => item.profileId === partnerId(partner)); return <div key={partnerId(partner)} className="flex items-center gap-3 rounded-lg border p-3"><div className="min-w-0 flex-1"><p className="text-sm font-medium">{partnerName(partner)}</p><p className="text-xs text-gray-500">{partner.phone || partner.phoneNumber || partnerUid(partner)}</p></div>{alreadyAdded ? <Badge variant="secondary"><Check className="mr-1 h-3 w-3" />Added</Badge> : <Button size="sm" onClick={() => addPartnerMutation.mutate(partner)} disabled={addPartnerMutation.isPending}><Plus className="mr-1 h-4 w-4" />Add</Button>}</div>; })}</div>
-          </CardContent>
-        </Card>
-
         <Card>
           <CardHeader>
-            <CardTitle>Preferred partners list</CardTitle>
-              <CardDescription>Used for direct hourly assignments. Book Now offers notify area-rule partners first, then other eligible partners.</CardDescription>
+            <CardTitle>Task Posted Email exclusions</CardTitle>
+            <CardDescription>
+              This is the shared list used in Admin Settings. Manage it in{" "}
+              <Link href="/admin/settings" className="font-medium text-amber-700 hover:underline">
+                Admin Settings
+              </Link>
+              .
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            {preferredPartners.map((partner, index) => (
-              <div key={partner.profileId} className="flex items-center gap-3 rounded-lg border p-3">
-                <span className="w-5 text-center text-sm font-semibold text-gray-500">{index + 1}</span>
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-100 font-semibold text-amber-700">{partner.name.charAt(0).toUpperCase()}</div>
-                <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-gray-900">{partner.name}</p><p className="truncate text-xs text-gray-500">{partner.phone || partner.uid}</p></div>
-                <Badge variant={partner.active ? "success" : "secondary"}>{partner.active ? "Active" : "Inactive"}</Badge>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" aria-label={`Move ${partner.name} up`} disabled={index === 0 || reorderPartnerMutation.isPending} onClick={() => reorderPartnerMutation.mutate({ profileId: partner.profileId, direction: "up" })}><ArrowUp className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" aria-label={`Move ${partner.name} down`} disabled={index === preferredPartners.length - 1 || reorderPartnerMutation.isPending} onClick={() => reorderPartnerMutation.mutate({ profileId: partner.profileId, direction: "down" })}><ArrowDown className="h-4 w-4" /></Button>
+            {taskPostedEmailSettingsQuery.isError ? (
+              <p className="text-sm text-red-600">Failed to load Task Posted Email exclusions.</p>
+            ) : taskPostedEmailSettingsQuery.isPending ? (
+              <p className="text-sm text-gray-500">Loading exclusions...</p>
+            ) : excludedCustomers.length ? (
+              excludedCustomers.map(({ phone, name }, index) => (
+                <div key={phone} className="flex items-center gap-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2">
+                  <span className="w-6 text-sm font-semibold text-gray-500">{index + 1}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-gray-900">{name}</p>
+                    <p className="text-xs text-gray-600">{phone}</p>
+                  </div>
+                  <Badge variant="destructive">Excluded</Badge>
                 </div>
-                <Button variant="ghost" size="icon" aria-label={`Remove ${partner.name}`} onClick={() => removePartnerMutation.mutate(partner.profileId)} disabled={removePartnerMutation.isPending}><Trash2 className="h-4 w-4 text-red-500" /></Button>
-              </div>
-            ))}
-            {preferredPartners.length === 0 && <p className="py-8 text-center text-sm text-gray-500">No preferred partners added yet.</p>}
+              ))
+            ) : (
+              <p className="text-sm text-gray-500">No Task Posted Email exclusions configured.</p>
+            )}
           </CardContent>
         </Card>
-        </div>
-
-        <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Ban className="h-5 w-5 text-red-600" />Exclusions</CardTitle>
-          <CardDescription>A customer phone number here blocks automatic assignment for every Book Now work, even when no other partner matches.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Input value={phoneSearch} onChange={(event) => setPhoneSearch(event.target.value)} placeholder="Search or enter customer phone number" />
-            <Button onClick={() => addPhoneMutation.mutate(phoneSearch)} disabled={addPhoneMutation.isPending || phoneSearch.replace(/\D/g, "").length < 10}><Plus className="mr-2 h-4 w-4" />Add exclusion</Button>
-          </div>
-            {customerQuery.isFetching && <p className="text-sm text-gray-500">Searching customers...</p>}
-            {customerResults.length > 0 && (
-              <div className="space-y-2">
-                {customerResults.map((customer) => {
-                  const customerPhone = customer.phone || "";
-                  const normalizedPhone = customerPhone.replace(/\D/g, "");
-                  const alreadyExcluded = allExcludedPhones.some(
-                    (phone) => phone.replace(/\D/g, "").slice(-10) === normalizedPhone.slice(-10),
-                  );
-                  return (
-                    <div key={customer.userId || customer._id || customerPhone} className="flex items-center gap-3 rounded-lg border p-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-100 font-semibold text-red-700">{(customer.name || "C").charAt(0).toUpperCase()}</div>
-                      <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-gray-900">{customer.name}</p><p className="truncate text-xs text-gray-500">{customerPhone || "No phone number"}</p></div>
-                      {alreadyExcluded ? <Badge variant="destructive">Excluded</Badge> : <Button size="sm" onClick={() => addPhoneMutation.mutate(customerPhone)} disabled={addPhoneMutation.isPending || normalizedPhone.length < 10}><Plus className="mr-1 h-4 w-4" />Exclude</Button>}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          {addPhoneMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
-          <div className="space-y-2">
-            {excludedCustomers.filter(({ phone }) => excludedPhones.includes(phone)).map(({ phone, name }, index) => (
-              <div key={phone} className="flex items-center gap-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2">
-                <span className="w-6 text-sm font-semibold text-gray-500">{index + 1}</span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-gray-900">{name}</p>
-                  <p className="text-xs text-gray-600">{phone}</p>
-                </div>
-                <Badge variant="destructive">Excluded</Badge>
-                <Button variant="ghost" size="icon" aria-label={`Remove ${name}`} onClick={() => removePhoneMutation.mutate(phone)} disabled={removePhoneMutation.isPending}>
-                  <Trash2 className="h-4 w-4 text-red-600" />
-                </Button>
-              </div>
-            ))}
-            {excludedPhones.length === 0 && <p className="text-sm text-gray-500">No excluded phone numbers.</p>}
-          </div>
-        </CardContent>
-        </Card>
-      </>}
     </div>
   );
 }
