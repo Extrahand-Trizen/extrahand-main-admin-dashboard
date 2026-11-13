@@ -562,7 +562,7 @@ export function AssignmentManagementPage({
         <Card>
           <CardHeader>
             <CardTitle>Preferred partners list</CardTitle>
-              <CardDescription>Eligible partners receive hourly works one by one in a repeating cycle.</CardDescription>
+              <CardDescription>Used for direct hourly assignments. Book Now offers notify area-rule partners first, then other eligible partners.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             {preferredPartners.map((partner, index) => (

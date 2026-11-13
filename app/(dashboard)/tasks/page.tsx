@@ -164,7 +164,7 @@ export default function TasksPage() {
     requestedStatus &&
     ["all", "open", "overdue", "in_progress", "completed", "cancelled"].includes(requestedStatus)
       ? requestedStatus
-      : savedFilters?.statusFilter ?? "open";
+      : savedFilters?.statusFilter ?? "all";
 
   const [searchInput, setSearchInput] = useState<string>(savedFilters?.search ?? "");
   const [debouncedSearch, setDebouncedSearch] = useState<string>(savedFilters?.search ?? "");
@@ -173,7 +173,7 @@ export default function TasksPage() {
   const [followUpFilter, setFollowUpFilter] = useState<string>(savedFilters?.followUpFilter ?? "all");
   const [paymentTypeFilter, setPaymentTypeFilter] = useState<string>(savedFilters?.paymentTypeFilter ?? "all");
   const [assignedToFilter, setAssignedToFilter] = useState<string>(savedFilters?.assignedToFilter ?? "all");
-  const [postedByFilter, setPostedByFilter] = useState<string>(savedFilters?.postedByFilter ?? "all");
+  const [postedByFilter, setPostedByFilter] = useState<string>(savedFilters?.postedByFilter ?? "customer");
   const [workDateFilter, setWorkDateFilter] = useState<string>(savedFilters?.workDateFilter ?? "all");
   const [customDateFrom, setCustomDateFrom] = useState<string>(savedFilters?.customDateFrom ?? "");
   const [customDateTo, setCustomDateTo] = useState<string>(savedFilters?.customDateTo ?? "");
@@ -245,7 +245,7 @@ export default function TasksPage() {
     setFollowUpFilter("all");
     setPaymentTypeFilter("all");
     setAssignedToFilter("all");
-    setPostedByFilter("all");
+    setPostedByFilter("customer");
     setWorkDateFilter("all");
     setCustomDateFrom("");
     setCustomDateTo("");

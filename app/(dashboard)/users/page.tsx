@@ -580,23 +580,12 @@ export default function UsersPage() {
   const { data: verifiedCountData } = useQuery({
     queryKey: [
       "users-verified-count",
-      selectedCityFilter,
-      areaFilter,
-      createdFrom,
-      createdTo,
+      { ...activeUserFilters, isAadhaarVerified: true },
     ],
     queryFn: () =>
       listUsers({
+        ...activeUserFilters,
         isAadhaarVerified: true,
-        role: "partner",
-        city: selectedCityFilter !== "all" ? selectedCityFilter : undefined,
-        area:
-          selectedCityFilter.trim().toLowerCase() === "hyderabad" &&
-          areaFilter !== "all"
-            ? areaFilter
-            : undefined,
-        createdFrom: createdFrom || undefined,
-        createdTo: createdTo || undefined,
         page: 1,
         limit: 1,
       }),
@@ -616,6 +605,10 @@ export default function UsersPage() {
               ? "helpers"
               : "partners"
         }`;
+  const verifiedCountLabel =
+    roleFilter === "all"
+      ? "Aadhaar verified users"
+      : `Aadhaar verified ${roleFilter === "customer" ? "customers" : "partners"}`;
 
   const handleExportUsers = async () => {
     setIsExporting(true);
@@ -962,7 +955,8 @@ export default function UsersPage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-gray-600">
-              Aadhaar verified Partners{createdFrom || createdTo ? " in selected date range" : ""}
+              {verifiedCountLabel}
+              {createdFrom || createdTo ? " in selected date range" : ""}
             </p>
             <p className="text-2xl font-semibold text-gray-900">
               {Number(verifiedInRange).toLocaleString()}
