@@ -1,15 +1,13 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, ChevronDown, ChevronRight, Loader2, Plus, X } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { listUsers } from "@/lib/api/users";
 import { getLocationCatalog, ManagedLocation } from "@/lib/api/locations";
 import { getTaskPostedEmailSettings } from "@/lib/api/admin";
 import {
@@ -243,20 +241,6 @@ export function AssignmentManagementPage() {
   const selectedAreaPartners = areaPartnerIds
     .map((id) => areaAddedPartners.find((partner) => partnerId(partner) === id) || approvedAreaPartners.find((partner) => partner.profileId === id))
     .filter(Boolean) as PartnerSearchResult[];
-  const excludedCustomerQueries = useQueries({
-    queries: allExcludedPhones.map((phone) => ({
-      queryKey: ["task-posted-email-excluded-user", phone],
-      queryFn: () => listUsers({ search: phone, limit: 10 }),
-      enabled: phone.length >= 2,
-    })),
-  });
-
-  const excludedCustomers = allExcludedPhones.map((phone, index) => ({
-    phone,
-    name: excludedCustomerQueries[index]?.data?.data?.find((customer) =>
-      (customer.phone || "").replace(/\D/g, "").slice(-10) === phone.replace(/\D/g, "").slice(-10),
-    )?.name || "Customer",
-  }));
   const refreshRules = (data: { data?: unknown }) => {
     queryClient.setQueryData(["assignment-management-rules"], data);
     void queryClient.invalidateQueries({ queryKey: ["assignment-management-approved-partners"] });
@@ -465,38 +449,6 @@ export function AssignmentManagementPage() {
           </Card>
           </div>
         </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Task Posted Email exclusions</CardTitle>
-            <CardDescription>
-              This is the shared list used in Admin Settings. Manage it in{" "}
-              <Link href="/admin/settings" className="font-medium text-amber-700 hover:underline">
-                Admin Settings
-              </Link>
-              .
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {taskPostedEmailSettingsQuery.isError ? (
-              <p className="text-sm text-red-600">Failed to load Task Posted Email exclusions.</p>
-            ) : taskPostedEmailSettingsQuery.isPending ? (
-              <p className="text-sm text-gray-500">Loading exclusions...</p>
-            ) : excludedCustomers.length ? (
-              excludedCustomers.map(({ phone, name }, index) => (
-                <div key={phone} className="flex items-center gap-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2">
-                  <span className="w-6 text-sm font-semibold text-gray-500">{index + 1}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-gray-900">{name}</p>
-                    <p className="text-xs text-gray-600">{phone}</p>
-                  </div>
-                  <Badge variant="destructive">Excluded</Badge>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-gray-500">No Task Posted Email exclusions configured.</p>
-            )}
-          </CardContent>
-        </Card>
     </div>
   );
 }

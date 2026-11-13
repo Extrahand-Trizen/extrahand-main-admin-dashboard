@@ -40,6 +40,14 @@ function formatDateTime(value?: string | null): string {
   return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString();
 }
 
+function formatTime(value?: string | null): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "—"
+    : date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
 function taskLocationLabel(location?: unknown): string {
   if (typeof location === "string" && location.trim()) return location.trim();
   if (location && typeof location === "object") {
@@ -130,6 +138,7 @@ function AreaCandidates({
   onResendWhatsApp,
   resendPending,
   canResendWhatsApp,
+  scheduledNotificationAt,
 }: {
   area: DispatchAreaLog;
   candidates: DispatchCandidateLog[];
@@ -139,6 +148,7 @@ function AreaCandidates({
   onResendWhatsApp: (candidate: DispatchCandidateLog, stage: "preferred" | "area_rule" | "all") => void;
   resendPending: boolean;
   canResendWhatsApp: boolean;
+  scheduledNotificationAt?: string;
 }) {
   const counts = {
     eligible: candidates.filter((candidate) => candidate.status !== "ineligible").length,
@@ -174,6 +184,8 @@ function AreaCandidates({
           const offerActive = Boolean(
             candidate.partnerUid && activeOfferUids.has(candidate.partnerUid),
           );
+          const pushScheduledAt =
+            !candidate.notifiedAt && stage === "all" ? scheduledNotificationAt : undefined;
 
           return (
             <div key={`${candidate.partnerUid || candidate.partnerId || candidate.name}-${index}`} className="rounded-md border border-gray-100 p-2.5">
@@ -204,15 +216,23 @@ function AreaCandidates({
                   className={`rounded px-2 py-0.5 text-[11px] font-medium ${
                     candidate.notifiedAt
                       ? "bg-emerald-50 text-emerald-700"
+                      : pushScheduledAt
+                        ? "bg-blue-50 text-blue-700"
                       : "bg-amber-50 text-amber-700"
                   }`}
                   title={
                     candidate.notifiedAt
                       ? "The notification service confirmed a device send."
+                      : pushScheduledAt
+                        ? `Expected push notification at ${formatDateTime(pushScheduledAt)} after the preferred-partner window ends.`
                       : "No successful push send has been recorded."
                   }
                 >
-                  {candidate.notifiedAt ? "Push sent" : "Push not confirmed"}
+                  {candidate.notifiedAt
+                    ? "Push sent"
+                    : pushScheduledAt
+                      ? `Push at ${formatTime(pushScheduledAt)}`
+                      : "Push not confirmed"}
                 </span>
                 <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${whatsappStatusClass(getWhatsAppStatus(candidate.partnerUid)?.status)}`}>
                   WhatsApp {whatsappStatusLabel(getWhatsAppStatus(candidate.partnerUid)?.status)}
@@ -316,6 +336,16 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
   const canStartOtherStage =
     !hasEligiblePreferredPartners ||
     (!hasAcceptedPreferredPartner && preferredWindowExpired);
+  const otherStageProgress = progress?.stages.find((stage) => stage.stage === "all");
+  const scheduledOtherStageNotificationAt =
+    canNotifyImmediately &&
+    hasEligiblePreferredPartners &&
+    !hasAcceptedPreferredPartner &&
+    otherStageProgress?.status === "pending" &&
+    preferredExpiry &&
+    !preferredWindowExpired
+      ? preferredExpiry
+      : undefined;
   const notifyStageMutation = useMutation({
     mutationFn: (stage: "area_rule" | "all") =>
       notifyBookNowDispatchStage(task.taskId, stage),
@@ -569,6 +599,9 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                       resendMutation.mutate({ candidate, stage: candidateStage })}
                     resendPending={resendMutation.isPending}
                     canResendWhatsApp={canNotifyImmediately && canStartOtherStage}
+                    scheduledNotificationAt={
+                      stage.key === "all" ? scheduledOtherStageNotificationAt : undefined
+                    }
                   />
                   ))
                 ) : (
