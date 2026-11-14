@@ -58,6 +58,7 @@ const PARTNER_STATUS_OPTIONS = [
 
 const PARTNER_CATEGORY_OPTIONS = [
   { value: "cleaning_related", label: "Cleaning & Related Services" },
+  { value: "plumbing", label: "Plumbing" },
   { value: "Home Services", label: "Home Services" },
   { value: "Delivery & Logistics", label: "Delivery & Logistics" },
   { value: "Driving", label: "Driving" },
