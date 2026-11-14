@@ -185,7 +185,6 @@ export default function HomePromotionsTab() {
   const homeOfferCandidates = coupons.filter((coupon) =>
     coupon.isActive &&
     (coupon.applicableFlows || []).includes("BOOK_NOW") &&
-    coupon.applicableLocations === "ALL_LOCATIONS" &&
     coupon.redemptionScope !== "GLOBAL_SINGLE_USE" &&
     new Date(coupon.startDate).getTime() <= now &&
     (!coupon.expiryDate || new Date(coupon.expiryDate).getTime() >= now),
@@ -210,7 +209,7 @@ export default function HomePromotionsTab() {
         <div className="overflow-x-auto rounded-lg border border-gray-200">
           <table className="w-full min-w-[680px] text-left text-sm">
             <thead className="bg-gray-50 text-xs uppercase text-gray-500">
-              <tr>{["Coupon", "Discount", "Minimum booking", "Eligibility", "Customer Offers", "Action"].map((item) => <th className="px-4 py-3" key={item}>{item}</th>)}</tr>
+              <tr>{["Coupon", "Discount", "Minimum booking", "Eligibility", "Location", "Customer Offers", "Action"].map((item) => <th className="px-4 py-3" key={item}>{item}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {homeOfferCandidates.map((coupon) => {
@@ -222,6 +221,7 @@ export default function HomePromotionsTab() {
                   <td className="px-4 py-3">{coupon.discountType === "PERCENTAGE" ? `${coupon.discountValue}% off` : `₹${coupon.discountValue} off`}</td>
                   <td className="px-4 py-3">{coupon.minOrderAmount > 0 ? `₹${coupon.minOrderAmount}` : "No minimum"}</td>
                   <td className="px-4 py-3">{coupon.applicableTo === "SELECTED_SERVICES" ? "Selected services" : "All services"}{coupon.firstBookingOnly ? " · First booking" : ""}</td>
+                  <td className="px-4 py-3">{coupon.applicableLocations === "SELECTED_LOCATIONS" ? [...(coupon.cities || []), ...(coupon.pincodes || [])].join(", ") : "All locations"}</td>
                   <td className="px-4 py-3"><StatusBadge active={isVisible} />{isVisible && !isCurrentlyShown ? <span className="ml-2 text-xs text-gray-500">Not in current feed</span> : null}</td>
                   <td className="px-4 py-3">
                     <Button size="sm" variant={isVisible ? "secondary" : "default"} disabled={savingCouponCode === coupon.code} onClick={() => void toggleCouponInOffers(coupon)}>
@@ -231,7 +231,7 @@ export default function HomePromotionsTab() {
                 </tr>
                 );
               })}
-              {!homeOfferCandidates.length ? <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">{loading ? "Loading…" : "No active Book Now coupons are eligible for customer Offers."}</td></tr> : null}
+              {!homeOfferCandidates.length ? <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">{loading ? "Loading…" : "No active Book Now coupons are eligible for customer Offers."}</td></tr> : null}
             </tbody>
           </table>
         </div>
