@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, ListFilter, Send, ShieldCheck, ShieldX, MessageCircle } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import {
   getWorkWhatsAppDispatchStatuses,
   notifyBookNowDispatchStage,
@@ -14,6 +15,7 @@ import {
 } from "@/lib/api/tasks";
 import { Task, DispatchAreaLog, DispatchCandidateLog } from "@/types";
 import { toast } from "sonner";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 interface BookNowDispatchLogCardProps {
   task: Task;
@@ -150,6 +152,7 @@ function AreaCandidates({
   canResendWhatsApp: boolean;
   scheduledNotificationAt?: string;
 }) {
+  const { hasPermission } = usePermissions();
   const counts = {
     eligible: candidates.filter((candidate) => candidate.status !== "ineligible").length,
     notified: candidates.filter((candidate) => Boolean(candidate.notifiedAt)).length,
@@ -190,7 +193,16 @@ function AreaCandidates({
           return (
             <div key={`${candidate.partnerUid || candidate.partnerId || candidate.name}-${index}`} className="rounded-md border border-gray-100 p-2.5">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium text-sm text-gray-900">{candidate.name}</span>
+                {hasPermission("user.view") && candidate.partnerId ? (
+                  <Link
+                    href={`/users/${encodeURIComponent(candidate.partnerId)}`}
+                    className="font-medium text-sm text-blue-700 hover:underline"
+                  >
+                    {candidate.name}
+                  </Link>
+                ) : (
+                  <span className="font-medium text-sm text-gray-900">{candidate.name}</span>
+                )}
                 <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${ineligible ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
                   {ineligible ? "Ineligible" : "Eligible"}
                 </span>
