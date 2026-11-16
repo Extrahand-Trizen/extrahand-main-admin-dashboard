@@ -42,8 +42,8 @@ import {
   type SelectedRecipient,
 } from "@/components/notifications/shared";
 
-const MAX_TITLE_LENGTH = 100;
-const MAX_MESSAGE_LENGTH = 500;
+const MAX_TITLE_LENGTH = 90;
+const MAX_MESSAGE_LENGTH = 94;
 
 /** `YYYY-MM-DDTHH:mm` in local time, for `<input type="datetime-local">`. */
 function toLocalInputValue(date: Date): string {
