@@ -1041,7 +1041,11 @@ export default function TaskDetailsPage() {
                   </Label>
                   <div className="mt-1 text-sm text-gray-900 flex items-start gap-2">
                     <Calendar className="h-4 w-4 text-gray-400 mt-0.5" />
-                    {task.bookingSource === "book_now" ? (
+                    {task.bookingSource === "book_now" ||
+                    task.isHourly === true ||
+                    task.budgetType === "hourly" ||
+                    task.categorySlug === "hourly-helper" ||
+                    task.categorySlug === "hourly-based" ? (
                       <div className="flex flex-col gap-0.5">
                         {task.scheduledDate && (
                           <span className="font-semibold text-blue-700">
@@ -1290,7 +1294,7 @@ export default function TaskDetailsPage() {
                   )}
                 </div>
                 <CardDescription>
-                  Assign a partner to this Book Now task
+                  Assign a partner to this task
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1379,7 +1383,7 @@ export default function TaskDetailsPage() {
               </CardContent>
             </Card>
 
-            {/* Book Now Auto-Assignment Dispatch Log */}
+            {/* Staged partner offer dispatch log */}
             <BookNowDispatchLogCard task={task} />
           </>
           ) : hasPermission("task.application.list") ? (

@@ -57,7 +57,7 @@ import { usePermissions } from "@/lib/hooks/usePermissions";
 import { formatDate, formatCurrency, isTaskOverdue } from "@/lib/utils";
 import { CATEGORY_OPTIONS } from "@/lib/category-options";
 import { toast } from "sonner";
-import { Task } from "@/types";
+import { ApiResponse, Task } from "@/types";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableSkeleton } from "@/components/LoadingSkeleton";
@@ -158,13 +158,28 @@ export default function TasksPage() {
   const queryClient = useQueryClient();
   const { hasPermission, isSuperAdmin } = usePermissions();
 
+  const cacheTaskDetails = (task: Task, taskId: string) => {
+    const queryKey = ["task", taskId] as const;
+    if (!queryClient.getQueryData<ApiResponse<Task>>(queryKey)) {
+      queryClient.setQueryData<ApiResponse<Task>>(queryKey, {
+        success: true,
+        data: task,
+      });
+    }
+  };
+
+  const openTask = (task: Task, taskId: string) => {
+    cacheTaskDetails(task, taskId);
+    router.push(`/tasks/${taskId}`);
+  };
+
   const savedFilters = useMemo(() => getSavedFilters(), []);
   const requestedStatus = searchParams.get("status");
   const initialStatusFilter =
     requestedStatus &&
     ["all", "open", "overdue", "in_progress", "completed", "cancelled"].includes(requestedStatus)
       ? requestedStatus
-      : savedFilters?.statusFilter ?? "open";
+      : savedFilters?.statusFilter ?? "all";
 
   const [searchInput, setSearchInput] = useState<string>(savedFilters?.search ?? "");
   const [debouncedSearch, setDebouncedSearch] = useState<string>(savedFilters?.search ?? "");
@@ -173,7 +188,7 @@ export default function TasksPage() {
   const [followUpFilter, setFollowUpFilter] = useState<string>(savedFilters?.followUpFilter ?? "all");
   const [paymentTypeFilter, setPaymentTypeFilter] = useState<string>(savedFilters?.paymentTypeFilter ?? "all");
   const [assignedToFilter, setAssignedToFilter] = useState<string>(savedFilters?.assignedToFilter ?? "all");
-  const [postedByFilter, setPostedByFilter] = useState<string>(savedFilters?.postedByFilter ?? "all");
+  const [postedByFilter, setPostedByFilter] = useState<string>(savedFilters?.postedByFilter ?? "customer");
   const [workDateFilter, setWorkDateFilter] = useState<string>(savedFilters?.workDateFilter ?? "all");
   const [customDateFrom, setCustomDateFrom] = useState<string>(savedFilters?.customDateFrom ?? "");
   const [customDateTo, setCustomDateTo] = useState<string>(savedFilters?.customDateTo ?? "");
@@ -245,7 +260,7 @@ export default function TasksPage() {
     setFollowUpFilter("all");
     setPaymentTypeFilter("all");
     setAssignedToFilter("all");
-    setPostedByFilter("all");
+    setPostedByFilter("customer");
     setWorkDateFilter("all");
     setCustomDateFrom("");
     setCustomDateTo("");
@@ -892,7 +907,7 @@ export default function TasksPage() {
                         className="cursor-pointer hover:bg-gray-50 transition-colors"
                         onClick={() => {
                           if (taskIdentifier) {
-                            router.push(`/tasks/${taskIdentifier}`);
+                            openTask(task, taskIdentifier);
                           }
                         }}
                       >
@@ -1026,6 +1041,11 @@ export default function TasksPage() {
                               <DropdownMenuItem asChild>
                                 <Link
                                   href={taskIdentifier ? `/tasks/${taskIdentifier}` : "/tasks"}
+                                  onClick={() => {
+                                    if (taskIdentifier) {
+                                      cacheTaskDetails(task, taskIdentifier);
+                                    }
+                                  }}
                                 >
                                   <Eye className="mr-2 h-4 w-4" />
                                   View Details

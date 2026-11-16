@@ -50,6 +50,12 @@ const navigation: Array<{
     permission: 'user.list',
   },
   {
+    name: 'Preferred Partners',
+    href: '/assignment-management/area-rules',
+    icon: SlidersHorizontal,
+    permission: 'task.list',
+  },
+  {
     name: 'Location Management',
     href: '/locations',
     icon: MapPin,
@@ -60,12 +66,6 @@ const navigation: Array<{
     name: 'Works',
     href: '/tasks',
     icon: Briefcase,
-    permission: 'task.list',
-  },
-  {
-    name: 'Assignment Management',
-    href: '/assignment-management',
-    icon: SlidersHorizontal,
     permission: 'task.list',
   },
   {
@@ -117,14 +117,11 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
   const [paymentsSectionOpen, setPaymentsSectionOpen] = useState(
     pathname?.startsWith('/payments')
   );
-  const [assignmentSectionOpen, setAssignmentSectionOpen] = useState(
-    pathname?.startsWith('/assignment-management')
-  );
   const [notificationsSectionOpen, setNotificationsSectionOpen] = useState(
     pathname?.startsWith('/notifications')
   );
   const [partnerSectionOpen, setPartnerSectionOpen] = useState(
-    pathname?.startsWith('/partner-registrations')
+    pathname?.startsWith('/partner-registrations') || pathname?.startsWith('/assignment-management')
   );
   const [usersSectionOpen, setUsersSectionOpen] = useState(
     pathname?.startsWith('/users')
@@ -318,50 +315,6 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
                         </Link>
                       </div>
                     )}
-                  </div>
-                ) : item.href === '/assignment-management' ? (
-                  <div className="space-y-1">
-                    <button
-                      onClick={() => setAssignmentSectionOpen(!assignmentSectionOpen)}
-                      className={cn(
-                        'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
-                        isActive
-                          ? 'bg-yellow-50 text-yellow-700'
-                          : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
-                      )}
-                    >
-                      <span className="flex items-center gap-3">
-                        <item.icon className={cn('h-5 w-5', isActive ? 'text-yellow-600' : 'text-gray-400')} />
-                        {item.name}
-                      </span>
-                      {assignmentSectionOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    </button>
-                  {assignmentSectionOpen && <div className="ml-6 space-y-1 border-l border-gray-200 pl-2">
-                    <Link
-                      href="/assignment-management/preferred-partners"
-                      onClick={handleLinkClick}
-                      className={cn(
-                        'block rounded-md px-3 py-2 text-xs font-medium transition-colors',
-                        pathname?.startsWith('/assignment-management/preferred-partners')
-                          ? 'bg-yellow-50 text-yellow-700'
-                          : 'text-gray-500 hover:bg-yellow-50/50 hover:text-yellow-600'
-                      )}
-                    >
-                      Preferred Partners
-                    </Link>
-                    <Link
-                      href="/assignment-management/area-rules"
-                      onClick={handleLinkClick}
-                      className={cn(
-                        'block rounded-md px-3 py-2 text-xs font-medium transition-colors',
-                        pathname?.startsWith('/assignment-management/area-rules')
-                          ? 'bg-yellow-50 text-yellow-700'
-                          : 'text-gray-500 hover:bg-yellow-50/50 hover:text-yellow-600'
-                      )}
-                    >
-                      Area Rules
-                    </Link>
-                  </div>}
                   </div>
                 ) : item.href === '/notifications' ? (
                   <div className="space-y-1">
