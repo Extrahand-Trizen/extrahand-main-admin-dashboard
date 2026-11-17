@@ -1,6 +1,13 @@
 import { apiRequest } from './client';
 import { ApiResponse } from '@/types';
 
+export type PartnerAddedBy = {
+  userId: string;
+  name: string;
+  role: string;
+  isSuperAdmin: boolean;
+};
+
 type PreferredPartner = {
   profileId: string;
   uid: string;
@@ -8,6 +15,8 @@ type PreferredPartner = {
   phone?: string;
   categories: string[];
   areas: string[];
+  isAadhaarVerified?: boolean;
+  addedBy?: PartnerAddedBy;
   priority: number;
   active: boolean;
 };
@@ -45,6 +54,8 @@ export type PartnerSearchResult = {
     workAreas?: string[];
     phone?: string;
   };
+  isAadhaarVerified?: boolean;
+  addedBy?: PartnerAddedBy;
 };
 
 export type EligibleAssignmentPartnersResponse = ApiResponse<PartnerSearchResult[]> & {
@@ -113,10 +124,20 @@ export async function addExcludedPhone(phone: string): Promise<ApiResponse<Assig
   });
 }
 
-export async function saveAreaRule(rule: Omit<AreaAssignmentRule, 'active'>): Promise<ApiResponse<AssignmentRules>> {
-  return apiRequest<ApiResponse<AssignmentRules>>('/api/v1/assignment-management/area-rules', {
-    method: 'POST', body: JSON.stringify(rule),
-  });
+export async function saveAreaRule(
+  rule: Omit<AreaAssignmentRule, 'active'>,
+): Promise<{ success: true; data: { areaRule: AreaAssignmentRule } }> {
+  const response = await apiRequest<ApiResponse<{ areaRule: AreaAssignmentRule }>>(
+    '/api/v1/assignment-management/area-rules',
+    {
+      method: 'POST',
+      body: JSON.stringify(rule),
+    },
+  );
+  if (!response?.success || !response.data?.areaRule) {
+    throw new Error(response?.error || 'Failed to save area rule');
+  }
+  return { success: true, data: response.data };
 }
 
 export async function removeAreaRule(area: string): Promise<ApiResponse<AssignmentRules>> {

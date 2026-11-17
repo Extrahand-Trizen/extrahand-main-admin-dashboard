@@ -2,11 +2,25 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, ChevronDown, ChevronRight, Loader2, Plus, X } from "lucide-react";
+import {
+  Building2,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  Plus,
+  Search,
+  ShieldAlert,
+  ShieldCheck,
+  UserRound,
+  X,
+} from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { ApiResponse } from "@/types";
+import { useAuth } from "@/lib/hooks/useAuth";
 import { toast } from "sonner";
 import { getLocationCatalog, ManagedLocation } from "@/lib/api/locations";
 import { getTaskPostedEmailSettings } from "@/lib/api/admin";
@@ -14,6 +28,8 @@ import {
   getEligibleAssignmentPartners,
   getEligiblePartnerAreaData,
   getAssignmentRules,
+  AssignmentRules,
+  PartnerAddedBy,
   PartnerSearchResult,
   AreaAssignmentRule,
   removeAreaRule,
@@ -33,6 +49,24 @@ function partnerName(partner: PartnerSearchResult): string {
   return partner.name || partner.fullName || "Partner";
 }
 
+function partnerInitials(partner: PartnerSearchResult): string {
+  return partnerName(partner)
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0] || "")
+    .join("")
+    .toUpperCase();
+}
+
+function aadhaarStatusLabel(partner: PartnerSearchResult): string {
+  return partner.isAadhaarVerified === true ? "Aadhaar verified" : "Aadhaar not verified";
+}
+
+function addedByLabel(addedBy?: PartnerAddedBy): string {
+  if (!addedBy) return "Not recorded";
+  return addedBy.name || "Unknown admin";
+}
+
 function normalizeArea(value: string | undefined): string {
   return String(value || "").toLowerCase().replace(/[-_\s]+/g, "");
 }
@@ -48,6 +82,7 @@ function cityAreas(city: ManagedLocation): ManagedLocation[] {
 
 export function AssignmentManagementPage() {
   const queryClient = useQueryClient();
+  const { isSuperAdmin } = useAuth();
   const [areaName, setAreaName] = useState("");
   const [areaRuleCategory, setAreaRuleCategory] = useState("");
   const [areaRuleWorkType, setAreaRuleWorkType] = useState("hourly");
@@ -66,10 +101,15 @@ export function AssignmentManagementPage() {
   const rulesQuery = useQuery({
     queryKey: ["assignment-management-rules"],
     queryFn: getAssignmentRules,
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
   const taskPostedEmailSettingsQuery = useQuery({
     queryKey: ["task-posted-email-settings"],
     queryFn: getTaskPostedEmailSettings,
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: false,
   });
   const locationCatalogQuery = useQuery({
     queryKey: ["assignment-management-location-catalog"],
@@ -80,11 +120,16 @@ export function AssignmentManagementPage() {
       }
       return response.data.cities;
     },
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
   const areaPartnerQuery = useQuery({
     queryKey: ["assignment-management-area-partners", areaPartnerSearch],
     queryFn: () => getEligibleAssignmentPartners(areaPartnerSearch),
     enabled: areaPartnerSearchOpen && areaPartnerSearch.trim().length >= 2,
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: false,
+    retry: false,
   });
   const approvedPartnersQuery = useQuery({
     queryKey: ["assignment-management-approved-partners"],
@@ -96,6 +141,8 @@ export function AssignmentManagementPage() {
       return response.data;
     },
     staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: false,
   });
 
   useEffect(() => {
@@ -119,7 +166,8 @@ export function AssignmentManagementPage() {
   const locationCities = useMemo(() => locationCatalogQuery.data || [], [locationCatalogQuery.data]);
 
   const rules = rulesQuery.data?.data;
-  const isLoadingAreaRules = rulesQuery.isPending || locationCatalogQuery.isPending;
+  const isLoadingLocations = locationCatalogQuery.isPending;
+  const isLoadingAreaRules = rulesQuery.isPending;
   const approvedAreaPartners = (approvedPartnersQuery.data || []).map((partner) => ({
     profileId: String(partner._id || partner.profileId || partner.userId),
     uid: String(partner.uid || partner.userId),
@@ -127,6 +175,7 @@ export function AssignmentManagementPage() {
     phone: partner.phone,
     categories: partner.partnerProfile?.categories || [],
     areas: partner.partnerProfile?.workAreas || partner.workAreas || [],
+    isAadhaarVerified: partner.isAadhaarVerified === true,
     priority: 0,
     active: true,
   }));
@@ -177,6 +226,7 @@ export function AssignmentManagementPage() {
     workType = areaWorkTypeFilter,
     category = areaCategoryFilter,
   ) => approvedAreaPartners
+    .filter((partner) => partner.isAadhaarVerified === true)
     .filter((partner) => (partner.areas || []).some((partnerArea) => {
       const normalizedPartnerArea = normalizeArea(partnerArea);
       const normalizedArea = normalizeArea(area);
@@ -188,14 +238,7 @@ export function AssignmentManagementPage() {
     area: string,
     workType = areaWorkTypeFilter,
     category = areaCategoryFilter,
-  ) => {
-    if (getAreaRules(area, workType).some((rule) =>
-      workType !== "book_now" ||
-      category === "all" ||
-      String(rule.category || "").toLowerCase() === category.toLowerCase(),
-    )) return getSavedAreaPartners(area, workType, category).length;
-    return getEligiblePartnersForArea(area, workType, category).length;
-  };
+  ) => getSavedAreaPartners(area, workType, category).length;
   const getPreferredBookNowCategory = (area: string) => {
     const savedRules = [...getAreaRules(area, "book_now")].sort(
       (first, second) => second.preferredPartners.length - first.preferredPartners.length,
@@ -239,26 +282,49 @@ export function AssignmentManagementPage() {
   );
   const matchingAreaPartners = getEligiblePartnersForArea(areaName, areaRuleWorkType, areaRuleCategory || "all");
   const selectedAreaPartners = areaPartnerIds
-    .map((id) => areaAddedPartners.find((partner) => partnerId(partner) === id) || approvedAreaPartners.find((partner) => partner.profileId === id))
+    .map((id) => {
+      const savedPartner = areaAddedPartners.find((partner) => partnerId(partner) === id);
+      const currentPartner = approvedAreaPartners.find((partner) => partner.profileId === id);
+      return currentPartner ? { ...currentPartner, addedBy: savedPartner?.addedBy } : savedPartner;
+    })
     .filter(Boolean) as PartnerSearchResult[];
   const refreshRules = (data: { data?: unknown }) => {
     queryClient.setQueryData(["assignment-management-rules"], data);
-    void queryClient.invalidateQueries({ queryKey: ["assignment-management-approved-partners"] });
-    void queryClient.invalidateQueries({ queryKey: ["assignment-management-area-partners"] });
+  };
+
+  const refreshSavedAreaRule = (savedRule: AreaAssignmentRule) => {
+    queryClient.setQueryData<ApiResponse<AssignmentRules>>(
+      ["assignment-management-rules"],
+      (current) => {
+        if (!current?.data) return current;
+        const areaKey = normalizeArea(savedRule.area);
+        const categoryKey = String(savedRule.category || "").trim().toLowerCase();
+        const savedWorkTypes = new Set(savedRule.workTypes);
+        const areaRules = current.data.areaRules.flatMap((rule) => {
+          const matchesRule =
+            normalizeArea(rule.area) === areaKey &&
+            String(rule.category || "").trim().toLowerCase() === categoryKey &&
+            rule.workTypes.some((workType) => savedWorkTypes.has(workType));
+          if (!matchesRule) return [rule];
+          const remainingWorkTypes = rule.workTypes.filter(
+            (workType) => !savedWorkTypes.has(workType),
+          );
+          return remainingWorkTypes.length
+            ? [{ ...rule, workTypes: remainingWorkTypes }]
+            : [];
+        });
+        return {
+          ...current,
+          data: { ...current.data, areaRules: [...areaRules, savedRule] },
+        };
+      },
+    );
   };
 
   const saveAreaRuleMutation = useMutation({
-    mutationFn: () => saveAreaRule({
-      area: areaName,
-      category: areaRuleWorkType === "book_now" ? areaRuleCategory : undefined,
-      zone: "Default Zone",
-      workTypes: [areaRuleWorkType],
-      preferredPartners: areaPartnerIds
-        .map((profileId) => areaAddedPartners.find((partner) => partnerId(partner) === profileId) || approvedAreaPartners.find((partner) => partner.profileId === profileId))
-        .filter(Boolean) as AreaAssignmentRule["preferredPartners"],
-    }),
-    onSuccess: (data) => {
-      refreshRules(data);
+    mutationFn: (rule: Omit<AreaAssignmentRule, "active">) => saveAreaRule(rule),
+    onSuccess: (response) => {
+      refreshSavedAreaRule(response.data.areaRule);
       setAreaEditorOpen(false);
       setAreaName("");
       setAreaRuleCategory("");
@@ -310,11 +376,8 @@ export function AssignmentManagementPage() {
       setAreaPartnerIds(savedRule.preferredPartners.map((partner) => partner.profileId));
       setAreaAddedPartners(savedRule.preferredPartners);
     } else {
-      const matchingPartners = targetArea
-        ? getEligiblePartnersForArea(targetArea, workType, selectedCategory || "all")
-        : [];
-      setAreaPartnerIds(matchingPartners.map((partner) => partner.profileId));
-      setAreaAddedPartners(matchingPartners);
+      setAreaPartnerIds([]);
+      setAreaAddedPartners([]);
     }
     setAreaPartnerSearch("");
     setAreaPartnerSearchOpen(false);
@@ -323,7 +386,7 @@ export function AssignmentManagementPage() {
 
   const loadEditorPartnersFor = (workType: string, category: string) => {
     const rule = getAreaRule(areaName, workType, category);
-    const partners = rule?.preferredPartners || getEligiblePartnersForArea(areaName, workType, category);
+    const partners = rule ? rule.preferredPartners : [];
     setAreaPartnerIds(partners.map((partner) => partner.profileId));
     setAreaAddedPartners(partners);
   };
@@ -331,7 +394,7 @@ export function AssignmentManagementPage() {
   const renderAreaPartnerEditor = () => (
     <div className="space-y-4 border-t bg-white p-4">
       <div className="flex items-start justify-between gap-3">
-        <div><h3 className="text-lg font-semibold text-gray-900">Manage partners for {areaName}</h3><p className="text-sm text-gray-500">Add or remove partners, then save your changes.</p></div>
+        <div><h3 className="text-lg font-semibold text-gray-900">Manage partners for {areaName}</h3><p className="text-sm text-gray-500">Add or remove partners, then save. New partners are included only after you add them.</p></div>
         <Button type="button" variant="ghost" size="icon" aria-label="Close partner editor" onClick={() => setAreaEditorOpen(false)}><X className="h-4 w-4" /></Button>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -340,12 +403,169 @@ export function AssignmentManagementPage() {
         {areaRuleWorkType === "book_now" && <label className="space-y-1.5"><span className="text-xs font-medium uppercase tracking-wide text-gray-500">Category</span><select className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm" value={areaRuleCategory} onChange={(event) => { setAreaRuleCategory(event.target.value); loadEditorPartnersFor("book_now", event.target.value); }} aria-label="Select area category"><option value="">Select category</option>{areaCategories.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>}
       </div>
       <div className="space-y-3 rounded-lg border p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-medium text-gray-700">Preferred partners ({selectedAreaPartners.length})</p>{(areaRuleWorkType === "hourly" || areaRuleCategory) && <Button type="button" size="sm" variant="outline" onClick={() => setAreaPartnerSearchOpen((open) => !open)}><Plus className="mr-1 h-3 w-3" />Add Partner</Button>}</div>
-        {areaPartnerSearchOpen && <div className="relative"><Input value={areaPartnerSearch} onChange={(event) => setAreaPartnerSearch(event.target.value)} placeholder="Search by name or phone..." autoFocus />{(areaPartnerQuery.isFetching || areaPartnerSearch.trim().length >= 2) && <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-md border border-gray-300 bg-white p-1 shadow-lg">{areaPartnerQuery.isFetching && <p className="px-3 py-2 text-xs text-gray-500">Searching...</p>}{(areaPartnerQuery.data?.data || []).map((partner) => { const id = partnerId(partner); const added = areaPartnerIds.includes(id); return <button type="button" key={id} disabled={added} className="flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm hover:bg-amber-50 disabled:opacity-60" onClick={() => { setAreaPartnerIds((current) => current.includes(id) ? current : [...current, id]); setAreaAddedPartners((current) => current.some((item) => partnerId(item) === id) ? current : [...current, partner]); setAreaPartnerSearch(""); }}><span>{partnerName(partner)} <span className="text-xs text-gray-500">{partner.phone || partner.phoneNumber || partnerUid(partner)}</span></span><span className="text-xs font-medium text-amber-700">{added ? "Added" : "Add"}</span></button>; })}</div>}</div>}
-        <div className="max-h-80 space-y-1 overflow-y-auto">{selectedAreaPartners.length === 0 && <p className="text-sm text-gray-500">No partners added yet.</p>}{selectedAreaPartners.map((partner) => <div key={partnerId(partner)} className="flex items-center justify-between rounded bg-gray-50 px-3 py-2 text-sm"><span>{partnerName(partner)} <span className="text-xs text-gray-500">{partner.phone || partner.phoneNumber || partnerUid(partner)}</span></span><button type="button" className="text-xs text-red-600 hover:underline" onClick={() => { const id = partnerId(partner); setAreaPartnerIds((current) => current.filter((item) => item !== id)); setAreaAddedPartners((current) => current.filter((item) => partnerId(item) !== id)); }}>Remove</button></div>)}</div>
-        {matchingAreaPartners.length > 0 && <p className="text-xs text-gray-500">Approved partners matching this location are available to add.</p>}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-gray-800">Preferred partners</p>
+            <Badge variant="secondary">{selectedAreaPartners.length}</Badge>
+          </div>
+          {(areaRuleWorkType === "hourly" || areaRuleCategory) && (
+            <Button
+              type="button"
+              size="sm"
+              variant={areaPartnerSearchOpen ? "secondary" : "outline"}
+              onClick={() => setAreaPartnerSearchOpen((open) => !open)}
+            >
+              {areaPartnerSearchOpen ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              {areaPartnerSearchOpen ? "Close search" : "Add partner"}
+            </Button>
+          )}
+        </div>
+
+        {areaPartnerSearchOpen && (
+          <div className="relative">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                className="pl-9"
+                value={areaPartnerSearch}
+                onChange={(event) => setAreaPartnerSearch(event.target.value)}
+                placeholder="Search by name or phone..."
+                autoFocus
+                aria-label="Search partners by name or phone"
+              />
+            </div>
+            {areaPartnerSearch.trim().length < 2 && (
+              <p className="px-1 pt-2 text-xs text-gray-500">Enter at least 2 characters to search.</p>
+            )}
+            {(areaPartnerQuery.isFetching || areaPartnerSearch.trim().length >= 2) && (
+              <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white p-1 shadow-xl">
+                {areaPartnerQuery.isFetching && (
+                  <div className="flex items-center gap-2 px-3 py-3 text-sm text-gray-500">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Searching partners...
+                  </div>
+                )}
+                {!areaPartnerQuery.isFetching && (areaPartnerQuery.data?.data || []).length === 0 && (
+                  <p className="px-3 py-4 text-center text-sm text-gray-500">No matching partners found.</p>
+                )}
+                <div className="divide-y divide-gray-100">
+                  {(areaPartnerQuery.data?.data || []).map((partner) => {
+                    const id = partnerId(partner);
+                    const added = areaPartnerIds.includes(id);
+                    const verified = partner.isAadhaarVerified === true;
+                    return (
+                      <button
+                        type="button"
+                        key={id}
+                        disabled={added || !verified}
+                        title={!verified ? "Cannot be added: Aadhaar not verified" : undefined}
+                        aria-label={`${partnerName(partner)}. ${verified ? (added ? "Already added" : "Aadhaar verified, add partner") : "Cannot be added: Aadhaar not verified"}`}
+                        className="group grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-md px-3 py-3 text-left transition-colors hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:hover:bg-white sm:grid-cols-[minmax(0,1fr)_auto_auto]"
+                        onClick={() => {
+                          setAreaPartnerIds((current) => current.includes(id) ? current : [...current, id]);
+                          setAreaAddedPartners((current) =>
+                            current.some((item) => partnerId(item) === id) ? current : [...current, partner],
+                          );
+                          setAreaPartnerSearch("");
+                        }}
+                      >
+                        <span className="row-span-2 flex min-w-0 items-center gap-3 sm:row-span-1">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-semibold text-amber-800">
+                            {partnerInitials(partner)}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-medium text-gray-900">{partnerName(partner)}</span>
+                            <span className="block truncate text-xs text-gray-500">{partner.phone || partner.phoneNumber || partnerUid(partner)}</span>
+                          </span>
+                        </span>
+                        <span className={`col-start-2 row-start-1 inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold ${verified ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                          {verified ? <ShieldCheck className="h-3.5 w-3.5" /> : <ShieldAlert className="h-3.5 w-3.5" />}
+                          {aadhaarStatusLabel(partner)}
+                        </span>
+                        <span className={`col-start-2 row-start-2 inline-flex h-8 min-w-28 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border px-3 text-xs font-semibold transition-colors sm:col-start-3 sm:row-start-1 ${added ? "border-gray-200 bg-gray-50 text-gray-400" : verified ? "border-green-600 bg-white text-green-700 group-hover:bg-green-50" : "border-gray-200 bg-gray-100 text-gray-400"}`}>
+                          {added ? <Check className="h-3.5 w-3.5" /> : verified ? <Plus className="h-3.5 w-3.5" /> : null}
+                          {added ? "Added" : "Add partner"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {selectedAreaPartners.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-8 text-center">
+            <UserRound className="mx-auto h-6 w-6 text-gray-400" />
+            <p className="mt-2 text-sm font-medium text-gray-700">No preferred partners yet</p>
+            <p className="mt-1 text-xs text-gray-500">Add Aadhaar-verified partners for this location.</p>
+          </div>
+        ) : (
+          <div className="max-h-80 overflow-y-auto rounded-lg border border-gray-200">
+            <ul className="divide-y divide-gray-100">
+              {selectedAreaPartners.map((partner) => {
+                const id = partnerId(partner);
+                const verified = partner.isAadhaarVerified === true;
+                return (
+                  <li key={id} className="flex items-center justify-between gap-3 px-3 py-2.5 transition-colors hover:bg-gray-50 sm:px-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-700">
+                        {partnerInitials(partner)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-gray-900">{partnerName(partner)}</p>
+                        <p className="truncate text-xs text-gray-500">{partner.phone || partner.phoneNumber || partnerUid(partner)}</p>
+                        {isSuperAdmin && (
+                          <p className="truncate text-[11px] text-gray-500">
+                            Added by: {addedByLabel(partner.addedBy)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-medium sm:text-[11px] ${verified ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                        {verified ? <ShieldCheck className="h-3.5 w-3.5" /> : <ShieldAlert className="h-3.5 w-3.5" />}
+                        <span className="hidden sm:inline">{aadhaarStatusLabel(partner)}</span>
+                        <span className="sm:hidden">{verified ? "Verified" : "Not verified"}</span>
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-gray-500 hover:bg-red-50 hover:text-red-700"
+                        aria-label={`Remove ${partnerName(partner)}`}
+                        onClick={() => {
+                          setAreaPartnerIds((current) => current.filter((item) => item !== id));
+                          setAreaAddedPartners((current) => current.filter((item) => partnerId(item) !== id));
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                        <span className="hidden sm:inline">Remove</span>
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+        {matchingAreaPartners.length > 0 && (
+          <p className="flex items-center gap-1.5 text-xs text-gray-500">
+            <Check className="h-3.5 w-3.5 text-green-600" />
+            Approved, Aadhaar-verified partners matching this location are available to add.
+          </p>
+        )}
       </div>
-      <div className="flex justify-end"><Button onClick={() => saveAreaRuleMutation.mutate()} disabled={saveAreaRuleMutation.isPending || !areaName.trim() || (areaRuleWorkType === "book_now" && !areaRuleCategory)}>{saveAreaRuleMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Save Partners</Button></div>
+      <div className="flex justify-end"><Button onClick={() => saveAreaRuleMutation.mutate({
+        area: areaName,
+        category: areaRuleWorkType === "book_now" ? areaRuleCategory : undefined,
+        zone: "Default Zone",
+        workTypes: [areaRuleWorkType],
+        preferredPartners: areaPartnerIds
+          .map((profileId) => areaAddedPartners.find((partner) => partnerId(partner) === profileId) || approvedAreaPartners.find((partner) => partner.profileId === profileId))
+          .filter(Boolean) as AreaAssignmentRule["preferredPartners"],
+      })} disabled={saveAreaRuleMutation.isPending || !areaName.trim() || (areaRuleWorkType === "book_now" && !areaRuleCategory)}>{saveAreaRuleMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Save Partners</Button></div>
     </div>
   );
 
@@ -376,8 +596,8 @@ export function AssignmentManagementPage() {
           <Card className="min-w-0">
             <CardHeader className="border-b pb-3"><CardTitle className="text-base">Cities ({locationCities.length})</CardTitle><CardDescription>Locations from Location Management</CardDescription></CardHeader>
             <CardContent className="max-h-[620px] space-y-1 overflow-y-auto p-2">
-              {isLoadingAreaRules && <div className="flex items-center justify-center gap-2 py-8 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" />Loading locations...</div>}
-              {!isLoadingAreaRules && visibleCities.map((city) => {
+              {isLoadingLocations && <div className="flex items-center justify-center gap-2 py-8 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" />Loading locations...</div>}
+              {!isLoadingLocations && visibleCities.map((city) => {
                 const zones = city.areas?.length ? [] : city.zones || [];
                 const areas = cityAreas(city);
                 const cityRule = getAreaRule(city.name);
@@ -388,12 +608,12 @@ export function AssignmentManagementPage() {
                   {cityRule && <span className="sr-only">{cityRule.preferredPartners.length} city partners configured</span>}
                 </button>;
               })}
-              {!isLoadingAreaRules && visibleCities.length === 0 && <p className="px-3 py-8 text-center text-sm text-gray-500">{locationCities.length ? "No cities match this search." : "No cities are configured in Location Management."}</p>}
+              {!isLoadingLocations && visibleCities.length === 0 && <p className="px-3 py-8 text-center text-sm text-gray-500">{locationCities.length ? "No cities match this search." : "No cities are configured in Location Management."}</p>}
             </CardContent>
           </Card>
 
           <Card className="min-w-0">
-            {isLoadingAreaRules ? <CardContent className="flex items-center justify-center gap-2 py-10 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" />Loading area rules...</CardContent> : !selectedCity ? <CardContent className="py-10 text-center text-sm text-gray-500">Select a city to view its areas.</CardContent> : <>
+            {isLoadingAreaRules || isLoadingLocations ? <CardContent className="flex items-center justify-center gap-2 py-10 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" />Loading area rules...</CardContent> : !selectedCity ? <CardContent className="py-10 text-center text-sm text-gray-500">Select a city to view its areas.</CardContent> : <>
               <CardHeader className="border-b">
                 <div className="flex flex-wrap items-center gap-3"><Building2 className="h-6 w-6 text-gray-600" /><CardTitle>{selectedCity.name}</CardTitle><Badge variant={selectedCity.enabled === false ? "secondary" : "success"}>{selectedCity.enabled === false ? "Disabled" : "Active"}</Badge></div>
                 <CardDescription>{selectedCityAreas.length ? `${selectedCity.areas?.length ? 0 : selectedCity.zones?.length || 0} Zones · ${selectedCityAreas.length} Areas` : "No Areas · City-level partner assignment"}</CardDescription>
@@ -401,14 +621,48 @@ export function AssignmentManagementPage() {
               <CardContent className="space-y-4 p-4 sm:p-5">
                 {selectedCityAreas.length === 0 ? (() => {
                   const cityRule = getAreaRule(selectedCity.name);
-                  const partners = getAreaRules(selectedCity.name).length
-                    ? getSavedAreaPartners(selectedCity.name)
-                    : getEligiblePartnersForArea(selectedCity.name);
+                  const partners = getSavedAreaPartners(selectedCity.name);
                   return <div className="space-y-4">
                     <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">This city has no areas. Preferred partners added here apply to the entire city.</div>
                     {!areaEditorOpen && <div className="rounded-lg border p-4">
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold text-gray-900">Preferred partners ({getDisplayedAreaPartnerCount(selectedCity.name)})</h3><Button size="sm" variant="outline" onClick={() => openAreaEditor(cityRule, selectedCity.name)}><Plus className="mr-1 h-4 w-4" />{getDisplayedAreaPartnerCount(selectedCity.name) ? "Edit Partners" : "Add Partner"}</Button></div>
-                      {partners.length ? <div className="space-y-2">{partners.map((partner) => <div key={partner.profileId} className="rounded-md bg-gray-50 px-3 py-2 text-sm"><span className="font-medium">{partner.name}</span><span className="ml-2 text-xs text-gray-500">{partner.phone || partner.uid}</span></div>)}</div> : <p className="text-sm text-gray-500">No preferred partners configured for this city yet.</p>}
+                      {partners.length ? (
+                        <div className="max-h-80 overflow-y-auto rounded-lg border border-gray-200">
+                          <ul className="divide-y divide-gray-100">
+                            {partners.map((partner) => {
+                              const currentPartner = approvedAreaPartners.find(
+                                (item) => item.profileId === partner.profileId,
+                              ) || partner;
+                              const verified = currentPartner.isAadhaarVerified === true;
+                              return (
+                                <li
+                                  key={partner.profileId}
+                                  className="flex items-center justify-between gap-3 px-3 py-2.5 transition-colors hover:bg-gray-50 sm:px-4"
+                                >
+                                  <div className="flex min-w-0 items-center gap-3">
+                                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-700">
+                                      {partnerInitials(currentPartner)}
+                                    </span>
+                                    <div className="min-w-0">
+                                      <p className="truncate text-sm font-medium text-gray-900">{currentPartner.name || partner.name}</p>
+                                      <p className="truncate text-xs text-gray-500">{currentPartner.phone || partner.phone || partner.uid}</p>
+                                      {isSuperAdmin && (
+                                        <p className="truncate text-[11px] text-gray-500">
+                                          Added by: {addedByLabel(partner.addedBy)}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <span className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-medium sm:text-[11px] ${verified ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                                    {verified ? <ShieldCheck className="h-3.5 w-3.5" /> : <ShieldAlert className="h-3.5 w-3.5" />}
+                                    {aadhaarStatusLabel(currentPartner)}
+                                  </span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      ) : <p className="text-sm text-gray-500">No preferred partners configured for this city yet.</p>}
                     </div>}
                     {areaEditorOpen && normalizeArea(areaName) === normalizeArea(selectedCity.name) && renderAreaPartnerEditor()}
                   </div>;
