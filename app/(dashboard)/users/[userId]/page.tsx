@@ -90,12 +90,12 @@ const formatKycStatus = (status: boolean | string | null | undefined): string =>
 };
 
 const PARTNER_SHIFT_LABELS: Record<string, string> = {
-  morning_full_time: "Morning Full-Time (8 AM–4 PM)",
+  morning_full_time: "Full-Time (7 AM–8 PM)",
   general_day_full_time: "General Day Full-Time (10 AM–6 PM)",
   evening_full_time: "Evening Full-Time (11:30 AM–7:30 PM)",
-  morning_rush: "Morning Rush (8 AM–12 PM)",
+  morning_rush: "Morning Hours (7 AM–1 PM)",
   mid_day_block: "Mid-Day Block (12 PM–4 PM)",
-  afternoon_block: "Afternoon Block (3:30 PM–7:30 PM)",
+  afternoon_block: "Evening Hours (2 PM–8 PM)",
   evening_rush: "Evening Rush (5:30 PM–9:30 PM)",
 };
 
@@ -1037,6 +1037,21 @@ export default function UserDetailsPage() {
                       {partnerWorkAreas.map((area, index) => (
                         <Badge key={`${area}-${index}`} variant="outline">
                           {formatSkillLabel(area)}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {partnerShiftLabels.length > 0 && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                      Selected Shift Timings
+                    </Label>
+                    <div className="flex flex-wrap gap-2">
+                      {partnerShiftLabels.map((shift, index) => (
+                        <Badge key={`${shift}-${index}`} variant="secondary">
+                          {shift}
                         </Badge>
                       ))}
                     </div>

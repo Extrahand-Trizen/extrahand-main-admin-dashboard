@@ -836,6 +836,7 @@ export default function TasksPage() {
                       <TableHead className="hidden lg:table-cell">Assigned To</TableHead>
                       <TableHead className="hidden xl:table-cell">Assigned Ops Admin</TableHead>
                       <TableHead className="hidden lg:table-cell">Budget</TableHead>
+                      <TableHead className="hidden lg:table-cell">Coupons</TableHead>
                       <TableHead className="hidden lg:table-cell">Deadline / Schedule</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -937,6 +938,15 @@ export default function TasksPage() {
                               </div>
                             )}
                           </div>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-sm">
+                          {task.couponCode ? (
+                            <Badge variant="outline" className="max-w-40 truncate">
+                              {task.couponCode}
+                            </Badge>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-sm text-gray-500">
                           {task.bookingSource === "book_now" ? (

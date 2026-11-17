@@ -513,6 +513,37 @@ export default function TaskDetailsPage() {
         }).format(numericAmount)
       : "—";
   };
+  const customerServiceAmount = actualWorkCost ?? task?.budget;
+  const customerServiceAmountNumber =
+    customerServiceAmount != null ? Number(customerServiceAmount) : Number.NaN;
+  const couponCode = task?.couponCode || task?.couponRedemption?.couponCode;
+  const couponDiscount =
+    task?.couponDiscount ?? task?.couponRedemption?.discountAmount;
+  const couponDiscountNumber =
+    couponDiscount != null ? Number(couponDiscount) : 0;
+  const customerTaxAmountNumber =
+    customerTaxAmount != null && Number.isFinite(Number(customerTaxAmount))
+      ? Number(customerTaxAmount)
+      : Number.isFinite(customerServiceAmountNumber)
+        ? roundCurrency(
+            Math.max(0, customerServiceAmountNumber - couponDiscountNumber) *
+              0.18
+          )
+        : Number.NaN;
+  const calculatedCustomerPayment =
+    Number.isFinite(customerServiceAmountNumber) &&
+    Number.isFinite(couponDiscountNumber) &&
+    Number.isFinite(customerTaxAmountNumber)
+      ? roundCurrency(
+          customerServiceAmountNumber -
+            couponDiscountNumber +
+            customerTaxAmountNumber
+        )
+      : null;
+  const customerPaymentDue =
+    totalAmountPaid != null && Number.isFinite(Number(totalAmountPaid))
+      ? Number(totalAmountPaid)
+      : calculatedCustomerPayment;
   const refund = refundsData?.data?.find(
     (r: PaymentRefund) =>
       (r.taskId && String(r.taskId) === String(taskId)) ||
@@ -991,6 +1022,74 @@ export default function TaskDetailsPage() {
                 </div>
               </CardHeader>
               <CardContent>
+                {couponCode && (
+                  <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50/80 p-4 sm:p-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">
+                          Customer payment
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Coupon-adjusted payment details
+                        </p>
+                      </div>
+                      <Badge variant="success">Coupon applied</Badge>
+                    </div>
+                    <div className="mt-3 space-y-3 rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
+                      <div className="flex items-start justify-between gap-4 text-sm">
+                        <span className="text-gray-600">Service amount</span>
+                        <span className="font-medium text-gray-900">
+                          {formatFinancialAmount(customerServiceAmount)}
+                        </span>
+                      </div>
+                      <div className="flex items-start justify-between gap-4 text-sm">
+                        <span className="text-emerald-700">
+                          Coupon ({couponCode})
+                        </span>
+                        <span className="font-medium text-emerald-700">
+                          {couponDiscount != null
+                            ? `−${formatFinancialAmount(couponDiscount)}`
+                            : "—"}
+                        </span>
+                      </div>
+                      <div className="flex items-start justify-between gap-4 text-sm">
+                        <span className="text-gray-600">GST (18%)</span>
+                        <span className="font-medium text-gray-900">
+                          {Number.isFinite(customerTaxAmountNumber)
+                            ? `+${formatFinancialAmount(customerTaxAmountNumber)}`
+                            : "—"}
+                        </span>
+                      </div>
+                      <div className="flex items-start justify-between gap-4 border-t border-dashed border-gray-200 pt-3 text-sm font-semibold">
+                        <span className="text-gray-900">
+                          Customer needs to pay
+                        </span>
+                        <span className="text-gray-900">
+                          {formatFinancialAmount(customerPaymentDue)}
+                        </span>
+                      </div>
+                      <div
+                        className={`flex items-center justify-between gap-4 rounded-lg px-3 py-2.5 text-sm ${
+                          isPaymentCaptured
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-gray-100 text-gray-700"
+                        }`}
+                      >
+                        <span className="flex items-center gap-2 font-medium">
+                          {isPaymentCaptured && (
+                            <CheckCircle className="h-4 w-4" />
+                          )}
+                          {isPaymentCaptured ? "Amount paid" : "Payment status"}
+                        </span>
+                        <span className="font-semibold">
+                          {isPaymentCaptured
+                            ? formatFinancialAmount(totalAmountPaid ?? customerPaymentDue)
+                            : paymentStatus || task?.paymentStatus || "Pending"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <div className="rounded-xl border border-gray-200 bg-white p-4">
                     <p className="text-xs font-semibold text-gray-700">Total amount paid</p>
@@ -1447,6 +1546,55 @@ export default function TaskDetailsPage() {
                   </span>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="text-lg">Coupon Details</CardTitle>
+                <Badge variant={task.couponCode ? "success" : "secondary"}>
+                  {task.couponCode ? "Applied" : "Not applied"}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {task.couponCode ? (
+                <>
+                  <div>
+                    <Label className="text-xs font-medium text-gray-500">Coupon code</Label>
+                    <p className="mt-1 break-all text-sm font-semibold text-gray-900">
+                      {task.couponCode}
+                    </p>
+                  </div>
+                  {task.couponDiscount != null && (
+                    <div>
+                      <Label className="text-xs font-medium text-gray-500">Discount</Label>
+                      <p className="mt-1 text-sm font-medium text-gray-900">
+                        {formatCurrency(task.couponDiscount)}
+                      </p>
+                    </div>
+                  )}
+                  {task.couponRedemption?.flowType && (
+                    <div>
+                      <Label className="text-xs font-medium text-gray-500">Applied through</Label>
+                      <p className="mt-1 text-sm font-medium text-gray-900">
+                        {task.couponRedemption.flowType.replace(/_/g, " ")}
+                      </p>
+                    </div>
+                  )}
+                  {task.couponRedemption?.redeemedAt && (
+                    <div>
+                      <Label className="text-xs font-medium text-gray-500">Redeemed at</Label>
+                      <p className="mt-1 text-sm font-medium text-gray-900">
+                        {formatDateTime(task.couponRedemption.redeemedAt)}
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-gray-500">No coupon was applied to this work.</p>
+              )}
             </CardContent>
           </Card>
 

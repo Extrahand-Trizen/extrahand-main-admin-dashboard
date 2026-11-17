@@ -15,7 +15,6 @@ import {
   ChevronRight,
   Shield,
   ShieldCheck,
-  PhoneCall,
   ShoppingBag,
   SlidersHorizontal,
   MapPin,
@@ -406,26 +405,6 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
                 )}
                 {item.href === '/dashboard' && isOperationsAdminRole && (
                   <>
-                    <Link
-                      href="/task-calls"
-                      onClick={handleLinkClick}
-                      className={cn(
-                        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
-                        pathname === '/task-calls' || pathname?.startsWith('/task-calls/')
-                          ? 'bg-yellow-50 text-yellow-700 border-l-4 border-yellow-500 shadow-sm'
-                          : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600'
-                      )}
-                    >
-                      <PhoneCall
-                        className={cn(
-                          'h-5 w-5',
-                          pathname === '/task-calls' || pathname?.startsWith('/task-calls/')
-                            ? 'text-yellow-600'
-                            : 'text-gray-400'
-                        )}
-                      />
-                      My Task Calls
-                    </Link>
                     <Link
                       href="/kyc-reviews"
                       onClick={handleLinkClick}

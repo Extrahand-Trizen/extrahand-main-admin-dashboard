@@ -23,6 +23,13 @@ interface BookNowDispatchLogCardProps {
 
 const GENDER_ICON: Record<string, string> = { male: "♂", female: "♀" };
 const GENDER_LABEL: Record<string, string> = { male: "Male", female: "Female", any: "Any" };
+const LEGACY_SHIFT_LABELS: Record<string, string> = {
+  "8am-4pm": "7am-8pm",
+  "9am-1pm": "7am-1pm",
+  "3:30-7:30pm": "2-8pm",
+  "1-9pm": "11:30am-7:30pm",
+};
+const LEGACY_SHIFT_LABEL_PATTERN = /8am-4pm|9am-1pm|3:30-7:30pm|1-9pm/gi;
 const STAGES = [
   {
     key: "area_rule",
@@ -48,6 +55,17 @@ function formatTime(value?: string | null): string {
   return Number.isNaN(date.getTime())
     ? "—"
     : date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function formatShiftTiming(value: string): string {
+  return LEGACY_SHIFT_LABELS[value.trim().toLowerCase().replace(/\s+/g, "")] ?? value;
+}
+
+function formatShiftTimingInDetails(value?: string): string | undefined {
+  return value?.replace(
+    LEGACY_SHIFT_LABEL_PATTERN,
+    (label) => formatShiftTiming(label),
+  );
 }
 
 function taskLocationLabel(location?: unknown): string {
@@ -181,7 +199,11 @@ function AreaCandidates({
       <div className="mt-2 space-y-2">
         {candidates.map((candidate, index) => {
           const ineligible = candidate.status === "ineligible";
-          const reason = candidate.reasons?.filter(Boolean).join(", ") || candidate.details;
+          const rawReason = candidate.reasons?.filter(Boolean).join(", ") || candidate.details;
+          const reason = formatShiftTimingInDetails(rawReason);
+          const shiftTiming = candidate.shiftTiming
+            ? formatShiftTiming(candidate.shiftTiming)
+            : undefined;
           const genderFailed = candidate.genderCheckResult === "failed";
           const genderPassed = candidate.genderCheckResult === "passed";
           const offerActive = Boolean(
@@ -270,7 +292,7 @@ function AreaCandidates({
               </div>
               <div className="mt-1 text-xs text-gray-600">
                 <span>{candidate.distanceKm == null ? "Distance unavailable" : `${candidate.distanceKm.toFixed(1)} km from work location`}</span>
-                {candidate.shiftTiming ? <span> · Shift: {candidate.shiftTiming}</span> : null}
+                {shiftTiming ? <span> · Shift: {shiftTiming}</span> : null}
                 <span> · Push sent: {formatDateTime(candidate.notifiedAt)}</span>
                 {candidate.respondedAt ? <span> · Responded: {formatDateTime(candidate.respondedAt)}</span> : null}
               </div>
