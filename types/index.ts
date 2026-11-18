@@ -594,7 +594,7 @@ export interface AnalyticsOverview {
     total: number;
     open: number;
     overdue: number;
-    inProgress: number;
+    cancelled: number;
     completed: number;
   };
   generatedAt: string;

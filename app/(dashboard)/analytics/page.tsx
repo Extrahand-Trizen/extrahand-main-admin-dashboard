@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { BarChart3, Users, UserCheck, Briefcase, CircleDot, CheckCircle2 } from 'lucide-react';
+import { BarChart3, Users, UserCheck, Briefcase, XCircle, CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,11 +41,11 @@ export default function AnalyticsPage() {
         limit: 20
       }));
       router.push('/users');
-    } else if (title === 'Total Helpers') {
+    } else if (title === 'Total Partners') {
       sessionStorage.setItem('users_filters', JSON.stringify({
         search: '',
         statusFilter: 'all',
-        roleFilter: 'helper',
+        roleFilter: 'partner',
         aadhaarFilter: 'all',
         certifiedFilter: 'all',
         categoryFilter: 'all',
@@ -61,6 +61,7 @@ export default function AnalyticsPage() {
       sessionStorage.setItem('tasks_filters', JSON.stringify({
         search: '',
         statusFilter: 'open',
+        postedByFilter: 'customer',
         categoryFilter: 'all',
         followUpFilter: 'all',
         assignedToFilter: 'all',
@@ -73,6 +74,7 @@ export default function AnalyticsPage() {
       sessionStorage.setItem('tasks_filters', JSON.stringify({
         search: '',
         statusFilter: 'all',
+        postedByFilter: 'customer',
         categoryFilter: 'all',
         followUpFilter: 'all',
         assignedToFilter: 'all',
@@ -81,10 +83,11 @@ export default function AnalyticsPage() {
         limit: 20
       }));
       router.push('/tasks');
-    } else if (title === 'In Progress Works') {
+    } else if (title === 'Cancelled Works') {
       sessionStorage.setItem('tasks_filters', JSON.stringify({
         search: '',
-        statusFilter: 'in_progress',
+        statusFilter: 'cancelled',
+        postedByFilter: 'customer',
         categoryFilter: 'all',
         followUpFilter: 'all',
         assignedToFilter: 'all',
@@ -97,6 +100,7 @@ export default function AnalyticsPage() {
       sessionStorage.setItem('tasks_filters', JSON.stringify({
         search: '',
         statusFilter: 'completed',
+        postedByFilter: 'customer',
         categoryFilter: 'all',
         followUpFilter: 'all',
         assignedToFilter: 'all',
@@ -112,7 +116,7 @@ export default function AnalyticsPage() {
     sessionStorage.setItem('users_filters', JSON.stringify({
       search: '',
       statusFilter: 'all',
-      roleFilter: 'helper',
+      roleFilter: 'partner',
       aadhaarFilter: 'all',
       certifiedFilter: 'all',
       categoryFilter: category,
@@ -193,9 +197,9 @@ export default function AnalyticsPage() {
       bg: 'bg-yellow-50',
     },
     {
-      title: 'Total Helpers',
+      title: 'Total Partners',
       value: analytics?.Helpers.totalRegistered ?? 0,
-      subtitle: 'Registered helpers',
+      subtitle: 'Registered partners',
       icon: UserCheck,
       color: 'text-indigo-600',
       bg: 'bg-indigo-50',
@@ -217,12 +221,12 @@ export default function AnalyticsPage() {
       bg: 'bg-gray-50',
     },
     {
-      title: 'In Progress Works',
-      value: analytics?.tasks.inProgress ?? 0,
-      subtitle: 'Currently active',
-      icon: CircleDot,
-      color: 'text-purple-600',
-      bg: 'bg-purple-50',
+      title: 'Cancelled Works',
+      value: analytics?.tasks.cancelled ?? 0,
+      subtitle: 'Customer cancelled',
+      icon: XCircle,
+      color: 'text-red-600',
+      bg: 'bg-red-50',
     },
     {
       title: 'Completed Works',
@@ -239,7 +243,7 @@ export default function AnalyticsPage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>
         <p className="mt-2 text-sm text-gray-600">
-          Platform growth overview for Customers, Helpers, and works.
+          Platform growth overview for Customers, Partners, and works.
         </p>
       </div>
 
@@ -296,10 +300,10 @@ export default function AnalyticsPage() {
           <CardContent>
             <div className="space-y-2">
               <p className="text-sm font-medium text-gray-700">
-                Helpers by category (from skills)
+                Partners by category (from skills)
               </p>
               <p className="text-xs text-gray-500">
-                Total helpers: {analytics?.Helpers?.categorySummary?.totalHelpers ?? 0} | Categorized: {analytics?.Helpers?.categorySummary?.categorizedHelpers ?? 0} | Uncategorized: {analytics?.Helpers?.categorySummary?.uncategorizedHelpers ?? 0}
+                Total partners: {analytics?.Helpers?.categorySummary?.totalHelpers ?? 0} | Categorized: {analytics?.Helpers?.categorySummary?.categorizedHelpers ?? 0} | Uncategorized: {analytics?.Helpers?.categorySummary?.uncategorizedHelpers ?? 0}
               </p>
               <div className="space-y-2">
                 {(analytics?.Helpers?.categoryCounts || []).map((row) => (

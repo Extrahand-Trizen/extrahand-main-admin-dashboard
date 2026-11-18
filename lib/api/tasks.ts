@@ -64,20 +64,26 @@ export async function getTask(taskId: string): Promise<ApiResponse<Task>> {
 
 export async function sendTaskPostedEmail(taskId: string): Promise<ApiResponse<{
   sent: boolean;
+  partial?: boolean;
   skipped?: boolean;
   reason?: string;
+  failedRecipients?: string[];
 }>> {
   return apiRequest<ApiResponse<{
     sent: boolean;
+    partial?: boolean;
     skipped?: boolean;
     reason?: string;
+    failedRecipients?: string[];
   }>>(`/api/v1/tasks/${taskId}/send-email`, { method: 'POST' });
 }
 
 export interface TaskPostedEmailStatus {
   taskId: string;
-  status: 'sent' | 'failed' | 'skipped';
+  status: 'sent' | 'partial' | 'failed' | 'skipped';
   recipients: string[];
+  sentRecipients?: string[];
+  failedRecipients?: string[];
   lastAttemptAt: string;
   error?: string;
 }

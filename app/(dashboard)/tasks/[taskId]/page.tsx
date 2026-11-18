@@ -281,6 +281,8 @@ export default function TaskDetailsPage() {
       queryClient.invalidateQueries({ queryKey: ["task-posted-email-status", taskId] });
       if (result?.data?.skipped) {
         toast.info("Email skipped because this customer is excluded");
+      } else if (result?.data?.partial) {
+        toast.info("Email sent to some recipients; see the list below for failures");
       } else if (result?.data?.sent) {
         toast.success("Work-posted email sent to all configured recipients");
       } else {
@@ -1604,6 +1606,8 @@ export default function TaskDetailsPage() {
                   <CardTitle className="text-lg">Email Notification</CardTitle>
                   {taskPostedEmailStatusData?.data?.status === "sent" ? (
                     <Badge variant="success">Sent successfully</Badge>
+                  ) : taskPostedEmailStatusData?.data?.status === "partial" ? (
+                    <Badge variant="secondary">Partially sent</Badge>
                   ) : taskPostedEmailStatusData?.data?.status === "failed" ? (
                     <Badge variant="destructive">Failed</Badge>
                   ) : taskPostedEmailStatusData?.data?.status === "skipped" ? (
@@ -1622,11 +1626,11 @@ export default function TaskDetailsPage() {
                       <div>
                         <Label className="text-xs font-medium text-gray-500">Sent to</Label>
                         <p className="mt-1 font-medium text-gray-900">
-                          {taskPostedEmailStatusData.data.recipients.length} recipient{taskPostedEmailStatusData.data.recipients.length === 1 ? "" : "s"}
+                          {(taskPostedEmailStatusData.data.sentRecipients?.length ?? (taskPostedEmailStatusData.data.status === "sent" ? taskPostedEmailStatusData.data.recipients.length : 0))} recipient{(taskPostedEmailStatusData.data.sentRecipients?.length ?? (taskPostedEmailStatusData.data.status === "sent" ? taskPostedEmailStatusData.data.recipients.length : 0)) === 1 ? "" : "s"}
                         </p>
                       </div>
                       <div>
-                        <Label className="text-xs font-medium text-gray-500">Last sent at</Label>
+                        <Label className="text-xs font-medium text-gray-500">Last attempt at</Label>
                         <p className="mt-1 font-medium text-gray-900">
                           {formatDateTime(taskPostedEmailStatusData.data.lastAttemptAt)}
                         </p>
@@ -1635,13 +1639,25 @@ export default function TaskDetailsPage() {
                     <div>
                       <Label className="text-xs font-medium text-gray-500">Recipient emails</Label>
                       <div className="mt-1 space-y-1">
-                        {taskPostedEmailStatusData.data.recipients.map((recipient) => (
+                        {(taskPostedEmailStatusData.data.sentRecipients ?? (taskPostedEmailStatusData.data.status === "sent" ? taskPostedEmailStatusData.data.recipients : [])).map((recipient) => (
                           <p key={recipient} className="break-all text-sm text-gray-900">
                             {recipient}
                           </p>
                         ))}
                       </div>
                     </div>
+                    {!!taskPostedEmailStatusData.data.failedRecipients?.length && (
+                      <div>
+                        <Label className="text-xs font-medium text-red-700">Failed recipients</Label>
+                        <div className="mt-1 space-y-1">
+                          {taskPostedEmailStatusData.data.failedRecipients.map((recipient) => (
+                            <p key={recipient} className="break-all text-sm text-red-700">
+                              {recipient}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {taskPostedEmailStatusData.data.error && (
                       <p className="text-sm text-red-700">{taskPostedEmailStatusData.data.error}</p>
                     )}
