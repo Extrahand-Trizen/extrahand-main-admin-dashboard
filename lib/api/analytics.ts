@@ -10,8 +10,9 @@ import {
   UserAnalytics,
 } from '@/types';
 
-export async function getAnalyticsOverview(): Promise<ApiResponse<AnalyticsOverview>> {
-  return apiRequest<ApiResponse<AnalyticsOverview>>('/api/v1/analytics/overview');
+export async function getAnalyticsOverview(city?: string): Promise<ApiResponse<AnalyticsOverview>> {
+  const query = city && city !== 'all' ? `?city=${encodeURIComponent(city)}` : '';
+  return apiRequest<ApiResponse<AnalyticsOverview>>(`/api/v1/analytics/overview${query}`);
 }
 
 export async function getCustomerAnalytics(
@@ -30,9 +31,11 @@ export async function getCustomerVerificationComparison(
 }
 
 export async function getTaskCategoryBreakdown(
-  range: '7d' | '30d' | '90d' = '30d'
+  range: '7d' | '30d' | '90d' = '30d',
+  city?: string,
 ): Promise<ApiResponse<TaskCategoryBreakdown>> {
-  return apiRequest<ApiResponse<TaskCategoryBreakdown>>(`/api/v1/analytics/tasks/categories?range=${range}`);
+  const cityQuery = city && city !== 'all' ? `&city=${encodeURIComponent(city)}` : '';
+  return apiRequest<ApiResponse<TaskCategoryBreakdown>>(`/api/v1/analytics/tasks/categories?range=${range}${cityQuery}`);
 }
 
 export async function getUserAnalytics(
@@ -43,17 +46,21 @@ export async function getUserAnalytics(
 }
 
 export async function getTaskCategoryPerformance(
-  range: '7d' | '30d' | '90d' = '30d'
+  range: '7d' | '30d' | '90d' = '30d',
+  city?: string,
 ): Promise<ApiResponse<TaskCategoryPerformance>> {
+  const cityQuery = city && city !== 'all' ? `&city=${encodeURIComponent(city)}` : '';
   return apiRequest<ApiResponse<TaskCategoryPerformance>>(
-    `/api/v1/analytics/tasks/categories/performance?range=${range}`
+    `/api/v1/analytics/tasks/categories/performance?range=${range}${cityQuery}`
   );
 }
 
 export async function getTaskCancellationAnalytics(
-  range: '7d' | '30d' | '90d' = '30d'
+  range: '7d' | '30d' | '90d' = '30d',
+  city?: string,
 ): Promise<ApiResponse<TaskCancellationAnalytics>> {
+  const cityQuery = city && city !== 'all' ? `&city=${encodeURIComponent(city)}` : '';
   return apiRequest<ApiResponse<TaskCancellationAnalytics>>(
-    `/api/v1/analytics/tasks/cancellations?range=${range}`
+    `/api/v1/analytics/tasks/cancellations?range=${range}${cityQuery}`
   );
 }

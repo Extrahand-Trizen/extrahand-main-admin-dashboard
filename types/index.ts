@@ -597,6 +597,18 @@ export interface AnalyticsOverview {
     cancelled: number;
     completed: number;
   };
+  cityComparison?: Array<{
+    city: string;
+    customers: number;
+    partners: number;
+    worksPosted: number;
+    completionRate: number;
+    cancellationRate: number;
+    openWorks: number;
+    completedWorks: number;
+    cancelledWorks: number;
+    partnersPerWork: number;
+  }>;
   generatedAt: string;
   partial?: {
     taskServiceUnavailable?: boolean;

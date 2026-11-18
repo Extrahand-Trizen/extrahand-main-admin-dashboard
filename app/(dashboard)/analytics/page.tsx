@@ -3,16 +3,13 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { BarChart3, Users, UserCheck, Briefcase, XCircle, CheckCircle2 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Users, UserCheck, Briefcase, XCircle, CheckCircle2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatsCardSkeleton } from '@/components/LoadingSkeleton';
 import { usePermissions } from '@/lib/hooks/usePermissions';
+import { getLocationCatalog } from '@/lib/api/locations';
 import {
   getAnalyticsOverview,
-  getCustomerAnalytics,
-  getCustomerVerificationComparison,
   getTaskCancellationAnalytics,
   getTaskCategoryBreakdown,
   getTaskCategoryPerformance,
@@ -21,8 +18,26 @@ import {
 export default function AnalyticsPage() {
   const router = useRouter();
   const { hasPermission } = usePermissions();
-  const [CustomerIdInput, setCustomerIdInput] = useState('');
-  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [selectedCity, setSelectedCity] = useState('all');
+
+  const { data: locationCatalogData } = useQuery({
+    queryKey: ['location-catalog'],
+    queryFn: getLocationCatalog,
+    enabled: hasPermission('analytics.view'),
+    retry: false,
+  });
+
+  const catalogCities = locationCatalogData?.data?.cities ?? [];
+  const analyticsCities = catalogCities.some(
+    (city) => city.name.trim().toLowerCase() === 'rajagopalpet',
+  )
+    ? catalogCities
+    : [...catalogCities, { id: 'rajagopalpet', name: 'Rajagopalpet', enabled: true }];
+  const cityOptions = analyticsCities
+    .filter((city) => city.enabled !== false)
+    .map((city) => city.name.trim())
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
 
   const handleCardClick = (title: string) => {
     if (title === 'Total Customers') {
@@ -33,7 +48,7 @@ export default function AnalyticsPage() {
         aadhaarFilter: 'all',
         certifiedFilter: 'all',
         categoryFilter: 'all',
-        cityFilter: 'all',
+        cityFilter: selectedCity,
         areaFilter: 'all',
         createdFrom: '',
         createdTo: '',
@@ -49,7 +64,7 @@ export default function AnalyticsPage() {
         aadhaarFilter: 'all',
         certifiedFilter: 'all',
         categoryFilter: 'all',
-        cityFilter: 'all',
+        cityFilter: selectedCity,
         areaFilter: 'all',
         createdFrom: '',
         createdTo: '',
@@ -112,62 +127,30 @@ export default function AnalyticsPage() {
     }
   };
 
-  const handleCategoryClick = (category: string) => {
-    sessionStorage.setItem('users_filters', JSON.stringify({
-      search: '',
-      statusFilter: 'all',
-      roleFilter: 'partner',
-      aadhaarFilter: 'all',
-      certifiedFilter: 'all',
-      categoryFilter: category,
-      cityFilter: 'all',
-      areaFilter: 'all',
-      createdFrom: '',
-      createdTo: '',
-      page: 1,
-      limit: 20
-    }));
-    router.push('/users');
-  };
-
   const { data, isLoading } = useQuery({
-    queryKey: ['analytics', 'overview'],
-    queryFn: getAnalyticsOverview,
+    queryKey: ['analytics', 'overview', selectedCity],
+    queryFn: () => getAnalyticsOverview(selectedCity),
     enabled: hasPermission('analytics.view'),
-    retry: false,
-  });
-
-  const { data: comparisonData } = useQuery({
-    queryKey: ['analytics', 'verification-comparison'],
-    queryFn: () => getCustomerVerificationComparison('30d'),
-    enabled: hasPermission('analytics.view'),
-    retry: false,
-  });
-
-  const { data: CustomerAnalyticsData, isFetching: isCustomerLoading } = useQuery({
-    queryKey: ['analytics', 'Customer', selectedCustomerId],
-    queryFn: () => getCustomerAnalytics(selectedCustomerId, '30d'),
-    enabled: hasPermission('analytics.view') && Boolean(selectedCustomerId),
     retry: false,
   });
 
   const { data: categoryBreakdownData } = useQuery({
-    queryKey: ['analytics', 'task-category-breakdown'],
-    queryFn: () => getTaskCategoryBreakdown('30d'),
+    queryKey: ['analytics', 'task-category-breakdown', selectedCity],
+    queryFn: () => getTaskCategoryBreakdown('30d', selectedCity),
     enabled: hasPermission('analytics.view'),
     retry: false,
   });
 
   const { data: categoryPerformanceData } = useQuery({
-    queryKey: ['analytics', 'task-category-performance'],
-    queryFn: () => getTaskCategoryPerformance('30d'),
+    queryKey: ['analytics', 'task-category-performance', selectedCity],
+    queryFn: () => getTaskCategoryPerformance('30d', selectedCity),
     enabled: hasPermission('analytics.view'),
     retry: false,
   });
 
   const { data: cancellationData } = useQuery({
-    queryKey: ['analytics', 'task-cancellations'],
-    queryFn: () => getTaskCancellationAnalytics('30d'),
+    queryKey: ['analytics', 'task-cancellations', selectedCity],
+    queryFn: () => getTaskCancellationAnalytics('30d', selectedCity),
     enabled: hasPermission('analytics.view'),
     retry: false,
   });
@@ -182,8 +165,6 @@ export default function AnalyticsPage() {
   }
 
   const analytics = data?.data;
-  const comparison = comparisonData?.data;
-  const CustomerAnalytics = CustomerAnalyticsData?.data;
   const categoryBreakdown = categoryBreakdownData?.data;
   const categoryPerformance = categoryPerformanceData?.data;
   const cancellations = cancellationData?.data;
@@ -240,11 +221,29 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Platform growth overview for Customers, Partners, and works.
-        </p>
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>
+          <p className="mt-2 text-sm text-gray-600">
+            Platform growth overview for Customers, Partners, and works.
+          </p>
+        </div>
+        <div className="w-full md:w-56">
+          <label htmlFor="analytics-city" className="mb-1 block text-sm font-medium text-gray-700">
+            City
+          </label>
+          <select
+            id="analytics-city"
+            value={selectedCity}
+            onChange={(event) => setSelectedCity(event.target.value)}
+            className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900"
+          >
+            <option value="all">All cities</option>
+            {cityOptions.map((city) => (
+              <option key={city} value={city}>{city}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -281,69 +280,29 @@ export default function AnalyticsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <BarChart3 className="h-5 w-5 text-yellow-600" />
-            Metrics snapshot
-          </CardTitle>
-          <CardDescription>
-            {analytics?.generatedAt
-              ? `Last updated: ${new Date(analytics.generatedAt).toLocaleString()}`
-              : 'No analytics data available yet.'}
-          </CardDescription>
-          {analytics?.partial?.taskServiceUnavailable && (
-            <CardDescription className="text-yellow-600">
-              Work service is currently unavailable. User counts are shown; work counts may be 0 temporarily.
-            </CardDescription>
-          )}
+          <CardTitle className="text-base">City Comparison</CardTitle>
+          <CardDescription>Compare key work and partner metrics across supported cities.</CardDescription>
         </CardHeader>
-        {(analytics?.Helpers?.categoryCounts || []).length > 0 && (
-          <CardContent>
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-700">
-                Partners by category (from skills)
-              </p>
-              <p className="text-xs text-gray-500">
-                Total partners: {analytics?.Helpers?.categorySummary?.totalHelpers ?? 0} | Categorized: {analytics?.Helpers?.categorySummary?.categorizedHelpers ?? 0} | Uncategorized: {analytics?.Helpers?.categorySummary?.uncategorizedHelpers ?? 0}
-              </p>
-              <div className="space-y-2">
-                {(analytics?.Helpers?.categoryCounts || []).map((row) => (
-                  <div
-                    key={`helper-category-${row.category}`}
-                    className="flex items-center justify-between rounded-md border p-2 cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-all duration-200"
-                    onClick={() => handleCategoryClick(row.category)}
-                  >
-                    <p className="text-sm text-gray-800 capitalize">{row.category}</p>
-                    <p className="text-sm font-semibold text-gray-900">{row.helperCount}</p>
-                  </div>
-                ))}
+        <CardContent className="space-y-3">
+          {[...(analytics?.cityComparison || [])]
+            .filter((row) => row.worksPosted > 0)
+            .sort((a, b) => b.worksPosted - a.worksPosted || a.city.localeCompare(b.city))
+            .map((row) => (
+            <div key={row.city} className="rounded-lg border p-4">
+              <p className="text-sm font-medium text-gray-800">{row.city}</p>
+              <div className="mt-2 grid gap-1 text-sm text-gray-600 md:grid-cols-3">
+                <p>Customers: {row.customers.toLocaleString()}</p>
+                <p>Partners: {row.partners.toLocaleString()}</p>
+                <p>Works posted: {row.worksPosted.toLocaleString()}</p>
+                <p>Completion: {row.completionRate}%</p>
+                <p>Cancellation: {row.cancellationRate}%</p>
+                <p>Open works: {row.openWorks.toLocaleString()}</p>
+                <p>Completed works: {row.completedWorks.toLocaleString()}</p>
+                <p>Cancelled works: {row.cancelledWorks.toLocaleString()}</p>
+                <p>Partners per work: {row.partnersPerWork}</p>
               </div>
             </div>
-          </CardContent>
-        )}
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Verified vs Unverified Customers (Last 30 days)</CardTitle>
-          <CardDescription>Compares work posting and bidding behavior by verification status.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-lg border p-4">
-            <p className="text-sm font-medium text-gray-700">Verified</p>
-            <p className="mt-2 text-sm text-gray-600">Customers: {comparison?.verified.CustomerCount ?? 0}</p>
-            <p className="text-sm text-gray-600">Works: {comparison?.verified.taskCount ?? 0}</p>
-            <p className="text-sm text-gray-600">Bids: {comparison?.verified.bidCount ?? 0}</p>
-            <p className="text-sm text-gray-600">Avg works/Customer: {comparison?.verified.avgTasksPerCustomer ?? 0}</p>
-            <p className="text-sm text-gray-600">Avg bids/work: {comparison?.verified.avgBidsPerTask ?? 0}</p>
-          </div>
-          <div className="rounded-lg border p-4">
-            <p className="text-sm font-medium text-gray-700">Unverified</p>
-            <p className="mt-2 text-sm text-gray-600">Customers: {comparison?.unverified.CustomerCount ?? 0}</p>
-            <p className="text-sm text-gray-600">Works: {comparison?.unverified.taskCount ?? 0}</p>
-            <p className="text-sm text-gray-600">Bids: {comparison?.unverified.bidCount ?? 0}</p>
-            <p className="text-sm text-gray-600">Avg works/Customer: {comparison?.unverified.avgTasksPerCustomer ?? 0}</p>
-            <p className="text-sm text-gray-600">Avg bids/work: {comparison?.unverified.avgBidsPerTask ?? 0}</p>
-          </div>
+          ))}
         </CardContent>
       </Card>
 
@@ -479,54 +438,6 @@ export default function AnalyticsPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Per-Customer Analytics</CardTitle>
-          <CardDescription>Enter Customer profile ObjectId (`requesterId`) to inspect work and bid signals.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Paste requesterId"
-              value={CustomerIdInput}
-              onChange={(e) => setCustomerIdInput(e.target.value)}
-            />
-            <Button
-              type="button"
-              onClick={() => setSelectedCustomerId(CustomerIdInput.trim())}
-              disabled={!CustomerIdInput.trim()}
-            >
-              Load
-            </Button>
-          </div>
-
-          {selectedCustomerId && (
-            <div className="rounded-lg border p-4">
-              {isCustomerLoading ? (
-                <p className="text-sm text-gray-500">Loading Customer analytics...</p>
-              ) : (
-                <>
-                  <p className="text-sm font-medium text-gray-700">{CustomerAnalytics?.profile.name || 'Unknown Customer'}</p>
-                  <p className="mt-2 text-sm text-gray-600">
-                    Verification: {CustomerAnalytics?.profile.isVerified ? 'Verified' : 'Unverified'}
-                  </p>
-                  <p className="text-sm text-gray-600">Posted works: {CustomerAnalytics?.metrics.postedTasks ?? 0}</p>
-                  <p className="text-sm text-gray-600">Total bids: {CustomerAnalytics?.metrics.totalBids ?? 0}</p>
-                  <p className="text-sm text-gray-600">Genuine works: {CustomerAnalytics?.metrics.genuineTaskCount ?? 0}</p>
-                  <p className="mt-2 text-sm font-medium text-gray-700">Top categories</p>
-                  <div className="mt-1 space-y-1">
-                    {(CustomerAnalytics?.metrics.categories || []).slice(0, 5).map((item) => (
-                      <p className="text-sm text-gray-600" key={item.category}>
-                        {item.category}: {item.count}
-                      </p>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
