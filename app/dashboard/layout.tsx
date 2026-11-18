@@ -45,8 +45,12 @@ export default function DashboardLayout({
   // Prefetch only overview metrics at app load (lightweight aggregate query).
   // Individual list pages (transactions, payouts, refunds, ledger) fetch their own data lazily.
   useEffect(() => {
-    if (!loading && isAuthenticated && hasPermission('payment.list')) {
-      queryClient.prefetchQuery({ queryKey: ['payments', 'overview'], queryFn: getPaymentsOverview });
+    if (!loading && isAuthenticated && hasPermission('payment.view')) {
+      queryClient.prefetchQuery({
+        queryKey: ['payments-overview', 'allTime', undefined, undefined],
+        queryFn: () => getPaymentsOverview(),
+        staleTime: 60_000,
+      });
     }
   }, [loading, isAuthenticated, hasPermission, queryClient]);
 

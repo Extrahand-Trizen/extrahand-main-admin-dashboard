@@ -280,7 +280,9 @@ export default function TaskDetailsPage() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["task-posted-email-status", taskId] });
       if (result?.data?.skipped) {
-        toast.info("Email skipped because this customer is excluded");
+        toast.info(result.data.reason === "no_failed_recipients"
+          ? "There are no failed recipients to retry"
+          : "Email skipped because this customer is excluded");
       } else if (result?.data?.partial) {
         toast.info("Email sent to some recipients; see the list below for failures");
       } else if (result?.data?.sent) {
@@ -1661,16 +1663,20 @@ export default function TaskDetailsPage() {
                     {taskPostedEmailStatusData.data.error && (
                       <p className="text-sm text-red-700">{taskPostedEmailStatusData.data.error}</p>
                     )}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => sendTaskPostedEmailMutation.mutate()}
-                      disabled={sendTaskPostedEmailMutation.isPending}
-                    >
-                      <Send className="mr-2 h-4 w-4" />
-                      {sendTaskPostedEmailMutation.isPending ? "Sending..." : "Retry email"}
-                    </Button>
+                    {(!!taskPostedEmailStatusData.data.failedRecipients?.length ||
+                      (taskPostedEmailStatusData.data.status === "failed" &&
+                        taskPostedEmailStatusData.data.recipients.length > 0)) && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => sendTaskPostedEmailMutation.mutate()}
+                          disabled={sendTaskPostedEmailMutation.isPending}
+                        >
+                          <Send className="mr-2 h-4 w-4" />
+                          {sendTaskPostedEmailMutation.isPending ? "Sending..." : "Retry failed emails"}
+                        </Button>
+                      )}
                   </>
                 ) : (
                   <p className="text-sm text-gray-500">No email attempt has been recorded.</p>

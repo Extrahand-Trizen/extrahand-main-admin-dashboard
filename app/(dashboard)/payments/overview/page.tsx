@@ -27,13 +27,16 @@ function getPeriodRange(period: Period): DateRange {
 
 export default function PaymentsOverviewPage() {
   const { hasPermission } = usePermissions();
-  const [period, setPeriod] = useState<Period>("today");
-  const [dateRange, setDateRange] = useState<DateRange>(() => getPeriodRange("today"));
-  const { data } = useQuery({
+  const [period, setPeriod] = useState<Period>("allTime");
+  const [dateRange, setDateRange] = useState<DateRange>(() => getPeriodRange("allTime"));
+  const { data, isLoading, isFetching } = useQuery({
     queryKey: ["payments-overview", period, dateRange.from, dateRange.to],
     queryFn: () => getPaymentsOverview(dateRange),
     enabled: hasPermission("payment.view"),
     retry: false,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    refetchOnMount: false,
   });
 
   const selectPeriod = (nextPeriod: Period) => {
@@ -49,6 +52,7 @@ export default function PaymentsOverviewPage() {
     );
   }
 
+  const loading = isLoading || isFetching;
   const metrics = data?.data?.metrics;
   const alerts = data?.data?.alerts || [];
   const statCards = [
@@ -124,7 +128,11 @@ export default function PaymentsOverviewPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-gray-900">{card.value}</div>
+                {loading ? (
+                  <div className="h-8 w-32 bg-gray-200 rounded animate-pulse mb-1" />
+                ) : (
+                  <div className="text-2xl font-bold text-gray-900">{card.value}</div>
+                )}
                 <p className="text-xs text-gray-500 mt-1">{card.subtitle}</p>
               </CardContent>
             </Card>
@@ -140,7 +148,13 @@ export default function PaymentsOverviewPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {alerts.length === 0 ? (
+          {loading ? (
+            <div className="space-y-2">
+              <div className="h-9 bg-gray-200 rounded animate-pulse" />
+              <div className="h-9 bg-gray-200 rounded animate-pulse" />
+              <div className="h-9 bg-gray-200 rounded animate-pulse" />
+            </div>
+          ) : alerts.length === 0 ? (
             <p className="text-sm text-gray-500">No active payment alerts.</p>
           ) : (
             alerts.map((alert) => (
