@@ -13,15 +13,11 @@ import {
   MapPin,
   IndianRupee,
   User,
-  FileText,
   Trash2,
   CheckCircle,
-  XCircle,
   ChevronLeft,
   ChevronRight,
   Send,
-  Edit,
-  MessageSquare,
   Search,
   Mail,
   Wallet,
@@ -46,12 +42,6 @@ import {
   sendTaskPostedEmail,
   getTaskPostedEmailStatus,
 } from "@/lib/api/tasks";
-import {
-  addTaskCallNote,
-  getTaskCall,
-  TaskCallStatus,
-  updateTaskCallStatus,
-} from "@/lib/api/task-calls";
 import { getUser } from "@/lib/api/users";
 import { listPaymentPayouts, listPaymentTransactions, listPaymentRefunds, processRefund } from "@/lib/api/payments";
 import { PaymentPayout, PaymentTransaction, PaymentRefund, Task } from "@/types";
@@ -125,24 +115,6 @@ const extractHelperProfileId = (application: any): string => {
   return String(raw).trim();
 };
 
-const taskCallStatusLabels: Record<TaskCallStatus, string> = {
-  not_updated: "Not updated",
-  genuine: "Genuine",
-  not_genuine: "Not genuine",
-  call_not_lifted: "Call not lifted",
-  follow_up: "Follow up",
-  completed: "Completed",
-};
-
-const taskCallStatusClasses: Record<TaskCallStatus, string> = {
-  not_updated: "bg-amber-500 text-white border-amber-600",
-  genuine: "bg-emerald-600 text-white border-emerald-700",
-  not_genuine: "bg-red-600 text-white border-red-700",
-  call_not_lifted: "bg-gray-600 text-white border-gray-700",
-  follow_up: "bg-blue-600 text-white border-blue-700",
-  completed: "bg-indigo-600 text-white border-indigo-700 shadow-sm",
-};
-
 const taskStatuses: { value: Task["status"]; label: string }[] = [
   { value: "open", label: "Open" },
   { value: "assigned", label: "Assigned" },
@@ -164,7 +136,7 @@ export default function TaskDetailsPage() {
   const { user } = useAuth();
   const taskId = params.taskId as string;
   const isValidTaskId = Boolean(taskId && taskId !== "undefined" && taskId !== "null");
-  const canManageTaskCalls = isOperationsRole(user?.role) || isSuperAdmin;
+  const canSendTaskPostedEmail = isOperationsRole(user?.role) || isSuperAdmin;
 
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
@@ -182,22 +154,6 @@ export default function TaskDetailsPage() {
   });
   const [applicationsPage, setApplicationsPage] = useState(1);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
-  const [stageDialog, setStageDialog] = useState<{
-    open: boolean;
-    status: TaskCallStatus;
-    followUpDate: string;
-    nextRetryAt: string;
-  }>({
-    open: false,
-    status: "not_updated",
-    followUpDate: "",
-    nextRetryAt: "",
-  });
-  const [noteDialog, setNoteDialog] = useState({
-    open: false,
-    note: "",
-  });
-
   const {
     data: taskData,
     isLoading: taskLoading,
@@ -225,13 +181,6 @@ export default function TaskDetailsPage() {
       isValidTaskId &&
       hasPermission("task.view") &&
       hasPermission("task.application.list"),
-  });
-
-  const { data: taskCallData, isLoading: taskCallLoading } = useQuery({
-    queryKey: ["task-call", taskId],
-    queryFn: () => getTaskCall(taskId),
-    enabled: isValidTaskId && canManageTaskCalls,
-    retry: false,
   });
 
   const { data: taskPostedEmailStatusData, isLoading: taskPostedEmailStatusLoading } = useQuery({
@@ -326,55 +275,14 @@ export default function TaskDetailsPage() {
     },
   });
 
-  const updateTaskCallStatusMutation = useMutation({
-    mutationFn: ({
-      status,
-      followUpDate,
-      nextRetryAt,
-    }: {
-      status: TaskCallStatus;
-      followUpDate?: string;
-      nextRetryAt?: string;
-    }) => updateTaskCallStatus(taskId, status, followUpDate, nextRetryAt),
-    onSuccess: (result) => {
-      if (result?.data) {
-        queryClient.setQueryData(["task-call", taskId], (current: typeof taskCallData) => ({
-          ...current,
-          ...result,
-          data: {
-            ...current?.data,
-            ...result.data,
-          },
-        }));
-      }
-      queryClient.invalidateQueries({ queryKey: ["task-calls"] });
-      toast.success("Works call stage updated");
-      setStageDialog({ open: false, status: "not_updated", followUpDate: "", nextRetryAt: "" });
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Failed to update works call stage");
-    },
-  });
-
-  const addTaskCallNoteMutation = useMutation({
-    mutationFn: (note: string) => addTaskCallNote(taskId, note),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["task-call", taskId] });
-      queryClient.invalidateQueries({ queryKey: ["task-calls"] });
-      toast.success("Note added");
-      setNoteDialog({ open: false, note: "" });
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Failed to add note");
-    },
-  });
-
   const sendTaskPostedEmailMutation = useMutation({
     mutationFn: () => sendTaskPostedEmail(taskId),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["task-posted-email-status", taskId] });
       if (result?.data?.skipped) {
         toast.info("Email skipped because this customer is excluded");
+      } else if (result?.data?.partial) {
+        toast.info("Email sent to some recipients; see the list below for failures");
       } else if (result?.data?.sent) {
         toast.success("Work-posted email sent to all configured recipients");
       } else {
@@ -483,47 +391,7 @@ export default function TaskDetailsPage() {
     updateApplicationStatusMutation.mutate({ applicationId, status });
   };
 
-  const openStageDialog = () => {
-    const existingStatus = taskCallData?.data?.status || "not_updated";
-    const existingDate = taskCallData?.data?.followUpDate
-      ? new Date(taskCallData.data.followUpDate).toISOString().slice(0, 10)
-      : "";
-    setStageDialog({
-      open: true,
-      status: existingStatus,
-      followUpDate: existingDate,
-      nextRetryAt: "",
-    });
-  };
-
-  const confirmStageUpdate = () => {
-    if (stageDialog.status === "follow_up" && !stageDialog.followUpDate) {
-      toast.error("Follow-up date is required");
-      return;
-    }
-    if (stageDialog.status === "call_not_lifted" && !stageDialog.nextRetryAt) {
-      toast.error("Next retry time is required");
-      return;
-    }
-    updateTaskCallStatusMutation.mutate({
-      status: stageDialog.status,
-      followUpDate:
-        stageDialog.status === "follow_up" ? stageDialog.followUpDate : undefined,
-        nextRetryAt:
-          stageDialog.status === "call_not_lifted" ? stageDialog.nextRetryAt : undefined,
-    });
-  };
-
-  const confirmNote = () => {
-    if (!noteDialog.note.trim()) {
-      toast.error("Note is required");
-      return;
-    }
-    addTaskCallNoteMutation.mutate(noteDialog.note.trim());
-  };
-
   const task = taskData?.data;
-  const taskCall = taskCallData?.data;
   const applications = applicationsData?.data || [];
   const payouts = payoutsData?.data || [];
   const payoutStatus = payouts.find((p: any) => p.taskId === taskId || p.escrow?.taskId === taskId)?.status || task?.payoutStatus;
@@ -647,6 +515,37 @@ export default function TaskDetailsPage() {
         }).format(numericAmount)
       : "—";
   };
+  const customerServiceAmount = actualWorkCost ?? task?.budget;
+  const customerServiceAmountNumber =
+    customerServiceAmount != null ? Number(customerServiceAmount) : Number.NaN;
+  const couponCode = task?.couponCode || task?.couponRedemption?.couponCode;
+  const couponDiscount =
+    task?.couponDiscount ?? task?.couponRedemption?.discountAmount;
+  const couponDiscountNumber =
+    couponDiscount != null ? Number(couponDiscount) : 0;
+  const customerTaxAmountNumber =
+    customerTaxAmount != null && Number.isFinite(Number(customerTaxAmount))
+      ? Number(customerTaxAmount)
+      : Number.isFinite(customerServiceAmountNumber)
+        ? roundCurrency(
+            Math.max(0, customerServiceAmountNumber - couponDiscountNumber) *
+              0.18
+          )
+        : Number.NaN;
+  const calculatedCustomerPayment =
+    Number.isFinite(customerServiceAmountNumber) &&
+    Number.isFinite(couponDiscountNumber) &&
+    Number.isFinite(customerTaxAmountNumber)
+      ? roundCurrency(
+          customerServiceAmountNumber -
+            couponDiscountNumber +
+            customerTaxAmountNumber
+        )
+      : null;
+  const customerPaymentDue =
+    totalAmountPaid != null && Number.isFinite(Number(totalAmountPaid))
+      ? Number(totalAmountPaid)
+      : calculatedCustomerPayment;
   const refund = refundsData?.data?.find(
     (r: PaymentRefund) =>
       (r.taskId && String(r.taskId) === String(taskId)) ||
@@ -908,7 +807,7 @@ export default function TaskDetailsPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {canManageTaskCalls && (
+          {canSendTaskPostedEmail && (
             <>
               <Button
                 variant="outline"
@@ -917,19 +816,6 @@ export default function TaskDetailsPage() {
               >
                 <Mail className="mr-2 h-4 w-4" />
                 {sendTaskPostedEmailMutation.isPending ? "Sending..." : "Send Email"}
-              </Button>
-              <Button variant="outline" onClick={openStageDialog}>
-                <Edit className="mr-2 h-4 w-4" />
-                {taskCallLoading
-                  ? "Move Stage"
-                  : taskCallStatusLabels[taskCall?.status || "not_updated"]}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setNoteDialog({ open: true, note: "" })}
-              >
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Add Note
               </Button>
             </>
           )}
@@ -1138,6 +1024,74 @@ export default function TaskDetailsPage() {
                 </div>
               </CardHeader>
               <CardContent>
+                {couponCode && (
+                  <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50/80 p-4 sm:p-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">
+                          Customer payment
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Coupon-adjusted payment details
+                        </p>
+                      </div>
+                      <Badge variant="success">Coupon applied</Badge>
+                    </div>
+                    <div className="mt-3 space-y-3 rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
+                      <div className="flex items-start justify-between gap-4 text-sm">
+                        <span className="text-gray-600">Service amount</span>
+                        <span className="font-medium text-gray-900">
+                          {formatFinancialAmount(customerServiceAmount)}
+                        </span>
+                      </div>
+                      <div className="flex items-start justify-between gap-4 text-sm">
+                        <span className="text-emerald-700">
+                          Coupon ({couponCode})
+                        </span>
+                        <span className="font-medium text-emerald-700">
+                          {couponDiscount != null
+                            ? `−${formatFinancialAmount(couponDiscount)}`
+                            : "—"}
+                        </span>
+                      </div>
+                      <div className="flex items-start justify-between gap-4 text-sm">
+                        <span className="text-gray-600">GST (18%)</span>
+                        <span className="font-medium text-gray-900">
+                          {Number.isFinite(customerTaxAmountNumber)
+                            ? `+${formatFinancialAmount(customerTaxAmountNumber)}`
+                            : "—"}
+                        </span>
+                      </div>
+                      <div className="flex items-start justify-between gap-4 border-t border-dashed border-gray-200 pt-3 text-sm font-semibold">
+                        <span className="text-gray-900">
+                          Customer needs to pay
+                        </span>
+                        <span className="text-gray-900">
+                          {formatFinancialAmount(customerPaymentDue)}
+                        </span>
+                      </div>
+                      <div
+                        className={`flex items-center justify-between gap-4 rounded-lg px-3 py-2.5 text-sm ${
+                          isPaymentCaptured
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-gray-100 text-gray-700"
+                        }`}
+                      >
+                        <span className="flex items-center gap-2 font-medium">
+                          {isPaymentCaptured && (
+                            <CheckCircle className="h-4 w-4" />
+                          )}
+                          {isPaymentCaptured ? "Amount paid" : "Payment status"}
+                        </span>
+                        <span className="font-semibold">
+                          {isPaymentCaptured
+                            ? formatFinancialAmount(totalAmountPaid ?? customerPaymentDue)
+                            : paymentStatus || task?.paymentStatus || "Pending"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <div className="rounded-xl border border-gray-200 bg-white p-4">
                     <p className="text-xs font-semibold text-gray-700">Total amount paid</p>
@@ -1597,144 +1551,54 @@ export default function TaskDetailsPage() {
             </CardContent>
           </Card>
 
-          {canManageTaskCalls && (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between gap-3">
-                  <CardTitle className="text-lg">Verification Stage</CardTitle>
-                  {!taskCallLoading && (
-                    <button
-                      type="button"
-                      onClick={openStageDialog}
-                      aria-label="Update works verification status"
-                      className={`inline-flex rounded-md border px-3 py-1.5 text-xs font-semibold shadow-sm ${
-                        taskCallStatusClasses[taskCall?.status || "not_updated"]
-                      } cursor-pointer transition-opacity hover:opacity-80`}
-                    >
-                      {taskCallStatusLabels[taskCall?.status || "not_updated"]}
-                    </button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {taskCallLoading ? (
-                  <div className="space-y-3">
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-4 w-1/2" />
-                    <Skeleton className="h-16 w-full" />
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="text-lg">Coupon Details</CardTitle>
+                <Badge variant={task.couponCode ? "success" : "secondary"}>
+                  {task.couponCode ? "Applied" : "Not applied"}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {task.couponCode ? (
+                <>
+                  <div>
+                    <Label className="text-xs font-medium text-gray-500">Coupon code</Label>
+                    <p className="mt-1 break-all text-sm font-semibold text-gray-900">
+                      {task.couponCode}
+                    </p>
                   </div>
-                ) : (
-                  <>
+                  {task.couponDiscount != null && (
                     <div>
-                      <Label className="text-xs font-medium text-gray-500">
-                        Attempt history
-                      </Label>
-                      {taskCall?.callAttempts?.length ? (
-                        <div className="mt-2 space-y-2">
-                          {taskCall.callAttempts.map((attempt, index) => (
-                            <div
-                              key={`${attempt.attemptedAt}-${index}`}
-                              className="flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2"
-                            >
-                              <span className="text-sm font-medium text-gray-900">
-                                Attempt {index + 1}
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className={`inline-flex rounded-md border px-2 py-1 text-xs font-medium ${
-                                    taskCallStatusClasses[attempt.outcome]
-                                  }`}
-                                >
-                                  {taskCallStatusLabels[attempt.outcome]}
-                                </span>
-                                <span className="text-xs text-gray-500">
-                                  {formatDateTime(attempt.attemptedAt)}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="mt-1 text-sm text-gray-500">No attempts recorded.</p>
-                      )}
+                      <Label className="text-xs font-medium text-gray-500">Discount</Label>
+                      <p className="mt-1 text-sm font-medium text-gray-900">
+                        {formatCurrency(task.couponDiscount)}
+                      </p>
                     </div>
-                    {taskCall?.status === "call_not_lifted" && taskCall.nextRetryAt && (
-                      <div className="border-t border-gray-200 pt-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <Label className="text-xs font-medium text-gray-500">
-                              Next attempt
-                            </Label>
-                            <p className="mt-1 text-sm font-medium text-blue-700">
-                              {formatDateTime(taskCall.nextRetryAt)}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={openStageDialog}
-                            aria-label="Update next call status"
-                            className={`inline-flex rounded-md border px-2 py-1 text-xs font-medium ${
-                              taskCallStatusClasses[taskCall.status]
-                            } cursor-pointer transition-opacity hover:opacity-80`}
-                          >
-                            {taskCallStatusLabels[taskCall.status]}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    {taskCall?.followUpDate && (
-                      <div>
-                        <Label className="text-xs font-medium text-gray-500">
-                          Follow-up date
-                        </Label>
-                        <p className="mt-1 text-sm font-medium text-blue-700">
-                          {formatDate(taskCall.followUpDate)}
-                        </p>
-                      </div>
-                    )}
+                  )}
+                  {task.couponRedemption?.flowType && (
                     <div>
-                      <div className="flex items-center justify-between gap-3">
-                        <Label className="text-xs font-medium text-gray-500">
-                          Internal notes
-                        </Label>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8"
-                          onClick={() => setNoteDialog({ open: true, note: "" })}
-                        >
-                          <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
-                          Add Note
-                        </Button>
-                      </div>
-                      {taskCall?.notes?.length ? (
-                        <div className="mt-2 space-y-3">
-                          {taskCall.notes.map((item, index) => (
-                            <div
-                              key={`${item.createdAt}-${index}`}
-                              className="rounded-md border border-gray-200 bg-gray-50 p-3"
-                            >
-                              <p className="text-sm text-gray-900 whitespace-pre-wrap">
-                                {item.note}
-                              </p>
-                              <p className="mt-2 text-xs text-gray-500">
-                                {item.createdBy?.name || "Operations"} ·{" "}
-                                {formatDateTime(item.createdAt)}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="mt-1 text-sm text-gray-500">No notes added.</p>
-                      )}
+                      <Label className="text-xs font-medium text-gray-500">Applied through</Label>
+                      <p className="mt-1 text-sm font-medium text-gray-900">
+                        {task.couponRedemption.flowType.replace(/_/g, " ")}
+                      </p>
                     </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-          )}
+                  )}
+                  {task.couponRedemption?.redeemedAt && (
+                    <div>
+                      <Label className="text-xs font-medium text-gray-500">Redeemed at</Label>
+                      <p className="mt-1 text-sm font-medium text-gray-900">
+                        {formatDateTime(task.couponRedemption.redeemedAt)}
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-gray-500">No coupon was applied to this work.</p>
+              )}
+            </CardContent>
+          </Card>
 
             <Card>
               <CardHeader>
@@ -1742,6 +1606,8 @@ export default function TaskDetailsPage() {
                   <CardTitle className="text-lg">Email Notification</CardTitle>
                   {taskPostedEmailStatusData?.data?.status === "sent" ? (
                     <Badge variant="success">Sent successfully</Badge>
+                  ) : taskPostedEmailStatusData?.data?.status === "partial" ? (
+                    <Badge variant="secondary">Partially sent</Badge>
                   ) : taskPostedEmailStatusData?.data?.status === "failed" ? (
                     <Badge variant="destructive">Failed</Badge>
                   ) : taskPostedEmailStatusData?.data?.status === "skipped" ? (
@@ -1760,11 +1626,11 @@ export default function TaskDetailsPage() {
                       <div>
                         <Label className="text-xs font-medium text-gray-500">Sent to</Label>
                         <p className="mt-1 font-medium text-gray-900">
-                          {taskPostedEmailStatusData.data.recipients.length} recipient{taskPostedEmailStatusData.data.recipients.length === 1 ? "" : "s"}
+                          {(taskPostedEmailStatusData.data.sentRecipients?.length ?? (taskPostedEmailStatusData.data.status === "sent" ? taskPostedEmailStatusData.data.recipients.length : 0))} recipient{(taskPostedEmailStatusData.data.sentRecipients?.length ?? (taskPostedEmailStatusData.data.status === "sent" ? taskPostedEmailStatusData.data.recipients.length : 0)) === 1 ? "" : "s"}
                         </p>
                       </div>
                       <div>
-                        <Label className="text-xs font-medium text-gray-500">Last sent at</Label>
+                        <Label className="text-xs font-medium text-gray-500">Last attempt at</Label>
                         <p className="mt-1 font-medium text-gray-900">
                           {formatDateTime(taskPostedEmailStatusData.data.lastAttemptAt)}
                         </p>
@@ -1773,13 +1639,25 @@ export default function TaskDetailsPage() {
                     <div>
                       <Label className="text-xs font-medium text-gray-500">Recipient emails</Label>
                       <div className="mt-1 space-y-1">
-                        {taskPostedEmailStatusData.data.recipients.map((recipient) => (
+                        {(taskPostedEmailStatusData.data.sentRecipients ?? (taskPostedEmailStatusData.data.status === "sent" ? taskPostedEmailStatusData.data.recipients : [])).map((recipient) => (
                           <p key={recipient} className="break-all text-sm text-gray-900">
                             {recipient}
                           </p>
                         ))}
                       </div>
                     </div>
+                    {!!taskPostedEmailStatusData.data.failedRecipients?.length && (
+                      <div>
+                        <Label className="text-xs font-medium text-red-700">Failed recipients</Label>
+                        <div className="mt-1 space-y-1">
+                          {taskPostedEmailStatusData.data.failedRecipients.map((recipient) => (
+                            <p key={recipient} className="break-all text-sm text-red-700">
+                              {recipient}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {taskPostedEmailStatusData.data.error && (
                       <p className="text-sm text-red-700">{taskPostedEmailStatusData.data.error}</p>
                     )}
@@ -1813,151 +1691,6 @@ export default function TaskDetailsPage() {
           updateTaskAssignment({ helperProfileId, helperName, role });
         }}
       />
-
-      {/* Task Call Stage Dialog */}
-      <Dialog
-        open={stageDialog.open}
-        onOpenChange={(open) => {
-          if (!open) {
-            setStageDialog({ open: false, status: "not_updated", followUpDate: "", nextRetryAt: "" });
-          } else {
-            setStageDialog((dialog) => ({ ...dialog, open: true }));
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Move Stage</DialogTitle>
-            <DialogDescription>
-              Update the verification call outcome for this posted works.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select
-                value={stageDialog.status}
-                onValueChange={(value) =>
-                  setStageDialog((dialog) => ({
-                    ...dialog,
-                    status: value as TaskCallStatus,
-                  }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="not_updated">Not Updated</SelectItem>
-                  <SelectItem value="genuine">Genuine</SelectItem>
-                  <SelectItem value="not_genuine">Not Genuine</SelectItem>
-                  <SelectItem value="call_not_lifted">Call Not Lifted</SelectItem>
-                  <SelectItem value="follow_up">Follow Up / Callback</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {stageDialog.status === "follow_up" && (
-              <div className="space-y-2">
-                <Label htmlFor="follow-up-date">Follow-up date *</Label>
-                <input
-                  id="follow-up-date"
-                  type="date"
-                  value={stageDialog.followUpDate}
-                  onChange={(event) =>
-                    setStageDialog((dialog) => ({
-                      ...dialog,
-                      followUpDate: event.target.value,
-                    }))
-                  }
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                />
-              </div>
-            )}
-            {stageDialog.status === "call_not_lifted" && (
-              <div className="space-y-2">
-                <Label htmlFor="next-retry-at">Next retry time *</Label>
-                <input
-                  id="next-retry-at"
-                  type="datetime-local"
-                  value={stageDialog.nextRetryAt}
-                  min={new Date().toISOString().slice(0, 16)}
-                  onChange={(event) =>
-                    setStageDialog((dialog) => ({
-                      ...dialog,
-                      nextRetryAt: event.target.value,
-                    }))
-                  }
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                />
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() =>
-                setStageDialog({ open: false, status: "not_updated", followUpDate: "", nextRetryAt: "" })
-              }
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={confirmStageUpdate}
-              disabled={updateTaskCallStatusMutation.isPending}
-            >
-              Save Stage
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Task Call Note Dialog */}
-      <Dialog
-        open={noteDialog.open}
-        onOpenChange={(open) => {
-          if (!open) {
-            setNoteDialog({ open: false, note: "" });
-          } else {
-            setNoteDialog((dialog) => ({ ...dialog, open: true }));
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Internal Note</DialogTitle>
-            <DialogDescription>
-              Save a note for operations follow-up on this works.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="task-call-note">Note</Label>
-            <Textarea
-              id="task-call-note"
-              placeholder="Enter your note..."
-              value={noteDialog.note}
-              onChange={(event) =>
-                setNoteDialog({ ...noteDialog, note: event.target.value })
-              }
-              rows={5}
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setNoteDialog({ open: false, note: "" })}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={confirmNote}
-              disabled={!noteDialog.note.trim() || addTaskCallNoteMutation.isPending}
-            >
-              Add Note
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog

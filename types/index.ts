@@ -235,14 +235,6 @@ export interface Task {
     | 'review'
     | 'completed'
     | 'cancelled';
-  taskCallStatus?:
-    | 'not_updated'
-    | 'genuine'
-    | 'not_genuine'
-    | 'call_not_lifted'
-    | 'follow_up';
-  taskCallFollowUpDate?: string | null;
-  taskCallUpdatedAt?: string | null;
   customerId: string;
   CustomerId?: string;
   customerUid?: string;
@@ -255,6 +247,15 @@ export interface Task {
   paymentAmount?: number;
   isFreeCoupon?: boolean;
   couponCode?: string | null;
+  couponDiscount?: number | null;
+  couponRedemption?: {
+    couponCode: string;
+    discountAmount: number | null;
+    flowType: string | null;
+    redemptionScope: string | null;
+    bookingOrderId: string | null;
+    redeemedAt: string | null;
+  } | null;
   location?: string;
   createdAt: string;
   updatedAt: string;
@@ -641,9 +642,21 @@ export interface AnalyticsOverview {
     total: number;
     open: number;
     overdue: number;
-    inProgress: number;
+    cancelled: number;
     completed: number;
   };
+  cityComparison?: Array<{
+    city: string;
+    customers: number;
+    partners: number;
+    worksPosted: number;
+    completionRate: number;
+    cancellationRate: number;
+    openWorks: number;
+    completedWorks: number;
+    cancelledWorks: number;
+    partnersPerWork: number;
+  }>;
   generatedAt: string;
   partial?: {
     taskServiceUnavailable?: boolean;
@@ -684,7 +697,6 @@ export interface TaskFilters {
   search?: string;
   status?: string;
   category?: string;
-  followUpStatus?: string;
   customerId?: string;
   assigneeId?: string;
   assignedTo?: string;

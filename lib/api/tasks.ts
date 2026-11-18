@@ -11,7 +11,6 @@ export async function listTasks(filters?: TaskFilters): Promise<ApiResponse<Task
   if (filters?.search) params.append('search', filters.search);
   if (filters?.status) params.append('status', filters.status);
   if (filters?.category) params.append('category', filters.category);
-  if (filters?.followUpStatus) params.append('followUpStatus', filters.followUpStatus);
   if (filters?.customerId) params.append('customerId', filters.customerId);
   if (filters?.assigneeId) params.append('assigneeId', filters.assigneeId);
   if (filters?.assignedTo && filters.assignedTo !== 'all') params.append('assignedTo', filters.assignedTo);
@@ -86,20 +85,26 @@ export async function getTaskAssignmentHistory(
 
 export async function sendTaskPostedEmail(taskId: string): Promise<ApiResponse<{
   sent: boolean;
+  partial?: boolean;
   skipped?: boolean;
   reason?: string;
+  failedRecipients?: string[];
 }>> {
   return apiRequest<ApiResponse<{
     sent: boolean;
+    partial?: boolean;
     skipped?: boolean;
     reason?: string;
+    failedRecipients?: string[];
   }>>(`/api/v1/tasks/${taskId}/send-email`, { method: 'POST' });
 }
 
 export interface TaskPostedEmailStatus {
   taskId: string;
-  status: 'sent' | 'failed' | 'skipped';
+  status: 'sent' | 'partial' | 'failed' | 'skipped';
   recipients: string[];
+  sentRecipients?: string[];
+  failedRecipients?: string[];
   lastAttemptAt: string;
   error?: string;
 }

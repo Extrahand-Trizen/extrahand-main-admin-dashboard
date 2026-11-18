@@ -59,7 +59,6 @@ import { CATEGORY_OPTIONS } from "@/lib/category-options";
 import { toast } from "sonner";
 import { ApiResponse, Task } from "@/types";
 import Link from "next/link";
-import { Skeleton } from "@/components/ui/skeleton";
 import { TableSkeleton } from "@/components/LoadingSkeleton";
 
 const TASK_TIME_ZONE = "Asia/Kolkata";
@@ -126,22 +125,6 @@ const getScheduledTimeMinutes = (time: string | undefined | null) => {
   return hours * 60 + minutes;
 };
 
-const followUpStatusLabels: Record<string, string> = {
-  not_updated: "Not updated",
-  genuine: "Genuine",
-  not_genuine: "Not genuine",
-  call_not_lifted: "Call not lifted",
-  follow_up: "Follow up",
-};
-
-const followUpStatusColors: Record<string, "secondary" | "success" | "destructive" | "warning" | "default"> = {
-  not_updated: "secondary",
-  genuine: "success",
-  not_genuine: "destructive",
-  call_not_lifted: "warning",
-  follow_up: "default",
-};
-
 function getSavedFilters() {
   if (typeof window === "undefined") return null;
   try {
@@ -185,7 +168,6 @@ export default function TasksPage() {
   const [debouncedSearch, setDebouncedSearch] = useState<string>(savedFilters?.search ?? "");
   const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter);
   const [categoryFilter, setCategoryFilter] = useState<string>(savedFilters?.categoryFilter ?? "all");
-  const [followUpFilter, setFollowUpFilter] = useState<string>(savedFilters?.followUpFilter ?? "all");
   const [paymentTypeFilter, setPaymentTypeFilter] = useState<string>(savedFilters?.paymentTypeFilter ?? "all");
   const [assignedToFilter, setAssignedToFilter] = useState<string>(savedFilters?.assignedToFilter ?? "all");
   const [postedByFilter, setPostedByFilter] = useState<string>(savedFilters?.postedByFilter ?? "customer");
@@ -236,7 +218,6 @@ export default function TasksPage() {
         search: debouncedSearch,
         statusFilter,
         categoryFilter,
-        followUpFilter,
         paymentTypeFilter,
         assignedToFilter,
         postedByFilter,
@@ -250,14 +231,13 @@ export default function TasksPage() {
     } catch (e) {
       console.error("Error saving filters to sessionStorage", e);
     }
-  }, [debouncedSearch, statusFilter, categoryFilter, followUpFilter, paymentTypeFilter, assignedToFilter, postedByFilter, workDateFilter, customDateFrom, customDateTo, scheduledTimeSortOrder, page, limit]);
+  }, [debouncedSearch, statusFilter, categoryFilter, paymentTypeFilter, assignedToFilter, postedByFilter, workDateFilter, customDateFrom, customDateTo, scheduledTimeSortOrder, page, limit]);
 
   const handleClearFilters = () => {
     setSearchInput("");
     setDebouncedSearch("");
     setStatusFilter("all");
     setCategoryFilter("all");
-    setFollowUpFilter("all");
     setPaymentTypeFilter("all");
     setAssignedToFilter("all");
     setPostedByFilter("customer");
@@ -277,7 +257,6 @@ export default function TasksPage() {
     searchInput ||
     statusFilter !== "all" ||
     categoryFilter !== "all" ||
-    followUpFilter !== "all" ||
     paymentTypeFilter !== "all" ||
     assignedToFilter !== "all" ||
     postedByFilter !== "all" ||
@@ -305,7 +284,6 @@ export default function TasksPage() {
       debouncedSearch,
       statusFilter,
       categoryFilter,
-      followUpFilter,
       paymentTypeFilter,
       assignedToFilter,
       postedByFilter,
@@ -321,8 +299,6 @@ export default function TasksPage() {
         search: debouncedSearch || undefined,
         status: statusFilter !== "all" ? statusFilter : undefined,
         category: categoryFilter !== "all" ? categoryFilter : undefined,
-        followUpStatus:
-          followUpFilter !== "all" ? followUpFilter : undefined,
         paymentType: paymentTypeFilter !== "all" ? paymentTypeFilter : undefined,
         assignedTo: assignedToFilter !== "all" ? assignedToFilter : undefined,
         postedBy: postedByFilter !== "all" ? postedByFilter as "customer" | "team" : undefined,
@@ -358,7 +334,6 @@ export default function TasksPage() {
         search: debouncedSearch || undefined,
         status: statusFilter !== "all" ? statusFilter : undefined,
         category: categoryFilter !== "all" ? categoryFilter : undefined,
-        followUpStatus: followUpFilter !== "all" ? followUpFilter : undefined,
         paymentType: paymentTypeFilter !== "all" ? paymentTypeFilter : undefined,
         assignedTo: assignedToFilter !== "all" ? assignedToFilter : undefined,
         postedBy: "team" as const,
@@ -669,28 +644,6 @@ export default function TasksPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="followUpStatus">Follow-up status</Label>
-              <Select
-                value={followUpFilter}
-                onValueChange={(value) => {
-                  setFollowUpFilter(value);
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger id="followUpStatus">
-                  <SelectValue placeholder="All follow-up statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Follow-up Statuses</SelectItem>
-                  <SelectItem value="not_updated">Not updated</SelectItem>
-                  <SelectItem value="genuine">Genuine</SelectItem>
-                  <SelectItem value="not_genuine">Not genuine</SelectItem>
-                  <SelectItem value="call_not_lifted">Call not lifted</SelectItem>
-                  <SelectItem value="follow_up">Follow up</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="paymentType">Payment Type</Label>
               <Select
                 value={paymentTypeFilter}
@@ -880,10 +833,10 @@ export default function TasksPage() {
                       <TableHead className="hidden lg:table-cell">Customer</TableHead>
                       <TableHead className="hidden md:table-cell">Category</TableHead>
                       <TableHead className="hidden lg:table-cell">Status</TableHead>
-                      <TableHead className="hidden xl:table-cell">Follow-up</TableHead>
                       <TableHead className="hidden lg:table-cell">Assigned To</TableHead>
                       <TableHead className="hidden xl:table-cell">Assigned Ops Admin</TableHead>
                       <TableHead className="hidden lg:table-cell">Budget</TableHead>
+                      <TableHead className="hidden lg:table-cell">Coupons</TableHead>
                       <TableHead className="hidden lg:table-cell">Deadline / Schedule</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -944,22 +897,6 @@ export default function TasksPage() {
                             {getDisplayStatus(task)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="hidden xl:table-cell">
-                          <div className="space-y-1">
-                            <Badge
-                              variant={
-                                followUpStatusColors[task.taskCallStatus || "not_updated"]
-                              }
-                            >
-                              {followUpStatusLabels[task.taskCallStatus || "not_updated"]}
-                            </Badge>
-                            {task.taskCallStatus === "follow_up" && task.taskCallFollowUpDate && (
-                              <div className="text-xs text-gray-500">
-                                {formatDate(task.taskCallFollowUpDate)}
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
                         <TableCell className="hidden lg:table-cell text-sm">
                           {resolvedHelperName ? (
                             task.assigneeId ? (
@@ -1001,6 +938,15 @@ export default function TasksPage() {
                               </div>
                             )}
                           </div>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-sm">
+                          {task.couponCode ? (
+                            <Badge variant="outline" className="max-w-40 truncate">
+                              {task.couponCode}
+                            </Badge>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-sm text-gray-500">
                           {task.bookingSource === "book_now" ? (
