@@ -5,6 +5,7 @@ import {
   PaymentOverview,
   PaymentPayout,
   PaymentRefund,
+  PaymentRefundDetails,
   PaymentTransaction,
 } from '@/types';
 
@@ -128,6 +129,18 @@ export async function listPaymentRefunds(filters?: {
   const query = params.toString();
   return apiRequest<PaymentListResponse<PaymentRefund>>(
     `/api/v1/payments/refunds${query ? `?${query}` : ''}`
+  );
+}
+
+export async function getPaymentRefund(
+  refundId: string,
+  environment: 'production' | 'development'
+): Promise<ApiResponse<PaymentRefundDetails>> {
+  const params = new URLSearchParams({ environment });
+  return apiRequest<ApiResponse<PaymentRefundDetails>>(
+    `/api/v1/payments/refunds/${encodeURIComponent(refundId)}?${params.toString()}`,
+    {},
+    { throwOnError: true }
   );
 }
 

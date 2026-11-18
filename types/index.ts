@@ -236,6 +236,9 @@ export interface Task {
     | 'completed'
     | 'cancelled';
   customerId: string;
+  CustomerId?: string;
+  customerUid?: string;
+  requesterId?: string;
   customerName?: string;
   budget: number;
   /** Budget type from original task: 'hourly' | 'fixed'. Populated by normalizeTask in admin server. */
@@ -463,6 +466,37 @@ export interface PaymentRefund {
   };
 }
 
+export interface PaymentRefundDetails {
+  refund: {
+    refundId: string;
+    paymentId: string;
+    taskId?: string | null;
+    razorpayRefundId?: string | null;
+    status: string;
+    providerStatus?: string | null;
+    refundAmount: string;
+    cancellationFee?: string | null;
+    toOtherParty?: string | null;
+    toPlatform?: string | null;
+    reason?: string | null;
+    cancelledBy?: 'poster' | 'performer' | null;
+    createdAt: string;
+    updatedAt?: string;
+    completedAt?: string | null;
+    providerProcessedAt?: string | null;
+    escrow?: {
+      taskId?: string | null;
+      amountInRupees?: string | null;
+      posterUid?: string | null;
+      performerUid?: string | null;
+    } | null;
+  };
+  timeline: Array<{
+    eventType: 'refund.created' | 'refund.processed' | 'refund.failed';
+    occurredAt: string;
+  }>;
+}
+
 export interface PaymentLedgerEntry {
   id: number;
   transactionId: string;
@@ -490,8 +524,22 @@ export interface SupportTicket {
   subject: string;
   message: string;
   status: 'new' | 'read' | 'replied' | 'closed';
+  userId?: string;
+  userUid?: string;
+  issueType?: 'payment' | 'task' | 'chat' | 'general';
+  pageContext?: string;
+  source?: string;
+  platform?: string;
+  taskId?: string;
+  paymentId?: string;
+  refundId?: string;
   ipAddress?: string;
   userAgent?: string;
+  replies?: Array<{
+    message: string;
+    repliedBy?: string;
+    createdAt: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 }

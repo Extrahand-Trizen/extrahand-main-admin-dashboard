@@ -20,6 +20,7 @@ import {
   MapPin,
   BellRing,
   Layers,
+  MessageSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -66,6 +67,12 @@ const navigation: Array<{
     href: '/tasks',
     icon: Briefcase,
     permission: 'task.list',
+  },
+  {
+    name: 'Support Tickets',
+    href: '/support/tickets',
+    icon: MessageSquare,
+    permission: 'support.ticket.list',
   },
   {
     name: 'Qcommerce orders',
