@@ -63,6 +63,27 @@ export async function getTask(taskId: string): Promise<ApiResponse<Task>> {
   return apiRequest<ApiResponse<Task>>(`/api/v1/tasks/${taskId}`);
 }
 
+export interface TaskAssignmentHistory {
+  assignedByUid: string | null;
+  assignedAt: string | null;
+  assignmentMode: string;
+  helperUid: string | null;
+}
+
+export async function getTaskAssignmentHistory(
+  taskId: string
+): Promise<ApiResponse<TaskAssignmentHistory | null>> {
+  const result = await apiRequest<ApiResponse<TaskAssignmentHistory | null> | null>(
+    `/api/v1/tasks/${encodeURIComponent(taskId)}/assignment-history`,
+    {},
+    { throwOnError: true }
+  );
+  if (!result || result.success === false) {
+    throw new Error(result?.error || 'Failed to load task assignment history');
+  }
+  return result;
+}
+
 export async function sendTaskPostedEmail(taskId: string): Promise<ApiResponse<{
   sent: boolean;
   skipped?: boolean;

@@ -45,6 +45,8 @@ import {
 import { useState } from "react";
 import Link from "next/link";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { replyToTicket } from "@/lib/api/support";
 
 export default function TicketDetailsPage() {
   const params = useParams();
@@ -60,6 +62,7 @@ export default function TicketDetailsPage() {
     open: false,
     status: null,
   });
+  const [replyMessage, setReplyMessage] = useState("");
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["ticket", ticketId],
@@ -78,6 +81,19 @@ export default function TicketDetailsPage() {
     },
     onError: (error: any) => {
       toast.error(error.message || "Failed to update ticket status");
+    },
+  });
+
+  const replyMutation = useMutation({
+    mutationFn: (message: string) => replyToTicket(ticketId, message),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ticket", ticketId] });
+      queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      setReplyMessage("");
+      toast.success("Reply sent to the customer");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to send reply");
     },
   });
 
@@ -130,6 +146,7 @@ export default function TicketDetailsPage() {
             </div>
           </CardContent>
         </Card>
+
       </div>
     );
   }
@@ -150,6 +167,7 @@ export default function TicketDetailsPage() {
             </div>
           </CardContent>
         </Card>
+
       </div>
     );
   }
@@ -215,6 +233,63 @@ export default function TicketDetailsPage() {
               </div>
             </CardContent>
           </Card>
+          {ticket.source !== "Support Service" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5" />
+                  Support Replies
+                </CardTitle>
+                <CardDescription>
+                  Replies are visible to the customer in the Customer App.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {ticket.replies?.length ? (
+                  <div className="space-y-3">
+                    {ticket.replies.map((reply, index) => (
+                      <div
+                        key={`${reply.createdAt}-${index}`}
+                        className="rounded-lg border bg-gray-50 p-4"
+                      >
+                        <div className="mb-2 flex items-center justify-between gap-3 text-xs text-gray-500">
+                          <span>{reply.repliedBy || "Support Team"}</span>
+                          <span>{formatDateTime(reply.createdAt)}</span>
+                        </div>
+                        <p className="whitespace-pre-wrap text-sm text-gray-900">
+                          {reply.message}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">No replies have been sent yet.</p>
+                )}
+
+                {hasPermission("support.ticket.update") && (
+                  <div className="space-y-3 border-t pt-4">
+                    <Label htmlFor="ticket-reply">Send a reply</Label>
+                    <Textarea
+                      id="ticket-reply"
+                      value={replyMessage}
+                      onChange={(event) => setReplyMessage(event.target.value.slice(0, 2000))}
+                      placeholder="Write a response for the customer..."
+                      rows={5}
+                      maxLength={2000}
+                    />
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={() => replyMutation.mutate(replyMessage.trim())}
+                        disabled={!replyMessage.trim() || replyMutation.isPending}
+                      >
+                        {replyMutation.isPending ? "Sending..." : "Send Reply"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Sidebar */}
@@ -242,9 +317,21 @@ export default function TicketDetailsPage() {
                 </Label>
                 <div className="mt-1 flex items-center gap-2">
                   <Mail className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-900">{ticket.email}</span>
+                  <span className="text-sm text-gray-900">
+                    {ticket.email || "Not provided"}
+                  </span>
                 </div>
               </div>
+              {ticket.userUid && (
+                <div>
+                  <Label className="text-xs font-medium text-gray-500">
+                    Customer UID
+                  </Label>
+                  <div className="mt-1 break-all text-sm text-gray-900">
+                    {ticket.userUid}
+                  </div>
+                </div>
+              )}
               <div>
                 <Label className="text-xs font-medium text-gray-500">
                   Created
@@ -271,6 +358,64 @@ export default function TicketDetailsPage() {
               )}
             </CardContent>
           </Card>
+
+          {(ticket.issueType || ticket.pageContext || ticket.taskId || ticket.paymentId || ticket.refundId || ticket.source || ticket.platform) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Request Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {ticket.issueType && (
+                  <div>
+                    <Label className="text-xs font-medium text-gray-500">Category</Label>
+                    <div className="mt-1 text-sm capitalize text-gray-900">
+                      {ticket.issueType}
+                    </div>
+                  </div>
+                )}
+                {ticket.pageContext && (
+                  <div>
+                    <Label className="text-xs font-medium text-gray-500">Reported from</Label>
+                    <div className="mt-1 text-sm text-gray-900">{ticket.pageContext}</div>
+                  </div>
+                )}
+                {ticket.taskId && (
+                  <div>
+                    <Label className="text-xs font-medium text-gray-500">Work ID</Label>
+                    <div className="mt-1 break-all text-sm text-gray-900">{ticket.taskId}</div>
+                  </div>
+                )}
+                {ticket.paymentId && (
+                  <div>
+                    <Label className="text-xs font-medium text-gray-500">Payment ID</Label>
+                    <div className="mt-1 break-all text-sm text-gray-900">{ticket.paymentId}</div>
+                  </div>
+                )}
+                {ticket.refundId && (
+                  <div>
+                    <Label className="text-xs font-medium text-gray-500">Refund ID</Label>
+                    <div className="mt-1 break-all text-sm text-gray-900">{ticket.refundId}</div>
+                  </div>
+                )}
+                {ticket.platform && (
+                  <div>
+                    <Label className="text-xs font-medium text-gray-500">Platform</Label>
+                    <div className="mt-1 text-sm capitalize text-gray-900">{ticket.platform}</div>
+                  </div>
+                )}
+                {ticket.source && (
+                  <div>
+                    <Label className="text-xs font-medium text-gray-500">Source</Label>
+                    <div className="mt-1 text-sm text-gray-900">
+                      {ticket.source === "extrahand-mobile-app"
+                        ? "Customer App"
+                        : ticket.source}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* System Information */}
           {(ticket.ipAddress || ticket.userAgent) && (

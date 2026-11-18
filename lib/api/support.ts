@@ -1,19 +1,22 @@
 import { apiRequest } from './client';
 import { ApiResponse, SupportTicket, SupportArticle, TicketFilters } from '@/types';
 
+type SupportTicketListResponse = ApiResponse<SupportTicket[]> & { warning?: string };
+
 /**
  * List support tickets
  */
 export async function listTickets(
-  filters?: TicketFilters
-): Promise<ApiResponse<SupportTicket[]>> {
+  filters?: TicketFilters & { search?: string }
+): Promise<SupportTicketListResponse> {
   const params = new URLSearchParams();
   if (filters?.page) params.append('page', filters.page.toString());
   if (filters?.limit) params.append('limit', filters.limit.toString());
   if (filters?.status) params.append('status', filters.status);
+  if (filters?.search) params.append('search', filters.search);
 
   const query = params.toString();
-  return apiRequest<ApiResponse<SupportTicket[]>>(
+  return apiRequest<SupportTicketListResponse>(
     `/api/v1/support/tickets${query ? `?${query}` : ''}`
   );
 }
@@ -22,7 +25,9 @@ export async function listTickets(
  * Get ticket by ID
  */
 export async function getTicket(ticketId: string): Promise<ApiResponse<SupportTicket>> {
-  return apiRequest<ApiResponse<SupportTicket>>(`/api/v1/support/tickets/${ticketId}`);
+  return apiRequest<ApiResponse<SupportTicket>>(
+    `/api/v1/support/tickets/${encodeURIComponent(ticketId)}`
+  );
 }
 
 /**
@@ -33,10 +38,23 @@ export async function updateTicketStatus(
   status: 'new' | 'read' | 'replied' | 'closed'
 ): Promise<ApiResponse<SupportTicket>> {
   return apiRequest<ApiResponse<SupportTicket>>(
-    `/api/v1/support/tickets/${ticketId}/status`,
+    `/api/v1/support/tickets/${encodeURIComponent(ticketId)}/status`,
     {
       method: 'PATCH',
       body: JSON.stringify({ status }),
+    }
+  );
+}
+
+export async function replyToTicket(
+  ticketId: string,
+  message: string
+): Promise<ApiResponse<SupportTicket>> {
+  return apiRequest<ApiResponse<SupportTicket>>(
+    `/api/v1/support/tickets/${encodeURIComponent(ticketId)}/replies`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ message }),
     }
   );
 }
