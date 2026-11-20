@@ -167,6 +167,13 @@ export default function TaskDetailsPage() {
     staleTime: 0,
     refetchInterval: (query) => {
       const currentTask = query.state.data as Task | undefined;
+      if (
+        currentTask &&
+        ["assigned", "started", "in_progress"].includes(currentTask.status) &&
+        currentTask.executionPhase !== "arrived"
+      ) {
+        return 15_000;
+      }
       return currentTask?.bookingSource === "book_now" && currentTask.status === "open"
         ? 15_000
         : false;

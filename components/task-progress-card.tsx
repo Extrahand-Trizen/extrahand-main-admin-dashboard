@@ -27,10 +27,10 @@ import {
   Circle,
   User,
   KeyRound,
-  Wrench,
   Star,
   X,
   RotateCcw,
+  Clock,
 } from 'lucide-react'
 import { cn, formatCurrency, formatDateTime } from '@/lib/utils'
 import { Task, PaymentRefund, PaymentTransaction } from '@/types'
@@ -76,11 +76,14 @@ function parseScheduledStart(task: Task): Date | null {
   if (!task.scheduledDate) return null
   const start = new Date(task.scheduledDate)
   if (Number.isNaN(start.getTime())) return null
-  const match = String(task.scheduledTimeStart || '').trim().match(/^(\d{1,2}):(\d{2})(?:\s*([AP]M))?$/i)
+  const scheduledTimeStart = String(task.scheduledTimeStart || '').trim()
+  const match = scheduledTimeStart.match(/^(\d{1,2}):(\d{2})(?:\s*([AP]M))?$/i)
+  if (scheduledTimeStart && !match) return null
   if (match) {
     let hours = Number(match[1])
     const minutes = Number(match[2])
     const meridiem = match[3]?.toUpperCase()
+    if (minutes > 59 || (meridiem ? hours < 1 || hours > 12 : hours > 23)) return null
     if (meridiem === 'PM' && hours < 12) hours += 12
     if (meridiem === 'AM' && hours === 12) hours = 0
     start.setHours(hours, minutes, 0, 0)
@@ -210,8 +213,11 @@ interface LifecycleStep {
   label: string
   state: StepState
   timestamp?: string | null
+  mapUrl?: string
+  mapLabel?: string
   detail?: string
   badge?: { label: string; className: string }
+  secondaryBadge?: { label: string; className: string }
 }
 
 function normalizeStatus(status: string | undefined): string {
@@ -304,6 +310,112 @@ function checkIsTaskRefunded(task: Task, refund?: PaymentRefund | null): boolean
   return es === 'refunded' || ps === 'refunded' || (task as any)?.isRefunded === true
 }
 
+function formatDuration(ms: number): string {
+  const totalMinutes = Math.round(Math.max(0, ms) / 60000)
+  if (totalMinutes < 60) return `${totalMinutes} min`
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (minutes === 0) return `${hours} h`
+  return `${hours} h ${minutes} min`
+}
+
+function getArrivalScheduleBadge(task: Task): LifecycleStep['badge'] {
+  if (!task.arrivedAt || !task.scheduledTimeStart?.trim()) return undefined
+
+  const scheduledStart = parseScheduledStart(task)
+  const arrivedAt = new Date(task.arrivedAt).getTime()
+  if (!scheduledStart || !Number.isFinite(arrivedAt)) return undefined
+
+  const difference = arrivedAt - scheduledStart.getTime()
+  if (difference === 0) return undefined
+
+  return difference > 0
+    ? {
+        label: `Arrived late by ${formatDuration(difference)}`,
+        className: 'bg-amber-50 text-amber-700 border-amber-200',
+      }
+    : {
+        label: `Arrived before by ${formatDuration(-difference)}`,
+        className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      }
+}
+
+function getOtpBadge(
+  task: Task,
+  otpDone: boolean,
+  proofDone: boolean,
+): { label: string; className: string } | undefined {
+  if (!otpDone || !task.startedAt) return undefined
+  if (proofDone && task.completedAt) {
+    const durationMs =
+      new Date(task.completedAt).getTime() - new Date(task.startedAt).getTime()
+    return {
+      label: `Work took ${formatDuration(durationMs)}`,
+      className: 'bg-gray-100 text-gray-700 border-gray-200',
+    }
+  }
+  // Still in progress
+  const durationMs = Date.now() - new Date(task.startedAt).getTime()
+  return {
+    label: `In progress · ${formatDuration(durationMs)}`,
+    className: 'bg-blue-50 text-blue-700 border-blue-200',
+  }
+}
+
+function getJourneySteps(task: Task): LifecycleStep[] {
+  const phase = String(task.executionPhase || '').toLowerCase()
+  const journeyStarted =
+    Boolean(task.journeyStarted?.at || task.onTheWayAt) ||
+    phase === 'on_the_way' ||
+    phase === 'arrived'
+  const arrived = Boolean(task.arrivedAt) || phase === 'arrived'
+  const journeyStartedTime = task.journeyStarted?.at || task.onTheWayAt
+  const journeyStartedAt = journeyStartedTime ? new Date(journeyStartedTime).getTime() : NaN
+  const arrivedAt = task.arrivedAt ? new Date(task.arrivedAt).getTime() : NaN
+  const journeyLocation =
+    task.journeyStarted?.location || task.journeyStartedLocation || task.partnerLocation
+  const hasValidJourneyLocation =
+    journeyStarted &&
+    journeyLocation &&
+    Number.isFinite(journeyLocation.lat) &&
+    Number.isFinite(journeyLocation.lng) &&
+    Math.abs(journeyLocation.lat) <= 90 &&
+    Math.abs(journeyLocation.lng) <= 180
+  const travelTime =
+    Number.isFinite(journeyStartedAt) &&
+    Number.isFinite(arrivedAt) &&
+    arrivedAt >= journeyStartedAt
+      ? {
+        label: `Time travelled ${formatDuration(arrivedAt - journeyStartedAt)}`,
+          className: 'bg-gray-100 text-gray-700 border-gray-200',
+        }
+      : undefined
+
+  return [
+    {
+      id: 'journey',
+      label: 'Journey started',
+      state: journeyStarted ? 'done' : 'future',
+      timestamp: journeyStartedTime,
+      mapUrl: hasValidJourneyLocation
+        ? `https://www.google.com/maps/search/?api=1&query=${journeyLocation.lat},${journeyLocation.lng}`
+        : undefined,
+      mapLabel:
+        task.journeyStarted?.location || task.journeyStartedLocation
+          ? 'View on map'
+          : 'View latest location',
+    },
+    {
+      id: 'arrived',
+      label: 'Arrived',
+      state: arrived ? 'done' : journeyStarted ? 'active' : 'future',
+      timestamp: task.arrivedAt,
+      badge: travelTime,
+      secondaryBadge: getArrivalScheduleBadge(task),
+    },
+  ]
+}
+
 function getLifecycleSteps(task: Task, refund?: PaymentRefund | null): LifecycleStep[] {
   const status = normalizeStatus(task.status)
   const slotLabel = getSlotHoursLabel(task)
@@ -354,19 +466,22 @@ function getLifecycleSteps(task: Task, refund?: PaymentRefund | null): Lifecycle
             ? task.cancellationReason
             : undefined,
       },
+      ...getJourneySteps(task),
       {
         id: 'otp',
         label: 'OTP verified · work started',
         state:
           cancelIndex > 2 ? 'done' : cancelIndex === 2 ? 'cancelled' : 'future',
         timestamp: task.startedAt,
-      },
-      {
-        id: 'in-progress',
-        label: 'In progress',
-        state:
-          cancelIndex > 3 ? 'done' : cancelIndex === 3 ? 'cancelled' : 'future',
-        timestamp: task.inProgressAt,
+        badge: cancelIndex > 2 && task.startedAt
+          ? {
+              label: `Work took ${formatDuration(
+                (task.completedAt ? new Date(task.completedAt).getTime() : (task.cancelledAt ? new Date(task.cancelledAt).getTime() : Date.now())) -
+                  new Date(task.startedAt).getTime(),
+              )}`,
+              className: 'bg-gray-100 text-gray-700 border-gray-200',
+            }
+          : undefined,
       },
       {
         id: 'proof',
@@ -380,13 +495,11 @@ function getLifecycleSteps(task: Task, refund?: PaymentRefund | null): Lifecycle
   }
 
   const helperDone = Boolean(task.startedAt) || status === 'started' || status === 'in_progress' || status === 'review' || status === 'completed'
-  const otpDone = Boolean(task.startedAt)
-  const inProgressDone = Boolean(task.inProgressAt)
+  const otpDone = Boolean(task.startedAt) || status === 'in_progress' || status === 'review' || status === 'completed'
   const proofDone = status === 'completed'
 
   const helperActive = status === 'assigned' && !helperDone
   const otpActive = status === 'started' && !otpDone
-  const inProgressActive = (status === 'in_progress' || status === 'review') && !inProgressDone
   const proofActive = status === 'review' && !proofDone
 
   const paymentDone = paymentCaptured
@@ -428,17 +541,13 @@ function getLifecycleSteps(task: Task, refund?: PaymentRefund | null): Lifecycle
           }
         : undefined,
     },
+    ...getJourneySteps(task),
     {
       id: 'otp',
       label: 'OTP verified · work started',
       state: otpDone ? 'done' : otpActive ? 'active' : 'future',
       timestamp: task.startedAt,
-    },
-    {
-      id: 'in-progress',
-      label: 'In progress',
-      state: inProgressDone ? 'done' : inProgressActive ? 'active' : 'future',
-      timestamp: task.inProgressAt,
+      badge: getOtpBadge(task, otpDone, proofDone),
     },
     {
       id: 'proof',
@@ -471,7 +580,6 @@ function StepIcon({ step }: { step: LifecycleStep; index?: number }) {
     const StepIconComponent =
       step.id === 'helper' ? User :
       step.id === 'otp' ? KeyRound :
-      step.id === 'in-progress' ? Wrench :
       step.id === 'proof' ? CheckCircle : Circle
 
     return (
@@ -493,7 +601,6 @@ function StepIcon({ step }: { step: LifecycleStep; index?: number }) {
     step.id === 'refund' ? RotateCcw :
     step.id === 'helper' ? User :
     step.id === 'otp' ? KeyRound :
-    step.id === 'in-progress' ? Wrench :
     step.id === 'proof' ? CheckCircle : Circle
 
   return (
@@ -561,7 +668,15 @@ export function TaskProgressCard({ task, refund, transaction, onAssignHelper, on
         ? 'Failed'
         : 'Awaiting payment'
   const payoutStatus = isRefunded ? 'Cancelled (Refunded)' : (task.payoutStatus ?? 'Pending completion')
-  const partnerConfirmed = task.bookingSource === 'book_now' && Boolean(task.confirmed)
+  const partnerSelfAccepted = task.bookingSource === 'book_now' && Boolean(task.confirmed)
+  const partnerAssigned = Boolean(
+    task.assignedTo ||
+      task.assigneeId ||
+      task.assigneeUid ||
+      task.assigneeName ||
+      task.partnerId ||
+      task.partnerUid,
+  )
   const cancellationCalculation = getCancellationCalculation(task, refund, transaction, calculationNow)
   const actualRefundAmount = refund?.refundAmount ? Number(refund.refundAmount) : null
 
@@ -576,6 +691,69 @@ export function TaskProgressCard({ task, refund, transaction, onAssignHelper, on
         <CardTitle className="text-lg font-semibold">Work progress</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {(() => {
+          const attempts =
+            Array.isArray(task.assignmentAttempts) && task.assignmentAttempts.length > 0
+              ? [...task.assignmentAttempts].sort((a, b) => a.attempt - b.attempt)
+              : task.status === 'cancelled'
+                ? [{
+                    attempt: 1,
+                    partnerName: task.assigneeName || task.assignedHelperName || task.assignedToName || 'Partner',
+                    assignedAt: task.assignedAt || task.createdAt,
+                    status: 'cancelled' as const,
+                    cancelledAt: task.cancelledAt,
+                    cancellationReason: task.cancellationReason,
+                  }]
+                : []
+
+          if (attempts.length === 0) return null
+
+          return (
+            <div className="space-y-3">
+              <SectionLabel>Assignment attempts</SectionLabel>
+              {attempts.map((attempt) => {
+                const cancelled = attempt.status === 'cancelled'
+                const partnerName =
+                  attempt.partnerName ||
+                  task.assigneeName ||
+                  task.assignedHelperName ||
+                  task.assignedToName ||
+                  'Partner'
+
+                return (
+                  <div
+                    key={attempt.attempt}
+                    className={cn(
+                      'rounded-md border p-3',
+                      cancelled
+                        ? 'border-red-200 bg-red-50'
+                        : 'border-gray-200 bg-gray-50',
+                    )}
+                  >
+                    <p className={cn('text-sm font-semibold', cancelled ? 'text-red-700' : 'text-gray-900')}>
+                      Attempt {attempt.attempt}
+                    </p>
+                    <p className={cn('mt-1 text-sm', cancelled ? 'text-red-700' : 'text-gray-800')}>
+                      {cancelled ? `${partnerName} cancelled` : `Assigned to ${partnerName}`}
+                    </p>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      {formatDateTime(cancelled ? attempt.cancelledAt : attempt.assignedAt)}
+                      {!cancelled && attempt.status === 'assigned' ? ' - Accepted' : ''}
+                      {attempt.status === 'started' ? ' - Journey started' : ''}
+                      {attempt.status === 'in_progress' ? ' - Work in progress' : ''}
+                      {attempt.status === 'completed' ? ' - Completed' : ''}
+                    </p>
+                    {cancelled && attempt.cancellationReason && (
+                      <p className="mt-1 text-sm text-red-700">
+                        Reason: {attempt.cancellationReason}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })()}
         <div className="space-y-4">
           <SectionLabel>Lifecycle</SectionLabel>
 
@@ -615,6 +793,19 @@ export function TaskProgressCard({ task, refund, transaction, onAssignHelper, on
                     {step.timestamp ? (
                       <p className="mt-0.5 text-xs text-gray-500">
                         {formatDateTime(step.timestamp)}
+                        {step.mapUrl && (
+                          <>
+                            {' · '}
+                            <a
+                              className="text-blue-600 hover:underline"
+                              href={step.mapUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {step.mapLabel || 'View on map'}
+                            </a>
+                          </>
+                        )}
                       </p>
                     ) : step.state === 'future' ? (
                       <p className="mt-0.5 text-xs text-gray-400">—</p>
@@ -633,14 +824,20 @@ export function TaskProgressCard({ task, refund, transaction, onAssignHelper, on
                       </p>
                     )}
 
-                    {step.badge && (
+                    {(step.badge || step.secondaryBadge) && (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <Badge
-                          variant="outline"
-                          className={cn(step.badge.className)}
-                        >
-                          {step.badge.label}
-                        </Badge>
+                        {[step.badge, step.secondaryBadge].filter(Boolean).map((badge, index) => (
+                          <Badge
+                            key={`${step.id}-badge-${index}`}
+                            variant="outline"
+                            className={cn(badge?.className, 'flex items-center gap-1')}
+                          >
+                            {(step.id === 'otp' || step.id === 'arrived') && (
+                              <Clock className="h-3 w-3" />
+                            )}
+                            {badge?.label}
+                          </Badge>
+                        ))}
                         {step.id === 'payment' && canRefund && !isRefunded && (
                           <Button
                             variant="destructive"
@@ -699,12 +896,16 @@ export function TaskProgressCard({ task, refund, transaction, onAssignHelper, on
                         <Badge
                           variant="outline"
                           className={cn(
-                            partnerConfirmed
+                            partnerSelfAccepted || partnerAssigned
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                               : 'bg-amber-50 text-amber-700 border-amber-200',
                           )}
                         >
-                          {partnerConfirmed ? 'Confirmed by partner' : 'Not confirmed by partner'}
+                          {partnerSelfAccepted
+                            ? 'Self accepted'
+                            : partnerAssigned
+                              ? 'Manually assigned'
+                              : 'Not confirmed by partner'}
                         </Badge>
                       </div>
                     )}

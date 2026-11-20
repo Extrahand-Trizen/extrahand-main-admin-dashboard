@@ -207,7 +207,8 @@ export default function PaymentTransactionsPage() {
         offset: (page - 1) * pageSize,
       }),
     enabled: hasPermission("payment.list"),
-      placeholderData: (previousData) => previousData,
+      placeholderData: (previousData, previousQuery) =>
+        previousQuery?.queryKey[4] === environment ? previousData : undefined,
       retry: false,
   });
 

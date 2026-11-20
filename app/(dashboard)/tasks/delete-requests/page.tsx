@@ -64,13 +64,19 @@ export default function DeleteRequestsPage() {
   const approveMutation = useMutation({
     mutationFn: ({ requestId, note }: { requestId: string; note?: string }) =>
       approveTaskDeleteRequest(requestId, note),
-    onSuccess: () => {
+    onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: ["tasks", "delete-requests"] });
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      toast.success("Delete request approved");
+      if (result?.data?.alreadyDeleted) {
+        toast.warning("This work is already deleted. The request has been removed.");
+      } else {
+        toast.success("Delete request approved");
+      }
       setDecision({ open: false, requestId: "", action: "approve", note: "" });
     },
-    onError: (e: any) => toast.error(e.message || "Failed to approve"),
+    onError: (e: any) => {
+      toast.error(e.message || "Failed to approve");
+    },
   });
 
   const rejectMutation = useMutation({
@@ -157,7 +163,14 @@ export default function DeleteRequestsPage() {
                 <TableBody>
                   {requests.map((r: any) => (
                     <TableRow key={r.requestId}>
-                      <TableCell className="font-mono text-xs">{r.taskId}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        <Link
+                          href={`/tasks/${r.taskId}`}
+                          className="text-amber-700 hover:text-amber-900 hover:underline"
+                        >
+                          {r.taskId}
+                        </Link>
+                      </TableCell>
                       <TableCell className="text-sm">{r.reason}</TableCell>
                       <TableCell className="hidden md:table-cell text-sm text-gray-600">
                         {r.requestedBy?.name || "Unknown"} ({r.requestedBy?.email || "—"})

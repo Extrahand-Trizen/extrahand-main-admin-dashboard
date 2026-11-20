@@ -4,11 +4,9 @@ import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Users, Briefcase, AlertTriangle, TrendingUp, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { listUsers } from '@/lib/api/users';
 import { listTasks } from '@/lib/api/tasks';
 import { getAnalyticsOverview } from '@/lib/api/analytics';
-import { formatDate } from '@/lib/utils';
 import Link from 'next/link';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -35,10 +33,6 @@ export default function DashboardPage() {
     }
   }, [isPaymentsOnlyRole, router]);
 
-  if (isPaymentsOnlyRole) {
-    return null;
-  }
-
   // Fetch users data
   const { data: usersData, isLoading: usersLoading, error: usersError } = useQuery({
     queryKey: ['users', 'stats'],
@@ -55,9 +49,30 @@ export default function DashboardPage() {
     retry: false,
   });
 
+  const { data: openTasksData, isLoading: openTasksLoading } = useQuery({
+    queryKey: ['tasks', 'stats', 'open'],
+    queryFn: () => listTasks({ status: 'open', postedBy: 'customer', limit: 1 }),
+    enabled: hasPermission('task.list'),
+    retry: false,
+  });
+
+  const { data: overdueTasksData, isLoading: overdueTasksLoading } = useQuery({
+    queryKey: ['tasks', 'stats', 'overdue'],
+    queryFn: () => listTasks({ status: 'overdue', postedBy: 'customer', limit: 1 }),
+    enabled: hasPermission('task.list'),
+    retry: false,
+  });
+
+  const { data: verifiedPartnersData, isLoading: verifiedPartnersLoading } = useQuery({
+    queryKey: ['users', 'stats', 'partner-aadhaar-verified'],
+    queryFn: () => listUsers({ role: 'partner', isAadhaarVerified: true, limit: 1 }),
+    enabled: hasPermission('analytics.view'),
+    retry: false,
+  });
+
   const { data: analyticsOverviewData } = useQuery({
     queryKey: ['analytics', 'overview', 'dashboard-card'],
-    queryFn: getAnalyticsOverview,
+    queryFn: () => getAnalyticsOverview(),
     enabled: hasPermission('analytics.view'),
     retry: false,
   });
@@ -66,19 +81,24 @@ export default function DashboardPage() {
   const stats: DashboardStats = {
     totalUsers: usersError ? 0 : (usersData?.pagination?.total || 0),
     activeUsers:
-      usersError ? 0 : (usersData?.data?.filter((u: any) => u.status === "active").length || 0),
+    usersError ? 0 : (usersData?.data?.filter((u) => u.status === 'active').length || 0),
     totalTasks:
       analyticsOverviewData?.data?.tasks?.total ??
       (tasksError ? 0 : (tasksData?.pagination?.total || 0)),
-    openTasks:
-      analyticsOverviewData?.data?.tasks?.open ??
-      (tasksError
-        ? 0
-        : (tasksData?.data?.filter((t: any) => t.status === "open")?.length ?? 0)),
-    overdueTasks: analyticsOverviewData?.data?.tasks?.overdue ?? 0,
+    openTasks: openTasksData?.pagination?.total ?? 0,
+    overdueTasks: overdueTasksData?.pagination?.total ?? 0,
   };
 
-  const isLoading = usersLoading || tasksLoading;
+  const isLoading =
+    usersLoading ||
+    tasksLoading ||
+    openTasksLoading ||
+    overdueTasksLoading ||
+    verifiedPartnersLoading;
+
+  if (isPaymentsOnlyRole) {
+    return null;
+  }
 
   const statCards = [
     {
@@ -113,7 +133,7 @@ export default function DashboardPage() {
     },
     {
       title: 'Partners Aadhaar Verified',
-      value: analyticsOverviewData?.data?.Partners?.aadhaarVerified ?? 0,
+      value: verifiedPartnersData?.pagination?.total ?? 0,
       subtitle: 'Partner profiles only',
       icon: Users,
       color: 'text-emerald-700',

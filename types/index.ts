@@ -277,12 +277,35 @@ export interface Task {
   scheduledTimeEnd?: string;
   estimatedDuration?: number;
   assignedAt?: string | null;
+  executionPhase?: 'assigned' | 'on_the_way' | 'arrived' | null;
+  journeyStarted?: {
+    at: string;
+    location?: { lat: number; lng: number } | null;
+  } | null;
+  onTheWayAt?: string | null;
+  arrivedAt?: string | null;
+  journeyStartedLocation?: { lat: number; lng: number; recordedAt?: string | null };
+  partnerLocation?: { lat: number; lng: number; recordedAt?: string | null };
   startedAt?: string | null;
   inProgressAt?: string | null;
   completedAt?: string | null;
   cancelledAt?: string | null;
   cancelledById?: string | null;
   cancellationReason?: string | null;
+  assignmentAttempts?: Array<{
+    attempt: number;
+    partnerId?: string | null;
+    partnerUid?: string | null;
+    partnerName?: string | null;
+    assignedAt: string;
+    status: 'assigned' | 'cancelled' | 'started' | 'in_progress' | 'completed';
+    cancelledAt?: string | null;
+    cancellationReason?: string | null;
+    journeyStartedAt?: string | null;
+    arrivedAt?: string | null;
+    startedAt?: string | null;
+    completedAt?: string | null;
+  }>;
   confirmed?: boolean | null;
   confirmedAt?: string | null;
   completionProof?: { url: string; type: string }[] | null;
