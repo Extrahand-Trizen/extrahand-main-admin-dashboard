@@ -6,7 +6,6 @@ import { Users, Briefcase, AlertTriangle, TrendingUp, ArrowRight } from 'lucide-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { listUsers } from '@/lib/api/users';
 import { listTasks } from '@/lib/api/tasks';
-import { getAnalyticsOverview } from '@/lib/api/analytics';
 import Link from 'next/link';
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -44,7 +43,7 @@ export default function DashboardPage() {
   // Fetch tasks data
   const { data: tasksData, isLoading: tasksLoading, error: tasksError } = useQuery({
     queryKey: ['tasks', 'stats'],
-    queryFn: () => listTasks({ limit: 1 }),
+    queryFn: () => listTasks({ postedBy: 'customer', limit: 1 }),
     enabled: hasPermission('task.list'),
     retry: false,
   });
@@ -70,21 +69,12 @@ export default function DashboardPage() {
     retry: false,
   });
 
-  const { data: analyticsOverviewData } = useQuery({
-    queryKey: ['analytics', 'overview', 'dashboard-card'],
-    queryFn: () => getAnalyticsOverview(),
-    enabled: hasPermission('analytics.view'),
-    retry: false,
-  });
-
   // Calculate stats - handle errors gracefully
   const stats: DashboardStats = {
     totalUsers: usersError ? 0 : (usersData?.pagination?.total || 0),
     activeUsers:
-    usersError ? 0 : (usersData?.data?.filter((u) => u.status === 'active').length || 0),
-    totalTasks:
-      analyticsOverviewData?.data?.tasks?.total ??
-      (tasksError ? 0 : (tasksData?.pagination?.total || 0)),
+      usersError ? 0 : (usersData?.data?.filter((u) => u.status === 'active').length || 0),
+    totalTasks: tasksError ? 0 : (tasksData?.pagination?.total || 0),
     openTasks: openTasksData?.pagination?.total ?? 0,
     overdueTasks: overdueTasksData?.pagination?.total ?? 0,
   };

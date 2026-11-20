@@ -33,6 +33,13 @@ export default function DashboardPage() {
     }
   }, [isPaymentsOnlyRole, router]);
 
+  const { data: totalTasksData, isLoading: totalTasksLoading } = useQuery({
+    queryKey: ['tasks', 'stats', 'total'],
+    queryFn: () => listTasks({ postedBy: 'customer', limit: 1 }),
+    enabled: hasPermission('task.list'),
+    retry: false,
+  });
+
   const { data: openTasksData, isLoading: openTasksLoading } = useQuery({
     queryKey: ['tasks', 'stats', 'open'],
     queryFn: () => listTasks({ status: 'open', postedBy: 'customer', limit: 1 }),
@@ -68,13 +75,14 @@ export default function DashboardPage() {
       ((analyticsOverviewData?.data?.Customers?.totalRegistered || 0) +
         (analyticsOverviewData?.data?.Helpers?.totalRegistered || 0)),
     activeUsers: 0, // Computed metric was previously flawed; resetting to 0 to preserve UI
-    totalTasks: analyticsOverviewData?.data?.tasks?.total ?? 0,
+    totalTasks: totalTasksData?.pagination?.total ?? 0,
     openTasks: openTasksData?.pagination?.total ?? 0,
     overdueTasks: overdueTasksData?.pagination?.total ?? 0,
   };
 
   const isLoading =
     !analyticsOverviewData ||
+    totalTasksLoading ||
     openTasksLoading ||
     overdueTasksLoading ||
     verifiedPartnersLoading;
