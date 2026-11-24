@@ -362,6 +362,7 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
       task.assignedHelperName,
   );
   const canNotifyImmediately =
+    !isTeamPosted &&
     isHourlyPartnerOfferTask(task) &&
     task.status === "open" &&
     !isAssigned &&
@@ -479,7 +480,7 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
         <CardContent className="p-4 pt-3 space-y-5">
           {isTeamPosted ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
-              Team-posted work: only eligible partners whose phone numbers are in the Task Posted Email exclusions list receive notifications. Other qualified partners remain visible in the logs but will not be notified.
+              Team-posted work: partner notifications are disabled. Preferred and eligible partners remain visible here for the Operations team.
             </div>
           ) : null}
 
@@ -505,7 +506,9 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
           {progress ? (
             <section className="rounded-lg border border-gray-200 p-3 space-y-3">
               <p className="text-xs text-gray-600">
-                Preferred partners are notified first. Other eligible partners are notified after 45 minutes if no one accepts. Each sent offer remains available until someone accepts, the work is cancelled, or its scheduled start time arrives. “Push sent” is recorded only when the notification service confirms a device send.
+                {isTeamPosted
+                  ? "Partner notifications are disabled for team-posted work. Candidate eligibility is still evaluated and shown below."
+                  : "Preferred partners are notified first. Other eligible partners are notified after 45 minutes if no one accepts. Each sent offer remains available until someone accepts, the work is cancelled, or its scheduled start time arrives. “Push sent” is recorded only when the notification service confirms a device send."}
               </p>
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
@@ -592,6 +595,8 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                         title={
                           canNotifyThisStage
                             ? `Send a push notification now to eligible ${stage.label.toLowerCase()}`
+                            : isTeamPosted
+                              ? "Partner notifications are disabled for team-posted work"
                             : stage.key === "all" && hasAcceptedPreferredPartner
                               ? "A preferred partner has accepted this work."
                               : stage.key === "all" && hasEligiblePreferredPartners
@@ -610,7 +615,9 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                       className="h-7 gap-1.5 border-emerald-200 px-2 text-xs text-emerald-700 hover:bg-emerald-50"
                       disabled={whatsappMutation.isPending || !canNotifyThisStage || eligibleUids.length === 0}
                       title={
-                        stage.key === "all" && !canStartOtherStage
+                        isTeamPosted
+                          ? "Partner WhatsApp notifications are disabled for team-posted work"
+                          : stage.key === "all" && !canStartOtherStage
                           ? "Other eligible partners can be notified after the 45-minute preferred-partner window ends without an acceptance."
                           : "Send WhatsApp to all eligible partners in this dispatch stage"
                       }
@@ -629,7 +636,7 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                 </div>
                 <p className="text-xs text-gray-500">
                   {isTeamPosted
-                    ? "For team-posted work, notifications go only to eligible partners whose phone numbers are in the Task Posted Email exclusions list. Other qualified partners remain visible here without being notified."
+                    ? "Team-posted work is not sent to partners. All eligible candidates remain visible here for the Operations team."
                     : stage.description}
                 </p>
                 {areaRows.length ? (
