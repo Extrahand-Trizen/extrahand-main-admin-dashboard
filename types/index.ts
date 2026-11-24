@@ -286,8 +286,12 @@ export interface Task {
   arrivedAt?: string | null;
   journeyStartedLocation?: { lat: number; lng: number; recordedAt?: string | null };
   partnerLocation?: { lat: number; lng: number; recordedAt?: string | null };
+  startOtp?: { verifiedAt?: string | null } | null;
   startedAt?: string | null;
   inProgressAt?: string | null;
+  reviewAt?: string | null;
+  completionSubmittedAt?: string | null;
+  completionApprovedAt?: string | null;
   completedAt?: string | null;
   cancelledAt?: string | null;
   cancelledById?: string | null;
@@ -308,7 +312,7 @@ export interface Task {
   }>;
   confirmed?: boolean | null;
   confirmedAt?: string | null;
-  completionProof?: { url: string; type: string }[] | null;
+  completionProof?: { url: string; type: string; uploadedAt?: string | null }[] | null;
   completionStatus?: string | null;
   completionNotes?: string | null;
   customerRating?: number | null;

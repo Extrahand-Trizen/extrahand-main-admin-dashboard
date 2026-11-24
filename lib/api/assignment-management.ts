@@ -8,7 +8,7 @@ export type PartnerAddedBy = {
   isSuperAdmin: boolean;
 };
 
-type PreferredPartner = {
+export type PreferredPartner = {
   profileId: string;
   uid: string;
   name: string;
@@ -64,6 +64,21 @@ export type EligibleAssignmentPartnersResponse = ApiResponse<PartnerSearchResult
 
 export async function getAssignmentRules(): Promise<ApiResponse<AssignmentRules>> {
   return apiRequest<ApiResponse<AssignmentRules>>('/api/v1/assignment-management');
+}
+
+export async function getCityPreferredPartners(params: {
+  city: string;
+  workType: 'hourly' | 'book_now';
+  category?: string;
+}): Promise<ApiResponse<AreaAssignmentRule[]>> {
+  const query = new URLSearchParams({
+    city: params.city,
+    workType: params.workType,
+  });
+  if (params.category?.trim()) query.set('category', params.category.trim());
+  return apiRequest<ApiResponse<AreaAssignmentRule[]>>(
+    `/api/v1/assignment-management/preferred-partners?${query.toString()}`,
+  );
 }
 
 export async function getEligibleAssignmentPartners(

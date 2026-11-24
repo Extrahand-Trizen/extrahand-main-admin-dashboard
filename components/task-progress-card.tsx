@@ -37,6 +37,7 @@ import { Task, PaymentRefund, PaymentTransaction } from '@/types'
 
 interface TaskProgressCardProps {
   task: Task
+  assignmentMode?: string | null
   refund?: PaymentRefund | null
   transaction?: PaymentTransaction | null
   onAssignHelper?: () => void
@@ -227,6 +228,21 @@ function normalizeStatus(status: string | undefined): string {
     .replace(/\s+/g, '_')
 }
 
+function hasCurrentAssignment(task: Task): boolean {
+  const status = normalizeStatus(task.status)
+  return (
+    ['assigned', 'started', 'in_progress', 'review', 'completed'].includes(status) &&
+    Boolean(
+      task.assignedTo ||
+        task.assigneeId ||
+        task.assigneeUid ||
+        task.assigneeName ||
+        task.partnerId ||
+        task.partnerUid,
+    )
+  )
+}
+
 function getCancellationStepIndex(task: Task): number {
   if (!task.cancelledAt) return 1
 
@@ -319,6 +335,20 @@ function formatDuration(ms: number): string {
   return `${hours} h ${minutes} min`
 }
 
+function getWorkStartedAt(task: Task): string | null {
+  return task.startedAt || task.inProgressAt || null
+}
+
+function getProofSubmittedAt(task: Task): string | null {
+  return (
+    task.completionSubmittedAt ||
+    task.reviewAt ||
+    task.completedAt ||
+    task.completionApprovedAt ||
+    null
+  )
+}
+
 function getArrivalScheduleBadge(task: Task): LifecycleStep['badge'] {
   if (!task.arrivedAt || !task.scheduledTimeStart?.trim()) return undefined
 
@@ -345,17 +375,26 @@ function getOtpBadge(
   otpDone: boolean,
   proofDone: boolean,
 ): { label: string; className: string } | undefined {
-  if (!otpDone || !task.startedAt) return undefined
-  if (proofDone && task.completedAt) {
-    const durationMs =
-      new Date(task.completedAt).getTime() - new Date(task.startedAt).getTime()
+  const workStartedAt = getWorkStartedAt(task)
+  if (!otpDone || !workStartedAt) return undefined
+  const startedAtMs = new Date(workStartedAt).getTime()
+  if (!Number.isFinite(startedAtMs)) return undefined
+
+  const proofSubmittedAt = getProofSubmittedAt(task)
+  if (proofSubmittedAt) {
+    const proofSubmittedAtMs = new Date(proofSubmittedAt).getTime()
+    if (!Number.isFinite(proofSubmittedAtMs) || proofSubmittedAtMs < startedAtMs) {
+      return undefined
+    }
     return {
-      label: `Work took ${formatDuration(durationMs)}`,
+      label: `Work took ${formatDuration(proofSubmittedAtMs - startedAtMs)}`,
       className: 'bg-gray-100 text-gray-700 border-gray-200',
     }
   }
-  // Still in progress
-  const durationMs = Date.now() - new Date(task.startedAt).getTime()
+
+  if (proofDone) return undefined
+
+  const durationMs = Math.max(0, Date.now() - startedAtMs)
   return {
     label: `In progress · ${formatDuration(durationMs)}`,
     className: 'bg-blue-50 text-blue-700 border-blue-200',
@@ -439,6 +478,20 @@ function getLifecycleSteps(task: Task, refund?: PaymentRefund | null): Lifecycle
 
   if (status === 'cancelled') {
     const cancelIndex = getCancellationStepIndex(task)
+    const workStartedAt = getWorkStartedAt(task)
+    const workStartedAtMs = workStartedAt ? new Date(workStartedAt).getTime() : NaN
+    const workEndedAt = getProofSubmittedAt(task) || task.cancelledAt
+    const workEndedAtMs = workEndedAt ? new Date(workEndedAt).getTime() : NaN
+    const cancelledWorkBadge =
+      cancelIndex > 2 &&
+      Number.isFinite(workStartedAtMs) &&
+      Number.isFinite(workEndedAtMs) &&
+      workEndedAtMs >= workStartedAtMs
+        ? {
+            label: `Work took ${formatDuration(workEndedAtMs - workStartedAtMs)}`,
+            className: 'bg-gray-100 text-gray-700 border-gray-200',
+          }
+        : undefined
 
     const steps: LifecycleStep[] = [
       {
@@ -472,30 +525,22 @@ function getLifecycleSteps(task: Task, refund?: PaymentRefund | null): Lifecycle
         label: 'OTP verified · work started',
         state:
           cancelIndex > 2 ? 'done' : cancelIndex === 2 ? 'cancelled' : 'future',
-        timestamp: task.startedAt,
-        badge: cancelIndex > 2 && task.startedAt
-          ? {
-              label: `Work took ${formatDuration(
-                (task.completedAt ? new Date(task.completedAt).getTime() : (task.cancelledAt ? new Date(task.cancelledAt).getTime() : Date.now())) -
-                  new Date(task.startedAt).getTime(),
-              )}`,
-              className: 'bg-gray-100 text-gray-700 border-gray-200',
-            }
-          : undefined,
+        timestamp: workStartedAt,
+        badge: cancelledWorkBadge,
       },
       {
         id: 'proof',
         label: 'Proof submitted · approved · closed',
         state: cancelIndex === 4 ? 'cancelled' : 'future',
-        timestamp: task.completedAt,
+        timestamp: getProofSubmittedAt(task),
       },
     )
 
     return steps
   }
 
-  const helperDone = Boolean(task.startedAt) || status === 'started' || status === 'in_progress' || status === 'review' || status === 'completed'
-  const otpDone = Boolean(task.startedAt) || status === 'in_progress' || status === 'review' || status === 'completed'
+  const helperDone = Boolean(task.startedAt || task.inProgressAt) || status === 'started' || status === 'in_progress' || status === 'review' || status === 'completed'
+  const otpDone = Boolean(getWorkStartedAt(task)) || status === 'in_progress' || status === 'review' || status === 'completed'
   const proofDone = status === 'completed'
 
   const helperActive = status === 'assigned' && !helperDone
@@ -511,7 +556,9 @@ function getLifecycleSteps(task: Task, refund?: PaymentRefund | null): Lifecycle
       : slotLabel
         ? `No ${task.bookingSource === 'book_now' ? 'partner' : 'helper'} assigned · ${slotLabel}`
         : `No ${task.bookingSource === 'book_now' ? 'partner' : 'helper'} assigned`
-    : task.assigneeName
+    : hasCurrentAssignment(task)
+      ? task.assigneeName
+      : undefined
 
   const steps: LifecycleStep[] = [
     {
@@ -546,14 +593,14 @@ function getLifecycleSteps(task: Task, refund?: PaymentRefund | null): Lifecycle
       id: 'otp',
       label: 'OTP verified · work started',
       state: otpDone ? 'done' : otpActive ? 'active' : 'future',
-      timestamp: task.startedAt,
+      timestamp: getWorkStartedAt(task),
       badge: getOtpBadge(task, otpDone, proofDone),
     },
     {
       id: 'proof',
       label: 'Proof submitted · approved · closed',
       state: proofDone ? 'done' : proofActive ? 'active' : 'future',
-      timestamp: task.completedAt,
+      timestamp: getProofSubmittedAt(task),
     },
   )
 
@@ -636,7 +683,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function TaskProgressCard({ task, refund, transaction, onAssignHelper, onRefundCustomer, isRefunding, canRefund }: TaskProgressCardProps) {
+export function TaskProgressCard({ task, assignmentMode, refund, transaction, onAssignHelper, onRefundCustomer, isRefunding, canRefund }: TaskProgressCardProps) {
   const proofSectionRef = useRef<HTMLDivElement>(null)
   const [refundDialogOpen, setRefundDialogOpen] = useState(false)
   const [calculationDialogOpen, setCalculationDialogOpen] = useState(false)
@@ -668,15 +715,10 @@ export function TaskProgressCard({ task, refund, transaction, onAssignHelper, on
         ? 'Failed'
         : 'Awaiting payment'
   const payoutStatus = isRefunded ? 'Cancelled (Refunded)' : (task.payoutStatus ?? 'Pending completion')
-  const partnerSelfAccepted = task.bookingSource === 'book_now' && Boolean(task.confirmed)
-  const partnerAssigned = Boolean(
-    task.assignedTo ||
-      task.assigneeId ||
-      task.assigneeUid ||
-      task.assigneeName ||
-      task.partnerId ||
-      task.partnerUid,
-  )
+  const partnerCurrentlyAssigned = hasCurrentAssignment(task)
+  const partnerSelfAccepted =
+    partnerCurrentlyAssigned && task.bookingSource === 'book_now' && Boolean(task.confirmed)
+  const partnerManuallyAssigned = assignmentMode === 'manual'
   const cancellationCalculation = getCancellationCalculation(task, refund, transaction, calculationNow)
   const actualRefundAmount = refund?.refundAmount ? Number(refund.refundAmount) : null
 
@@ -695,16 +737,7 @@ export function TaskProgressCard({ task, refund, transaction, onAssignHelper, on
           const attempts =
             Array.isArray(task.assignmentAttempts) && task.assignmentAttempts.length > 0
               ? [...task.assignmentAttempts].sort((a, b) => a.attempt - b.attempt)
-              : task.status === 'cancelled'
-                ? [{
-                    attempt: 1,
-                    partnerName: task.assigneeName || task.assignedHelperName || task.assignedToName || 'Partner',
-                    assignedAt: task.assignedAt || task.createdAt,
-                    status: 'cancelled' as const,
-                    cancelledAt: task.cancelledAt,
-                    cancellationReason: task.cancellationReason,
-                  }]
-                : []
+              : []
 
           if (attempts.length === 0) return null
 
@@ -891,24 +924,21 @@ export function TaskProgressCard({ task, refund, transaction, onAssignHelper, on
                       </div>
                     )}
 
-                    {step.id === 'helper' && task.bookingSource === 'book_now' && (
-                      <div className="mt-2">
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            partnerSelfAccepted || partnerAssigned
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : 'bg-amber-50 text-amber-700 border-amber-200',
-                          )}
-                        >
-                          {partnerSelfAccepted
-                            ? 'Self accepted'
-                            : partnerAssigned
-                              ? 'Manually assigned'
-                              : 'Not confirmed by partner'}
-                        </Badge>
-                      </div>
-                    )}
+                    {step.id === 'helper' &&
+                      task.bookingSource === 'book_now' &&
+                      partnerCurrentlyAssigned &&
+                      (partnerSelfAccepted || partnerManuallyAssigned) && (
+                        <div className="mt-2">
+                          <Badge
+                            variant="outline"
+                            className="bg-emerald-50 text-emerald-700 border-emerald-200"
+                          >
+                            {partnerSelfAccepted
+                              ? 'Self accepted'
+                              : 'Manually assigned'}
+                          </Badge>
+                        </div>
+                      )}
                   </div>
                 </div>
               )

@@ -41,6 +41,7 @@ import {
   updateApplicationStatus,
   sendTaskPostedEmail,
   getTaskPostedEmailStatus,
+  getTaskAssignmentHistory,
 } from "@/lib/api/tasks";
 import { getUser } from "@/lib/api/users";
 import { listPaymentPayouts, listPaymentTransactions, listPaymentRefunds, processRefund } from "@/lib/api/payments";
@@ -401,6 +402,16 @@ export default function TaskDetailsPage() {
   };
 
   const task = taskData?.data;
+  const assignmentHistoryQuery = useQuery({
+    queryKey: ["task-assignment-history", taskId],
+    queryFn: () => getTaskAssignmentHistory(taskId),
+    enabled: isValidTaskId && hasPermission("task.view") && task?.bookingSource === "book_now",
+    retry: false,
+    refetchInterval:
+      task?.bookingSource === "book_now" && ["open", "assigned"].includes(task.status)
+        ? 15_000
+        : false,
+  });
   const applications = applicationsData?.data || [];
   const payouts = payoutsData?.data || [];
   const payoutStatus = payouts.find((p: any) => p.taskId === taskId || p.escrow?.taskId === taskId)?.status || task?.payoutStatus;
@@ -1233,6 +1244,7 @@ export default function TaskDetailsPage() {
 
           <TaskProgressCard
             task={taskWithPayoutStatus as any}
+            assignmentMode={assignmentHistoryQuery.data?.data?.assignmentMode}
             refund={refund}
             transaction={transaction}
             onAssignHelper={() => setAssignModalOpen(true)}
@@ -1320,6 +1332,9 @@ export default function TaskDetailsPage() {
                           try {
                             updateTaskAssignment(null);
                             await unassignHelper(taskId);
+                            queryClient.invalidateQueries({
+                              queryKey: ["task-assignment-history", taskId],
+                            });
                             toast.success('Partner unassigned successfully');
                           } catch (err: any) {
                             refetch();
@@ -1702,6 +1717,9 @@ export default function TaskDetailsPage() {
         onAssignmentFailed={() => refetch()}
         onAssigned={({ helperProfileId, helperName, role }) => {
           updateTaskAssignment({ helperProfileId, helperName, role });
+          queryClient.invalidateQueries({
+            queryKey: ["task-assignment-history", taskId],
+          });
         }}
       />
 
