@@ -105,6 +105,34 @@ function getDisplayReviewStatus(row: KycReviewRow): KycReviewStatus | "failed" {
   return row.reviewStatus || "pending";
 }
 
+function formatAadhaarFailureReason(reason?: string): string {
+  const normalized = String(reason || "").trim();
+  if (/document failed security checks/i.test(normalized)) {
+    return "Aadhaar verification failed due to image quality or document issues (e.g., blurry images, improper cropping, or incomplete document visibility).";
+  }
+  if (/session expired/i.test(normalized)) {
+    return "Aadhaar verification session expired before completion. The Aadhaar images were not fully submitted or stored. Images may not be available for review.";
+  }
+  if (/aadhaar verification was not completed/i.test(normalized)) {
+    return "Aadhaar verification was not completed in time.";
+  }
+  if (/image was not identified as an aadhaar document/i.test(normalized)) {
+    return "The uploaded image was not identified as an Aadhaar document.";
+  }
+  return normalized || "-";
+}
+
+function getAadhaarFailureTitle(reason?: string): string {
+  const normalized = String(reason || "").trim();
+  if (/document failed security checks/i.test(normalized) || /face on the aadhaar/i.test(normalized) || /aadhaar front image/i.test(normalized) || /aadhaar back image/i.test(normalized) || /aadhaar image/i.test(normalized)) {
+    return "Aadhaar photos could not be accepted";
+  }
+  if (/session expired/i.test(normalized)) {
+    return "Aadhaar verification was not completed in time";
+  }
+  return normalized || "-";
+}
+
 const followUpLabels: Record<KycFollowUpStatus, string> = {
   none: "-",
   follow_up: "Follow up",
@@ -226,7 +254,9 @@ function ReviewDialog({
               ) : (
                 <div>
                   <p className="text-gray-500">Failure reason</p>
-                  <p className="font-medium text-gray-900">{row.failureReason || "-"}</p>
+                  <p className="font-medium text-gray-900">
+                    {formatAadhaarFailureReason(row.failureReason)}
+                  </p>
                 </div>
               )}
               <div>
@@ -599,7 +629,9 @@ export default function KycReviewsPage() {
                               )}
                             </div>
                           ) : (
-                            row.failureReason || "-"
+                            <span className="whitespace-normal">
+                              {formatAadhaarFailureReason(row.failureReason)}
+                            </span>
                           )}
                         </TableCell>
                         <TableCell>

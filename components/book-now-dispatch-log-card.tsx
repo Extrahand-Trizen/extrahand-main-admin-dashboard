@@ -87,6 +87,25 @@ function taskLocationLabel(location?: unknown): string {
   return "your area";
 }
 
+function isHourlyPartnerOfferTask(task: Task): boolean {
+  const title = String(task.title || "").trim();
+  const subcategory = String(task.subcategory || "").trim();
+  const category = String(task.category || "").trim().toLowerCase();
+  const categorySlug = String(task.categorySlug || "").trim().toLowerCase();
+  const isHourlySignal =
+    task.bookingSource === "book_now" ||
+    task.isHourly === true ||
+    task.budgetType === "hourly" ||
+    categorySlug === "hourly-helper" ||
+    categorySlug === "hourly-based";
+  const isCleaningHourly =
+    (category === "cleaning" || categorySlug.includes("clean") || categorySlug === "hourly-helper") &&
+    (/hourly/i.test(subcategory) || /^ExtraHand Assist(?:\s*[·-])?/i.test(title));
+
+  return isHourlySignal || isCleaningHourly ||
+    /^ExtraHand Assist(?:\s*[·-])?/i.test(title);
+}
+
 function stageStatusLabel(status?: string): string {
   if (!status) return "Not started";
   return status.replace("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -343,11 +362,7 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
       task.assignedHelperName,
   );
   const canNotifyImmediately =
-    (task.bookingSource === "book_now" ||
-      task.isHourly === true ||
-      task.budgetType === "hourly" ||
-      task.categorySlug === "hourly-helper" ||
-      task.categorySlug === "hourly-based") &&
+    isHourlyPartnerOfferTask(task) &&
     task.status === "open" &&
     !isAssigned &&
     progress?.currentStage !== "assigned";
@@ -435,9 +450,7 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
     onError: (error: Error) => toast.error(error.message || "Failed to resend WhatsApp notification."),
   });
   const preferredGender = task.preferredHelperGender;
-  const isHourlyTask = task.categorySlug === "hourly-helper" ||
-    task.categorySlug === "hourly-based" ||
-    task.budgetType === "hourly";
+  const isHourlyTask = isHourlyPartnerOfferTask(task);
   const hasStrictGenderCheck = isHourlyTask && preferredGender && preferredGender !== "any";
   const currentStage = progress?.stages.find((stage) => stage.stage === progress.currentStage);
 

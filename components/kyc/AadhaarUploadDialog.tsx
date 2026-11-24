@@ -326,6 +326,18 @@ export function AadhaarUploadDialog({
           <StepIndicator step={step} />
         </div>
 
+        {step !== "done" && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <p className="font-semibold">Photo tips</p>
+            <ul className="mt-1.5 list-disc space-y-0.5 pl-5">
+              <li>Upload the original Aadhaar card, not a photocopy or screenshot</li>
+              <li>All 4 corners visible, with no extra background</li>
+              <li>Clear photo: no blur, glare, or shadow</li>
+              <li>All text and the Aadhaar number must be readable</li>
+            </ul>
+          </div>
+        )}
+
         {/* ── Step: front ────────────────────────────────────────────────────── */}
         {step === "front" && (
           <div className="space-y-4">

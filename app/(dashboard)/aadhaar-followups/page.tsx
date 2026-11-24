@@ -69,6 +69,17 @@ import { listAadhaarFollowUps } from "@/lib/api/aadhaar-followups";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
+function formatAadhaarFailureReason(reason?: string): string {
+  const normalized = String(reason || "").trim();
+  if (/document failed security checks/i.test(normalized)) {
+    return "Aadhaar verification failed due to image quality or document issues (e.g., blurry images, improper cropping, or incomplete document visibility).";
+  }
+  if (/session expired/i.test(normalized)) {
+    return "Aadhaar verification session expired before completion. The Aadhaar images were not fully submitted or stored. Images may not be available for review.";
+  }
+  return normalized || "-";
+}
+
 const reviewStatusLabels: Record<KycReviewStatus, string> = {
   pending: "Pending",
   accepted: "Accepted",
@@ -348,7 +359,9 @@ function ReviewDialog({
               ) : (
                 <div>
                   <p className="text-gray-500">Failure reason</p>
-                  <p className="font-medium text-gray-900">{row.failureReason || "-"}</p>
+                  <p className="font-medium text-gray-900">
+                    {formatAadhaarFailureReason(row.failureReason)}
+                  </p>
                 </div>
               )}
               <div>

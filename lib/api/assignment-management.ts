@@ -36,6 +36,11 @@ export type AreaAssignmentRule = {
   active: boolean;
 };
 
+export type CityPreferredPartner = Omit<PreferredPartner, 'priority'>;
+export type CityPreferredPartnerRule = Omit<AreaAssignmentRule, 'preferredPartners'> & {
+  preferredPartners: CityPreferredPartner[];
+};
+
 export type PartnerSearchResult = {
   _id?: string;
   uid?: string;
@@ -70,13 +75,13 @@ export async function getCityPreferredPartners(params: {
   city: string;
   workType: 'hourly' | 'book_now';
   category?: string;
-}): Promise<ApiResponse<AreaAssignmentRule[]>> {
+}): Promise<ApiResponse<CityPreferredPartnerRule[]>> {
   const query = new URLSearchParams({
     city: params.city,
     workType: params.workType,
   });
   if (params.category?.trim()) query.set('category', params.category.trim());
-  return apiRequest<ApiResponse<AreaAssignmentRule[]>>(
+  return apiRequest<ApiResponse<CityPreferredPartnerRule[]>>(
     `/api/v1/assignment-management/preferred-partners?${query.toString()}`,
   );
 }

@@ -227,6 +227,7 @@ export interface Task {
   category: string;
   categorySlug?: string;
   categoryLabel?: string;
+  subcategory?: string;
   status:
     | 'open'
     | 'assigned'
