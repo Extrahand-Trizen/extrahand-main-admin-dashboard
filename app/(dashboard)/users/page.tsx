@@ -60,7 +60,7 @@ import {
   suspendUser,
   unsuspendUser,
 } from "@/lib/api/users";
-import { getLocationCatalog } from "@/lib/api/locations";
+import { getLocationAreas, getLocationCatalog } from "@/lib/api/locations";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { formatDate } from "@/lib/utils";
 import { CATEGORY_OPTIONS } from "@/lib/category-options";
@@ -153,6 +153,48 @@ const getPrimarySkillCategories = (user: User) => {
 
 const formatSkillLabel = (value: string) =>
   value.replace(/[_-]+/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+
+type PartnerServiceLocation = {
+  city: string;
+  zone?: string;
+  area?: string;
+};
+
+type PartnerServiceLocationGroup = {
+  city: string;
+  zone?: string;
+  areas: string[];
+};
+
+const getPartnerServiceLocationGroups = (
+  user: User,
+  locationsByWorkArea: ReadonlyMap<string, PartnerServiceLocation>,
+): PartnerServiceLocationGroup[] => {
+  const workAreas = user.helperWorkAreas?.length
+    ? user.helperWorkAreas
+    : user.partnerProfile?.workAreas ?? [];
+  const groups = new Map<string, PartnerServiceLocationGroup>();
+
+  workAreas.forEach((workArea) => {
+    const location =
+      locationsByWorkArea.get(workArea) ??
+      locationsByWorkArea.get(workArea.trim().toLowerCase());
+    if (!location) return;
+
+    const key = `${location.city}\u0000${location.zone ?? ""}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = { city: location.city, zone: location.zone, areas: [] };
+      groups.set(key, group);
+    }
+
+    if (location.area && !group.areas.includes(location.area)) {
+      group.areas.push(location.area);
+    }
+  });
+
+  return Array.from(groups.values());
+};
 
 const getPartnerSkillsLabel = (user: User) => {
   const groups = new Map<string, { label: string; skills: Map<string, string> }>();
@@ -271,13 +313,14 @@ export default function UsersPage() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [roleFilter, setRoleFilter] = useState<"customer" | "partner">("customer");
   const [aadhaarFilter, setAadhaarFilter] = useState<string>("all");
   const [registrationFilter, setRegistrationFilter] = useState<
     "all" | "complete" | "incomplete"
   >("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [cityFilter, setCityFilter] = useState<string>("all");
+  const [zoneFilter, setZoneFilter] = useState<string>("all");
   const [areaFilter, setAreaFilter] = useState<string>("all");
   const [createdFrom, setCreatedFrom] = useState<string>("");
   const [createdTo, setCreatedTo] = useState<string>("");
@@ -306,10 +349,7 @@ export default function UsersPage() {
         const parsed = JSON.parse(saved);
         if (parsed.search !== undefined) setSearch(parsed.search);
         if (parsed.statusFilter !== undefined) setStatusFilter(parsed.statusFilter);
-        if (
-          parsed.roleFilter !== undefined &&
-          ["all", "customer", "partner"].includes(parsed.roleFilter)
-        ) {
+        if (parsed.roleFilter === "customer" || parsed.roleFilter === "partner") {
           setRoleFilter(parsed.roleFilter);
         }
         if (parsed.aadhaarFilter !== undefined) setAadhaarFilter(parsed.aadhaarFilter);
@@ -321,6 +361,7 @@ export default function UsersPage() {
         }
         if (parsed.categoryFilter !== undefined) setCategoryFilter(parsed.categoryFilter);
         if (parsed.cityFilter !== undefined) setCityFilter(parsed.cityFilter);
+        if (parsed.zoneFilter !== undefined) setZoneFilter(parsed.zoneFilter);
         if (parsed.areaFilter !== undefined) setAreaFilter(parsed.areaFilter);
         if (parsed.createdFrom !== undefined) setCreatedFrom(parsed.createdFrom);
         if (parsed.createdTo !== undefined) setCreatedTo(parsed.createdTo);
@@ -333,8 +374,10 @@ export default function UsersPage() {
 
     const roleParam = params.get("role");
     const aadhaarParam = params.get("aadhaar");
-    if (roleParam && ["all", "customer", "partner"].includes(roleParam)) {
+    if (roleParam === "customer" || roleParam === "partner") {
       setRoleFilter(roleParam);
+    } else if (roleParam === "all") {
+      setRoleFilter("customer");
     }
     if (aadhaarParam && ["all", "verified", "not_verified"].includes(aadhaarParam)) {
       setAadhaarFilter(aadhaarParam);
@@ -356,6 +399,7 @@ export default function UsersPage() {
         registrationFilter,
         categoryFilter,
         cityFilter,
+        zoneFilter,
         areaFilter,
         createdFrom,
         createdTo,
@@ -365,7 +409,7 @@ export default function UsersPage() {
     } catch (e) {
       console.error("Error saving filters to sessionStorage", e);
     }
-  }, [search, statusFilter, roleFilter, aadhaarFilter, registrationFilter, categoryFilter, cityFilter, areaFilter, createdFrom, createdTo, page, limit, isLoaded]);
+  }, [search, statusFilter, roleFilter, aadhaarFilter, registrationFilter, categoryFilter, cityFilter, zoneFilter, areaFilter, createdFrom, createdTo, page, limit, isLoaded]);
 
   const {
     data: locationCatalogData,
@@ -378,11 +422,41 @@ export default function UsersPage() {
     retry: false,
   });
   const cities = locationCatalogData?.data?.cities ?? [];
+  const locationsByWorkArea = new Map<string, PartnerServiceLocation>();
+  const addWorkAreaLocation = (
+    area: { id: string; name: string },
+    city: { id: string; name: string },
+    zone?: { name: string },
+  ) => {
+    const location = { city: city.name, zone: zone?.name, area: area.name };
+    locationsByWorkArea.set(area.id, location);
+    const normalizedName = area.name.trim().toLowerCase();
+    if (normalizedName && !locationsByWorkArea.has(normalizedName)) {
+      locationsByWorkArea.set(normalizedName, location);
+    }
+  };
+  cities.forEach((city) => {
+    const cityLocation = { city: city.name, area: "" };
+    locationsByWorkArea.set(city.id, cityLocation);
+    const normalizedCityName = city.name.trim().toLowerCase();
+    if (normalizedCityName && !locationsByWorkArea.has(normalizedCityName)) {
+      locationsByWorkArea.set(normalizedCityName, cityLocation);
+    }
+    (city.areas ?? []).forEach((area) => {
+      addWorkAreaLocation(area, city);
+    });
+    (city.zones ?? []).forEach((zone) => {
+      (zone.areas ?? []).forEach((area) => {
+        addWorkAreaLocation(area, city, zone);
+      });
+    });
+  });
   const userFilterCities = cities.some(
     (city) => city.name.trim().toLowerCase() === "rajagopalpet",
   )
     ? cities
     : [...cities, { id: "rajagopalpet", name: "Rajagopalpet", enabled: true }];
+  const isPartnerRole = roleFilter.trim().toLowerCase() === "partner";
   const selectedCityFilter =
     locationCatalogData &&
     cityFilter !== "all" &&
@@ -391,15 +465,62 @@ export default function UsersPage() {
     )
       ? "all"
       : cityFilter;
+  const selectedLocationCity = cities.find(
+    (city) =>
+      city.name.trim().toLowerCase() === selectedCityFilter.trim().toLowerCase(),
+  );
+  const partnerCityZones = (selectedLocationCity?.zones ?? []).filter(
+    (zone) => zone.enabled !== false,
+  );
+  const selectedPartnerZone = partnerCityZones.find(
+    (zone) => zone.id === zoneFilter,
+  );
+  const partnerCityAreas = partnerCityZones.length > 0
+    ? partnerCityZones.flatMap((zone) => getLocationAreas(zone))
+    : getLocationAreas(selectedLocationCity);
+  const selectedPartnerZoneAreas = selectedPartnerZone
+    ? getLocationAreas(selectedPartnerZone)
+    : [];
+  const partnerAreaOptions =
+    partnerCityZones.length > 0
+      ? selectedPartnerZoneAreas
+      : partnerCityAreas;
+  const partnerAreaIdsInScope = selectedPartnerZone
+    ? selectedPartnerZoneAreas
+    : partnerCityAreas;
+  const isPartnerAreaFilterVisible =
+    partnerCityZones.length > 0
+      ? Boolean(selectedPartnerZone && selectedPartnerZoneAreas.length > 0)
+      : partnerCityAreas.length > 0;
+  const isPartnerCitySelected =
+    isPartnerRole &&
+    selectedCityFilter !== "all" &&
+    Boolean(selectedLocationCity);
   const isHyderabadSelected =
     selectedCityFilter.trim().toLowerCase() === "hyderabad";
+  const partnerWorkAreaIds =
+    isPartnerCitySelected && selectedLocationCity
+      ? partnerAreaIdsInScope.length > 0
+        ? isPartnerAreaFilterVisible &&
+          areaFilter !== "all" &&
+          partnerAreaOptions.some((area) => area.id === areaFilter)
+          ? [areaFilter]
+          : partnerAreaIdsInScope.map((area) => area.id)
+        : [selectedLocationCity.id]
+      : undefined;
   const activeUserFilters: UserFilters = {
     search: search || undefined,
     status: statusFilter !== "all" ? statusFilter : undefined,
-    role: roleFilter !== "all" ? roleFilter : undefined,
+    role: roleFilter,
     category: categoryFilter !== "all" ? categoryFilter : undefined,
-    city: selectedCityFilter !== "all" ? selectedCityFilter : undefined,
+    city:
+      selectedCityFilter !== "all" &&
+      (!isPartnerRole || !selectedLocationCity)
+        ? selectedCityFilter
+        : undefined,
+    workAreaIds: partnerWorkAreaIds,
     area:
+      !isPartnerRole &&
       selectedCityFilter.trim().toLowerCase() === "hyderabad" &&
       areaFilter !== "all"
         ? areaFilter
@@ -429,7 +550,11 @@ export default function UsersPage() {
   } = useQuery({
     queryKey: ["hyderabad-user-areas"],
     queryFn: getHyderabadSubAreas,
-    enabled: hasPermission("user.list") && isLoaded && isHyderabadSelected,
+    enabled:
+      hasPermission("user.list") &&
+      isLoaded &&
+      !isPartnerRole &&
+      isHyderabadSelected,
     retry: false,
   });
 
@@ -451,7 +576,9 @@ export default function UsersPage() {
       registrationFilter,
       categoryFilter,
       selectedCityFilter,
+      zoneFilter,
       areaFilter,
+      partnerWorkAreaIds,
       createdFrom,
       createdTo,
       page,
@@ -558,6 +685,12 @@ export default function UsersPage() {
   };
 
   const users = data?.data || [];
+  const partnerServiceLocationsByUserId = new Map(
+    users.map((user) => [
+      user.userId,
+      getPartnerServiceLocationGroups(user, locationsByWorkArea),
+    ]),
+  );
   const pagination = data?.pagination || {
     page: 1,
     limit: 20,
@@ -595,20 +728,12 @@ export default function UsersPage() {
 
   const registeredInRange = registeredCountData?.pagination?.total ?? 0;
   const verifiedInRange = verifiedCountData?.pagination?.total ?? 0;
-  const registeredCountLabel =
-    roleFilter === "all"
-      ? "Registered users"
-      : `Registered ${
-          roleFilter === "customer"
-            ? "customers"
-            : roleFilter === "helper"
-              ? "helpers"
-              : "partners"
-        }`;
-  const verifiedCountLabel =
-    roleFilter === "all"
-      ? "Aadhaar verified users"
-      : `Aadhaar verified ${roleFilter === "customer" ? "customers" : "partners"}`;
+  const registeredCountLabel = `Registered ${
+    roleFilter === "customer" ? "customers" : "partners"
+  }`;
+  const verifiedCountLabel = `Aadhaar verified ${
+    roleFilter === "customer" ? "customers" : "partners"
+  }`;
 
   const handleExportUsers = async () => {
     setIsExporting(true);
@@ -708,40 +833,21 @@ export default function UsersPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select
-                value={statusFilter}
-                onValueChange={(value) => {
-                  setStatusFilter(value);
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger id="status">
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
-                  <SelectItem value="banned">Banned</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="role">Role</Label>
               <Select
                 value={roleFilter}
                 onValueChange={(value) => {
+                  if (value !== "customer" && value !== "partner") return;
                   setRoleFilter(value);
+                  setZoneFilter("all");
+                  setAreaFilter("all");
                   setPage(1);
                 }}
               >
                 <SelectTrigger id="role">
-                  <SelectValue placeholder="All roles" />
+                  <SelectValue placeholder="Customer" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="customer">Customer</SelectItem>
                   <SelectItem value="partner">Partner</SelectItem>
                 </SelectContent>
@@ -793,6 +899,27 @@ export default function UsersPage() {
               </Select>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => {
+                  setStatusFilter(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger id="status">
+                  <SelectValue placeholder="All statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="suspended">Suspended</SelectItem>
+                  <SelectItem value="banned">Banned</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="category">Category</Label>
               <Select
                 value={categoryFilter}
@@ -815,12 +942,15 @@ export default function UsersPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="city">City</Label>
+              <Label htmlFor="city">
+                {isPartnerRole ? "Service City" : "City"}
+              </Label>
               <Select
                 value={selectedCityFilter}
                 disabled={isLoadingCities || Boolean(locationCatalogError)}
                 onValueChange={(value) => {
                   setCityFilter(value);
+                  setZoneFilter("all");
                   setAreaFilter("all");
                   setPage(1);
                 }}
@@ -851,7 +981,60 @@ export default function UsersPage() {
                 </p>
               )}
             </div>
-            {isHyderabadSelected && (
+            {isPartnerRole &&
+              selectedCityFilter !== "all" &&
+              partnerCityZones.length > 0 && (
+                <div className="space-y-2">
+                  <Label htmlFor="zone">Operational Zone</Label>
+                  <Select
+                    value={zoneFilter}
+                    onValueChange={(value) => {
+                      setZoneFilter(value);
+                      setAreaFilter("all");
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger id="zone">
+                      <SelectValue placeholder="All operational zones" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All operational zones</SelectItem>
+                      {partnerCityZones.map((zone) => (
+                        <SelectItem key={zone.id} value={zone.id}>
+                          {zone.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            {isPartnerRole &&
+              selectedCityFilter !== "all" &&
+              isPartnerAreaFilterVisible && (
+                <div className="space-y-2">
+                  <Label htmlFor="area">Service Area</Label>
+                  <Select
+                    value={areaFilter}
+                    onValueChange={(value) => {
+                      setAreaFilter(value);
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger id="area">
+                      <SelectValue placeholder="All service areas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All service areas</SelectItem>
+                      {partnerAreaOptions.map((area) => (
+                        <SelectItem key={area.id} value={area.id}>
+                          {area.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            {!isPartnerRole && isHyderabadSelected && (
               <div className="space-y-2">
                 <Label htmlFor="area">Hyderabad work area</Label>
                 <Select
@@ -921,11 +1104,12 @@ export default function UsersPage() {
                 onClick={() => {
                   setSearch("");
                   setStatusFilter("all");
-                  setRoleFilter("all");
+                  setRoleFilter("customer");
                   setAadhaarFilter("all");
                   setRegistrationFilter("all");
                   setCategoryFilter("all");
                   setCityFilter("all");
+                  setZoneFilter("all");
                   setAreaFilter("all");
                   setCreatedFrom("");
                   setCreatedTo("");
@@ -1008,7 +1192,9 @@ export default function UsersPage() {
                         Primary Skill
                       </TableHead>
                       <TableHead className="hidden md:table-cell">
-                        City / District
+                        {roleFilter === "partner"
+                          ? "Service location"
+                          : "City / District"}
                       </TableHead>
                       <TableHead className="hidden lg:table-cell">
                         Status
@@ -1061,7 +1247,33 @@ export default function UsersPage() {
                           </span>
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-sm text-gray-500">
-                          {getUserCityLabel(user)}
+                          {roleFilter === "partner" ? (
+                            <div className="max-w-[260px] space-y-2 whitespace-normal">
+                              {(partnerServiceLocationsByUserId.get(user.userId) ?? []).map(
+                                (location, index) => (
+                                  <div
+                                    key={`${location.city}-${location.zone ?? "areas"}-${index}`}
+                                  >
+                                    <p className="font-medium text-gray-700">
+                                      {location.city}
+                                    </p>
+                                    {location.zone && <p>{location.zone}</p>}
+                                    {location.areas.length > 0 && (
+                                      <p>
+                                        {location.areas.slice(0, 2).join(", ")}
+                                        {location.areas.length > 2 &&
+                                          ` +${location.areas.length - 2} more`}
+                                      </p>
+                                    )}
+                                  </div>
+                                ),
+                              )}
+                              {partnerServiceLocationsByUserId.get(user.userId)
+                                ?.length === 0 && "—"}
+                            </div>
+                          ) : (
+                            getUserCityLabel(user)
+                          )}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
                           <Badge variant={statusColors[user.status] as any}>

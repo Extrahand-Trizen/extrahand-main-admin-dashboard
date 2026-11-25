@@ -708,6 +708,7 @@ export interface UserFilters {
   category?: string;
   city?: string;
   workArea?: string;
+  workAreaIds?: string[];
   area?: string;
   includeSummary?: boolean;
   isAadhaarVerified?: boolean;

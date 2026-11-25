@@ -62,12 +62,13 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Upload, RefreshCw } from "lucide-react";
 import { AadhaarUploadDialog } from "@/components/kyc/AadhaarUploadDialog";
 import { getAadhaarUploadStatus } from "@/lib/api/kyc-reviews";
+import { getLocationCatalog } from "@/lib/api/locations";
 
 const TASKS_PER_PAGE = 5;
 const OFFERS_PER_PAGE = 5;
@@ -182,14 +183,63 @@ export default function UserDetailsPage() {
         : [],
     }))
     .filter((group) => group.skills.length > 0);
-  const partnerWorkAreas = (user?.partnerProfile?.workAreas ?? []).filter(
-    (area) => typeof area === "string" && area.trim().length > 0,
-  );
+  const partnerWorkAreas = (
+    user?.helperWorkAreas?.length
+      ? user.helperWorkAreas
+      : user?.partnerProfile?.workAreas ?? []
+  ).filter((area) => typeof area === "string" && area.trim().length > 0);
 
   const isPartnerUser =
-    user?.role === "Partner" ||
-    user?.roles?.includes("Partner") ||
+    user?.role?.trim().toLowerCase() === "partner" ||
+    user?.roles?.some((role) => role.trim().toLowerCase() === "partner") ||
     Boolean(user?.partnerProfile?.status || user?.partnerProfile?.workAreas?.length || user?.partnerProfile?.categories?.length);
+
+  const {
+    data: locationCatalogResponse,
+    error: locationCatalogError,
+  } = useQuery({
+    queryKey: ["location-catalog"],
+    queryFn: getLocationCatalog,
+    enabled: !!user && isPartnerUser && hasPermission("user.view"),
+    retry: false,
+  });
+  const locationCities = locationCatalogResponse?.data?.cities ?? [];
+  const workAreaLocations = locationCities.flatMap((city) => [
+    ...(city.areas ?? []).map((area) => ({ area, city, zone: null })),
+    ...(city.zones ?? []).flatMap((zone) =>
+      (zone.areas ?? []).map((area) => ({ area, city, zone })),
+    ),
+  ]);
+  const matchedWorkAreaLocations = workAreaLocations.filter(({ area }) =>
+    partnerWorkAreas.some(
+      (workArea) =>
+        area.id === workArea ||
+        area.name.trim().toLowerCase() === workArea.trim().toLowerCase(),
+    ),
+  );
+  const workAreaCityNames = Array.from(
+    new Set(matchedWorkAreaLocations.map(({ city }) => city.name)),
+  );
+  const workAreaZoneNames = Array.from(
+    new Set(
+      matchedWorkAreaLocations
+        .flatMap(({ zone }) => (zone ? [zone.name] : [])),
+    ),
+  );
+  const profileCity =
+    user?.location?.addressDetails?.city?.trim() ||
+    user?.location?.city?.trim() ||
+    user?.homeLocation?.addressDetails?.city?.trim() ||
+    user?.homeLocation?.city?.trim() ||
+    user?.savedAddresses?.find((address) => address.isDefault)?.city?.trim() ||
+    user?.savedAddresses?.[0]?.city?.trim();
+  const cityLabel = workAreaCityNames.join(", ") || profileCity;
+
+  useEffect(() => {
+    if (locationCatalogError) {
+      toast.error(locationCatalogError.message || "Failed to load location details");
+    }
+  }, [locationCatalogError]);
 
   const { data: registrationSourceResponse, isLoading: registrationSourceLoading } = useQuery({
     queryKey: ["user-registration-source", userId],
@@ -973,7 +1023,7 @@ export default function UserDetailsPage() {
                 {user.location && (
                   <div>
                     <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                      Primary Location
+                      {isPartnerUser ? "Registration Location" : "Primary Location"}
                     </Label>
                     <div className="p-3 rounded-lg border border-gray-200 bg-gray-50">
                       {user.location.address && (
@@ -1028,18 +1078,40 @@ export default function UserDetailsPage() {
                   </div>
                 )}
 
-                {partnerWorkAreas.length > 0 && (
+                {(cityLabel || partnerWorkAreas.length > 0) && (
                   <div>
-                    <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                      Partner Work Areas
-                    </Label>
-                    <div className="flex flex-wrap gap-2">
-                      {partnerWorkAreas.map((area, index) => (
-                        <Badge key={`${area}-${index}`} variant="outline">
-                          {formatSkillLabel(area)}
-                        </Badge>
-                      ))}
-                    </div>
+                    {cityLabel && (
+                      <div className="mb-3">
+                        <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                          Service City
+                        </Label>
+                        <p className="text-sm text-gray-700">{cityLabel}</p>
+                      </div>
+                    )}
+                    {workAreaZoneNames.length > 0 && (
+                      <div className="mb-3">
+                        <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                          Operational Zone
+                        </Label>
+                        <p className="text-sm text-gray-700">
+                          {workAreaZoneNames.join(", ")}
+                        </p>
+                      </div>
+                    )}
+                    {partnerWorkAreas.length > 0 && (
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                          Service Area
+                        </Label>
+                        <div className="flex flex-wrap gap-2">
+                          {partnerWorkAreas.map((area, index) => (
+                            <Badge key={`${area}-${index}`} variant="outline">
+                              {formatSkillLabel(area)}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

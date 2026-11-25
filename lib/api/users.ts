@@ -14,6 +14,9 @@ export async function listUsers(filters?: UserFilters): Promise<ApiResponse<User
   if (filters?.category) params.append('category', filters.category);
   if (filters?.city) params.append('city', filters.city);
   if (filters?.workArea) params.append('workArea', filters.workArea);
+  if (filters?.workAreaIds?.length) {
+    params.append('workAreaIds', filters.workAreaIds.join(','));
+  }
   if (filters?.area && filters.area !== 'all') params.append('area', filters.area);
   if (typeof filters?.includeSummary === 'boolean') {
     params.append('includeSummary', String(filters.includeSummary));
