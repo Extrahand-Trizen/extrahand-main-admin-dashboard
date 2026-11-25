@@ -362,7 +362,6 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
       task.assignedHelperName,
   );
   const canNotifyImmediately =
-    !isTeamPosted &&
     isHourlyPartnerOfferTask(task) &&
     task.status === "open" &&
     !isAssigned &&
@@ -480,7 +479,7 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
         <CardContent className="p-4 pt-3 space-y-5">
           {isTeamPosted ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
-              Team-posted work: partner notifications are disabled. Preferred and eligible partners remain visible here for the Operations team.
+              Team-posted work: only eligible partners whose phone is listed in Task-Posted Email exclusions can receive notifications.
             </div>
           ) : null}
 
@@ -507,7 +506,7 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
             <section className="rounded-lg border border-gray-200 p-3 space-y-3">
               <p className="text-xs text-gray-600">
                 {isTeamPosted
-                  ? "Partner notifications are disabled for team-posted work. Candidate eligibility is still evaluated and shown below."
+                  ? "For team-posted work, offers are sent only to eligible team partners identified by the Task-Posted Email exclusion list."
                   : "Preferred partners are notified first. Other eligible partners are notified after 45 minutes if no one accepts. Each sent offer remains available until someone accepts, the work is cancelled, or its scheduled start time arrives. “Push sent” is recorded only when the notification service confirms a device send."}
               </p>
               <div className="flex flex-wrap items-start justify-between gap-2">
@@ -596,7 +595,7 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                           canNotifyThisStage
                             ? `Send a push notification now to eligible ${stage.label.toLowerCase()}`
                             : isTeamPosted
-                              ? "Partner notifications are disabled for team-posted work"
+                              ? "Notifications are available only for open, unassigned work"
                             : stage.key === "all" && hasAcceptedPreferredPartner
                               ? "A preferred partner has accepted this work."
                               : stage.key === "all" && hasEligiblePreferredPartners
@@ -616,7 +615,7 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                       disabled={whatsappMutation.isPending || !canNotifyThisStage || eligibleUids.length === 0}
                       title={
                         isTeamPosted
-                          ? "Partner WhatsApp notifications are disabled for team-posted work"
+                          ? "Only eligible partners listed in Task-Posted Email exclusions will receive WhatsApp"
                           : stage.key === "all" && !canStartOtherStage
                           ? "Other eligible partners can be notified after the 45-minute preferred-partner window ends without an acceptance."
                           : "Send WhatsApp to all eligible partners in this dispatch stage"
@@ -636,7 +635,7 @@ export function BookNowDispatchLogCard({ task }: BookNowDispatchLogCardProps) {
                 </div>
                 <p className="text-xs text-gray-500">
                   {isTeamPosted
-                    ? "Team-posted work is not sent to partners. All eligible candidates remain visible here for the Operations team."
+                    ? "Only candidates whose phone is in Task-Posted Email exclusions are notified; other candidates are shown for Operations."
                     : stage.description}
                 </p>
                 {areaRows.length ? (
