@@ -95,7 +95,7 @@ export function AssignmentManagementPage() {
   const [areaCategoryFilter, setAreaCategoryFilter] = useState("all");
   const [partnerAssignmentFilter, setPartnerAssignmentFilter] = useState<"all" | "with" | "without">("all");
   const [selectedCityId, setSelectedCityId] = useState("");
-  const [expandedZoneIds, setExpandedZoneIds] = useState<string[]>([]);
+  const [expandedZoneIds, setExpandedZoneIds] = useState<string[] | null>(null);
   const [areaEditorOpen, setAreaEditorOpen] = useState(false);
 
   const rulesQuery = useQuery({
@@ -681,10 +681,10 @@ export function AssignmentManagementPage() {
                 </div> : <div className="space-y-3">
                   {visibleZones.map((zone, zoneIndex) => {
                     const zoneAreas = (zone.areas || []).filter((area) => areaMatchesFilters(area, zone.name));
-                    const isExpanded = expandedZoneIds.length ? expandedZoneIds.includes(zone.id) : zoneIndex === 0;
+                    const isExpanded = expandedZoneIds === null ? zoneIndex === 0 : expandedZoneIds.includes(zone.id);
                     return <section key={zone.id} className="overflow-hidden rounded-lg border">
                       <button type="button" onClick={() => setExpandedZoneIds((current) => {
-                        const expanded = current.length ? current : visibleZones[0]?.id ? [visibleZones[0].id] : [];
+                        const expanded = current ?? (visibleZones[0]?.id ? [visibleZones[0].id] : []);
                         return expanded.includes(zone.id) ? expanded.filter((id) => id !== zone.id) : [...expanded, zone.id];
                       })} className="flex w-full items-center justify-between bg-gray-50 px-4 py-3 text-left hover:bg-gray-100">
                         <span className="flex items-center gap-2 font-semibold text-gray-900">{isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}{zone.name}{zone.enabled === false && <Badge variant="secondary">Disabled</Badge>}</span><span className="text-xs text-gray-500">{zone.areas?.length || 0} Areas</span>

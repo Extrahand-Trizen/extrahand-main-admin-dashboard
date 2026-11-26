@@ -255,12 +255,12 @@ export default function PartnerCategoryRequestsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="request-city">City</Label>
+              <Label htmlFor="request-city">Service City</Label>
               <Input
                 id="request-city"
                 value={city}
                 onChange={(event) => updateFilter(() => setCity(event.target.value))}
-                placeholder="Filter by city"
+                placeholder="Filter by service city"
               />
             </div>
           </div>
@@ -300,7 +300,7 @@ export default function PartnerCategoryRequestsPage() {
                       <TableHead className="w-[10%] px-2">Current categories</TableHead>
                       <TableHead className="w-[15%] px-2">Requested category</TableHead>
                       <TableHead className="w-[12%] px-2">Work areas</TableHead>
-                      <TableHead className="w-[8%] px-2">City</TableHead>
+                      <TableHead className="w-[8%] px-2">Service City</TableHead>
                       <TableHead className="w-[11%] px-2">Requested</TableHead>
                       <TableHead className="w-[7%] px-2">Status</TableHead>
                       <TableHead className="w-[22%] px-2 text-right">Actions</TableHead>

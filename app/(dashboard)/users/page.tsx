@@ -313,7 +313,9 @@ export default function UsersPage() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [roleFilter, setRoleFilter] = useState<"customer" | "partner">("customer");
+  const [roleFilter, setRoleFilter] = useState<
+    "customer" | "helper" | "partner" | "empty"
+  >("customer");
   const [aadhaarFilter, setAadhaarFilter] = useState<string>("all");
   const [registrationFilter, setRegistrationFilter] = useState<
     "all" | "complete" | "incomplete"
@@ -349,7 +351,12 @@ export default function UsersPage() {
         const parsed = JSON.parse(saved);
         if (parsed.search !== undefined) setSearch(parsed.search);
         if (parsed.statusFilter !== undefined) setStatusFilter(parsed.statusFilter);
-        if (parsed.roleFilter === "customer" || parsed.roleFilter === "partner") {
+        if (
+          parsed.roleFilter === "customer" ||
+          parsed.roleFilter === "helper" ||
+          parsed.roleFilter === "partner" ||
+          parsed.roleFilter === "empty"
+        ) {
           setRoleFilter(parsed.roleFilter);
         }
         if (parsed.aadhaarFilter !== undefined) setAadhaarFilter(parsed.aadhaarFilter);
@@ -374,7 +381,12 @@ export default function UsersPage() {
 
     const roleParam = params.get("role");
     const aadhaarParam = params.get("aadhaar");
-    if (roleParam === "customer" || roleParam === "partner") {
+    if (
+      roleParam === "customer" ||
+      roleParam === "helper" ||
+      roleParam === "partner" ||
+      roleParam === "empty"
+    ) {
       setRoleFilter(roleParam);
     } else if (roleParam === "all") {
       setRoleFilter("customer");
@@ -451,11 +463,14 @@ export default function UsersPage() {
       });
     });
   });
-  const userFilterCities = cities.some(
+  const visibleUserFilterCities = cities.filter(
+    (city) => city.name.trim().toLowerCase() !== "testing",
+  );
+  const userFilterCities = visibleUserFilterCities.some(
     (city) => city.name.trim().toLowerCase() === "rajagopalpet",
   )
-    ? cities
-    : [...cities, { id: "rajagopalpet", name: "Rajagopalpet", enabled: true }];
+    ? visibleUserFilterCities
+    : [...visibleUserFilterCities, { id: "rajagopalpet", name: "Rajagopalpet", enabled: true }];
   const isPartnerRole = roleFilter.trim().toLowerCase() === "partner";
   const selectedCityFilter =
     locationCatalogData &&
@@ -470,7 +485,7 @@ export default function UsersPage() {
       city.name.trim().toLowerCase() === selectedCityFilter.trim().toLowerCase(),
   );
   const partnerCityZones = (selectedLocationCity?.zones ?? []).filter(
-    (zone) => zone.enabled !== false,
+    (zone) => zone.enabled !== false || zone.deleted,
   );
   const selectedPartnerZone = partnerCityZones.find(
     (zone) => zone.id === zoneFilter,
@@ -729,10 +744,22 @@ export default function UsersPage() {
   const registeredInRange = registeredCountData?.pagination?.total ?? 0;
   const verifiedInRange = verifiedCountData?.pagination?.total ?? 0;
   const registeredCountLabel = `Registered ${
-    roleFilter === "customer" ? "customers" : "partners"
+    roleFilter === "empty"
+      ? "users without a role"
+      : roleFilter === "customer"
+        ? "customers"
+        : roleFilter === "helper"
+          ? "helpers"
+          : "partners"
   }`;
   const verifiedCountLabel = `Aadhaar verified ${
-    roleFilter === "customer" ? "customers" : "partners"
+    roleFilter === "empty"
+      ? "users without a role"
+      : roleFilter === "customer"
+        ? "customers"
+        : roleFilter === "helper"
+          ? "helpers"
+          : "partners"
   }`;
 
   const handleExportUsers = async () => {
@@ -837,7 +864,12 @@ export default function UsersPage() {
               <Select
                 value={roleFilter}
                 onValueChange={(value) => {
-                  if (value !== "customer" && value !== "partner") return;
+                  if (
+                    value !== "customer" &&
+                    value !== "helper" &&
+                    value !== "partner" &&
+                    value !== "empty"
+                  ) return;
                   setRoleFilter(value);
                   setZoneFilter("all");
                   setAreaFilter("all");
@@ -849,7 +881,9 @@ export default function UsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="customer">Customer</SelectItem>
+                  <SelectItem value="helper">Helper</SelectItem>
                   <SelectItem value="partner">Partner</SelectItem>
+                  <SelectItem value="empty">Empty</SelectItem>
                 </SelectContent>
               </Select>
             </div>

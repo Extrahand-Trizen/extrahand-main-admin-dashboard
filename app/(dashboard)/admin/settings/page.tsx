@@ -77,6 +77,7 @@ function RoundRobinTeamEditor({
     onSuccess: (data) => {
       queryClient.setQueryData([queryKey], data);
       setTeamMembersOverride(data.teamMembers);
+      setSelectedNewAdminEmail("");
       toast.success(`${title} assignment order saved`);
     },
     onError: (error: Error) => {
@@ -86,6 +87,9 @@ function RoundRobinTeamEditor({
 
   const availableOpsAdminsToAdd = (teamQuery.data?.availableOpsAdmins || []).filter(
     (admin) => !teamMembers.some((member) => member.email.toLowerCase() === admin.email.toLowerCase()),
+  );
+  const selectedAdminToAdd = availableOpsAdminsToAdd.find(
+    (admin) => admin.email.toLowerCase() === selectedNewAdminEmail.toLowerCase(),
   );
 
   const moveMember = (fromIndex: number, toIndex: number) => {
@@ -104,14 +108,10 @@ function RoundRobinTeamEditor({
     setTeamMembersOverride(teamMembers.filter((_, index) => index !== indexToRemove));
   };
 
-  const addTeamMember = () => {
-    const adminToAdd = availableOpsAdminsToAdd.find(
-      (admin) => admin.email.toLowerCase() === selectedNewAdminEmail.toLowerCase(),
-    );
-    if (!adminToAdd) return;
-
-    saveMutation.mutate([...teamMembers.map((member) => member.email), adminToAdd.email]);
-    setSelectedNewAdminEmail("");
+  const saveTeamMembers = () => {
+    const emails = teamMembers.map((member) => member.email);
+    if (selectedAdminToAdd) emails.push(selectedAdminToAdd.email);
+    saveMutation.mutate(emails);
   };
 
   return (
@@ -206,7 +206,7 @@ function RoundRobinTeamEditor({
               </option>
             ))}
           </select>
-          <Button type="button" variant="outline" onClick={addTeamMember} disabled={!selectedNewAdminEmail || saveMutation.isPending} className="flex items-center gap-1.5">
+          <Button type="button" variant="outline" onClick={saveTeamMembers} disabled={!selectedAdminToAdd || saveMutation.isPending} className="flex items-center gap-1.5">
             <Plus className="h-4 w-4" />
             {saveMutation.isPending ? "Saving..." : "Add & save member"}
           </Button>
@@ -218,10 +218,12 @@ function RoundRobinTeamEditor({
 
       <div className="flex justify-end border-t pt-5">
         <Button
-          onClick={() => saveMutation.mutate(teamMembers.map((member) => member.email))}
-          disabled={saveMutation.isPending || teamQuery.isLoading || teamQuery.isError || teamMembers.length === 0}
+          onClick={saveTeamMembers}
+          disabled={saveMutation.isPending || teamQuery.isLoading || teamQuery.isError || (teamMembers.length === 0 && !selectedAdminToAdd)}
         >
-          {saveMutation.isPending ? "Saving..." : `Save ${title.toLowerCase()} order`}
+          {saveMutation.isPending
+            ? "Saving..."
+            : `Save ${title.toLowerCase()} order${selectedAdminToAdd ? " & member" : ""}`}
         </Button>
       </div>
     </section>

@@ -4,6 +4,7 @@ export type ManagedLocation = {
   id: string;
   name: string;
   enabled: boolean;
+  deleted?: boolean;
   latitude?: number;
   longitude?: number;
   zones?: ManagedLocation[];
@@ -14,13 +15,13 @@ export function getLocationAreas(city?: ManagedLocation): ManagedLocation[] {
   const locations = city?.areas?.length
     ? city.areas
     : city?.zones
-        ?.filter((zone) => zone.enabled !== false)
+        ?.filter((zone) => zone.enabled !== false || zone.deleted)
         .flatMap((zone) => zone.areas ?? []) ?? [];
   const seen = new Set<string>();
 
   return locations.filter((area) => {
     const normalizedName = area.name.trim().toLowerCase();
-    if (area.enabled === false || !normalizedName || seen.has(normalizedName)) {
+    if ((area.enabled === false && !area.deleted) || !normalizedName || seen.has(normalizedName)) {
       return false;
     }
     seen.add(normalizedName);

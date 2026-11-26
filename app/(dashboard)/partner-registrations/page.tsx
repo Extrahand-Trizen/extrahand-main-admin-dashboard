@@ -157,10 +157,13 @@ export default function PartnerRegistrationsPage() {
     retry: false,
   });
   const cities = locationCatalogData?.data?.cities ?? [];
+  const filterCities = cities.filter(
+    (city) => city.name.trim().toLowerCase() !== "testing",
+  );
   const selectedCityFilter =
     locationCatalogData &&
     cityFilter !== "all" &&
-    !cities.some((city) => city.name === cityFilter)
+    !filterCities.some((city) => city.name === cityFilter)
       ? "all"
       : cityFilter;
   const isHyderabadSelected =
@@ -386,7 +389,7 @@ export default function PartnerRegistrationsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="city">City</Label>
+              <Label htmlFor="city">Service City</Label>
               <Select
                 value={selectedCityFilter}
                 onValueChange={(value) => {
@@ -400,7 +403,7 @@ export default function PartnerRegistrationsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Cities</SelectItem>
-                  {cities.map((city) => (
+                  {filterCities.map((city) => (
                     <SelectItem key={city.id} value={city.name}>
                       {city.name}
                     </SelectItem>

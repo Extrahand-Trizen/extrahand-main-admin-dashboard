@@ -53,6 +53,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { listTasks, deleteTask, requestTaskDelete } from "@/lib/api/tasks";
+import { getRoundRobinTeamSettings } from "@/lib/api/admin";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { formatDate, formatCurrency, isTaskOverdue } from "@/lib/utils";
 import { CATEGORY_OPTIONS } from "@/lib/category-options";
@@ -202,6 +203,21 @@ export default function TasksPage() {
     reason: "",
   });
 
+  const worksTeamQuery = useQuery({
+    queryKey: ["works-round-robin-team-settings"],
+    queryFn: getRoundRobinTeamSettings,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
+  });
+  const worksTeamMembers = worksTeamQuery.data?.teamMembers;
+  const activeAssignedToFilter =
+    assignedToFilter === "all" ||
+    !worksTeamQuery.isSuccess ||
+    !worksTeamMembers ||
+    worksTeamMembers.some((member) => member.name === assignedToFilter)
+      ? assignedToFilter
+      : "all";
+
   // Debounce search input by 300ms
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -219,7 +235,7 @@ export default function TasksPage() {
         statusFilter,
         categoryFilter,
         paymentTypeFilter,
-        assignedToFilter,
+        assignedToFilter: activeAssignedToFilter,
         postedByFilter,
         workDateFilter,
         customDateFrom,
@@ -231,7 +247,7 @@ export default function TasksPage() {
     } catch (e) {
       console.error("Error saving filters to sessionStorage", e);
     }
-  }, [debouncedSearch, statusFilter, categoryFilter, paymentTypeFilter, assignedToFilter, postedByFilter, workDateFilter, customDateFrom, customDateTo, scheduledTimeSortOrder, page, limit]);
+  }, [debouncedSearch, statusFilter, categoryFilter, paymentTypeFilter, activeAssignedToFilter, postedByFilter, workDateFilter, customDateFrom, customDateTo, scheduledTimeSortOrder, page, limit]);
 
   const handleClearFilters = () => {
     setSearchInput("");
@@ -258,7 +274,7 @@ export default function TasksPage() {
     statusFilter !== "all" ||
     categoryFilter !== "all" ||
     paymentTypeFilter !== "all" ||
-    assignedToFilter !== "all" ||
+    activeAssignedToFilter !== "all" ||
     postedByFilter !== "all" ||
     workDateFilter !== "all" ||
     customDateFrom ||
@@ -285,7 +301,7 @@ export default function TasksPage() {
       statusFilter,
       categoryFilter,
       paymentTypeFilter,
-      assignedToFilter,
+      activeAssignedToFilter,
       postedByFilter,
       workDateFilter,
       workDateRange.from,
@@ -300,7 +316,7 @@ export default function TasksPage() {
         status: statusFilter !== "all" ? statusFilter : undefined,
         category: categoryFilter !== "all" ? categoryFilter : undefined,
         paymentType: paymentTypeFilter !== "all" ? paymentTypeFilter : undefined,
-        assignedTo: assignedToFilter !== "all" ? assignedToFilter : undefined,
+        assignedTo: activeAssignedToFilter !== "all" ? activeAssignedToFilter : undefined,
         postedBy: postedByFilter !== "all" ? postedByFilter as "customer" | "team" : undefined,
         scheduledDateFrom: workDateRange.from,
         scheduledDateTo: workDateRange.to,
@@ -335,7 +351,7 @@ export default function TasksPage() {
         status: statusFilter !== "all" ? statusFilter : undefined,
         category: categoryFilter !== "all" ? categoryFilter : undefined,
         paymentType: paymentTypeFilter !== "all" ? paymentTypeFilter : undefined,
-        assignedTo: assignedToFilter !== "all" ? assignedToFilter : undefined,
+        assignedTo: activeAssignedToFilter !== "all" ? activeAssignedToFilter : undefined,
         postedBy: "team" as const,
         scheduledDateFrom: workDateRange.from,
         scheduledDateTo: workDateRange.to,
@@ -665,7 +681,7 @@ export default function TasksPage() {
             <div className="space-y-2">
               <Label htmlFor="assignedTo">Assigned To</Label>
               <Select
-                value={assignedToFilter}
+                value={activeAssignedToFilter}
                 onValueChange={(value) => {
                   setAssignedToFilter(value);
                   setPage(1);
@@ -676,10 +692,18 @@ export default function TasksPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="durgamshiva">durgamshiva</SelectItem>
-                  <SelectItem value="tadembharath">tadembharath</SelectItem>
+                  {(worksTeamMembers ?? []).map((member) => (
+                    <SelectItem key={member.userId || member.email} value={member.name}>
+                      {member.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              {worksTeamQuery.isError && (
+                <p role="alert" className="text-xs text-red-600">
+                  Failed to load Works Team Assignment members.
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="postedBy">Posted By</Label>

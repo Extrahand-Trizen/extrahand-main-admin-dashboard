@@ -138,7 +138,18 @@ export default function LocationManagementPage() {
   const loadCatalog = useCallback(async () => {
     try {
       const response = await getLocationCatalog();
-      const nextCities = response?.data?.cities || [];
+      const nextCities = (response?.data?.cities || [])
+        .filter((city) => !city.deleted)
+        .map((city) => ({
+          ...city,
+          zones: city.zones
+            ?.filter((zone) => !zone.deleted)
+            .map((zone) => ({
+              ...zone,
+              areas: zone.areas?.filter((area) => !area.deleted),
+            })),
+          areas: city.areas?.filter((area) => !area.deleted),
+        }));
       setCities(nextCities);
       setSelectedCityId((current) => nextCities.some((city) => city.id === current) ? current : '');
       const selectedCity = nextCities.find((city) => city.id === selectedCityId);
