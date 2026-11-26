@@ -41,6 +41,7 @@ export interface KycReviewRow {
   sessionId?: string;
   verificationId?: string;
   isAadhaarVerified?: boolean;
+  partnerProfileStatus?: string | null;
   /** True when photos were uploaded manually by an admin (not via DigiLocker/OCR) */
   isManualUpload?: boolean;
   /** Admin who uploaded the photos manually */

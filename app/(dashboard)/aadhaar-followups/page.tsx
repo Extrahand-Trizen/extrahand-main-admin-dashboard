@@ -121,6 +121,14 @@ function formatFollowUpStatusLabel(row: KycReviewRow) {
   return "Pending";
 }
 
+function formatPartnerProfileStatus(status?: string | null) {
+  if (!status) return "-";
+  return status
+    .split(/[_-]+/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 function isOperationsRole(role?: string | null) {
   return ["operations_admin", "operation_admin", "operations"].includes(role || "");
 }
@@ -701,7 +709,7 @@ export default function AadhaarFollowUpsPage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Aadhaar Follow-ups</h1>
         <p className="mt-2 text-sm text-gray-600">
-          Helpers registered but Aadhaar not verified. Operations admins see only their assigned users; super admins see all follow-up cases.
+          Helpers and partners registered but Aadhaar not verified. Operations admins see only their assigned users; super admins see all follow-up cases.
         </p>
       </div>
 
@@ -755,7 +763,7 @@ export default function AadhaarFollowUpsPage() {
           <Badge variant="secondary">
             {pagination ? (
               <>
-                {pagination.total} {pagination.total === 1 ? "helper" : "helpers"}
+                {pagination.total} {pagination.total === 1 ? "user" : "users"}
               </>
             ) : (
               <>{rows.length} {rows.length === 1 ? "review" : "reviews"}</>
@@ -782,6 +790,8 @@ export default function AadhaarFollowUpsPage() {
                       <TableHead>User</TableHead>
                       <TableHead>Phone</TableHead>
                       <TableHead>Registered on</TableHead>
+                      <TableHead>Partner profile status</TableHead>
+                      <TableHead>Aadhaar verified</TableHead>
                       <TableHead>Assigned to</TableHead>
                       <TableHead>Follow-up status</TableHead>
                       <TableHead>Follow-up date</TableHead>
@@ -813,6 +823,34 @@ export default function AadhaarFollowUpsPage() {
                         </TableCell>
                         <TableCell>{row.userPhone || "-"}</TableCell>
                         <TableCell>{row.registeredAt ? formatDate(row.registeredAt) : "-"}</TableCell>
+                        <TableCell>
+                          {row.partnerProfileStatus ? (
+                            <Badge
+                              variant="outline"
+                              className={
+                                row.partnerProfileStatus === "approved"
+                                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                  : "border-slate-200 bg-slate-50 text-slate-700"
+                              }
+                            >
+                              {formatPartnerProfileStatus(row.partnerProfileStatus)}
+                            </Badge>
+                          ) : (
+                            "-"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={
+                              row.isAadhaarVerified
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                : "border-amber-200 bg-amber-50 text-amber-700"
+                            }
+                          >
+                            {row.isAadhaarVerified ? "Verified" : "Not verified"}
+                          </Badge>
+                        </TableCell>
                         <TableCell className="max-w-[220px] whitespace-normal">
                           {row.assignedTo.length > 0
                             ? row.assignedTo.map((admin) => admin.name).join(", ")
