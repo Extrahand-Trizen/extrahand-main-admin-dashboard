@@ -1,10 +1,13 @@
 import { apiRequest } from './client';
 
+export type LocationAreaType = 'town' | 'area';
+
 export type ManagedLocation = {
   id: string;
   name: string;
   enabled: boolean;
   deleted?: boolean;
+  type?: LocationAreaType;
   latitude?: number;
   longitude?: number;
   zones?: ManagedLocation[];
@@ -68,13 +71,13 @@ export const updateLocationZone = (
 export const deleteLocationZone = (cityId: string, zoneId: string) =>
   mutateLocation(`/api/v1/locations/cities/${encodeURIComponent(cityId)}/zones/${encodeURIComponent(zoneId)}`, 'DELETE');
 
-export const createCityLocationArea = (cityId: string, name: string) =>
-  mutateLocation(`/api/v1/locations/cities/${encodeURIComponent(cityId)}/areas`, 'POST', { name });
+export const createCityLocationArea = (cityId: string, name: string, type: LocationAreaType) =>
+  mutateLocation(`/api/v1/locations/cities/${encodeURIComponent(cityId)}/areas`, 'POST', { name, type });
 
 export const updateCityLocationArea = (
   cityId: string,
   areaId: string,
-  updates: { name?: string; enabled?: boolean },
+  updates: { name?: string; enabled?: boolean; type?: LocationAreaType },
 ) =>
   mutateLocation(
     `/api/v1/locations/cities/${encodeURIComponent(cityId)}/areas/${encodeURIComponent(areaId)}`,
@@ -85,18 +88,18 @@ export const updateCityLocationArea = (
 export const deleteCityLocationArea = (cityId: string, areaId: string) =>
   mutateLocation(`/api/v1/locations/cities/${encodeURIComponent(cityId)}/areas/${encodeURIComponent(areaId)}`, 'DELETE');
 
-export const createLocationArea = (cityId: string, zoneId: string, name: string) =>
+export const createLocationArea = (cityId: string, zoneId: string, name: string, type: LocationAreaType) =>
   mutateLocation(
     `/api/v1/locations/cities/${encodeURIComponent(cityId)}/zones/${encodeURIComponent(zoneId)}/areas`,
     'POST',
-    { name },
+    { name, type },
   );
 
 export const updateLocationArea = (
   cityId: string,
   zoneId: string,
   areaId: string,
-  updates: { name?: string; enabled?: boolean },
+  updates: { name?: string; enabled?: boolean; type?: LocationAreaType },
 ) =>
   mutateLocation(
     `/api/v1/locations/cities/${encodeURIComponent(cityId)}/zones/${encodeURIComponent(zoneId)}/areas/${encodeURIComponent(areaId)}`,

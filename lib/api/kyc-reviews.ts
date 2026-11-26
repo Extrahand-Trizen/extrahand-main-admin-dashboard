@@ -105,6 +105,13 @@ export async function acceptKycReview(row: {
   );
 }
 
+export async function deleteKycReview(userId: string): Promise<ApiResponse<unknown>> {
+  return apiRequest<ApiResponse<unknown>>(
+    `/api/v1/kyc-reviews/${encodeURIComponent(userId)}`,
+    { method: "DELETE" },
+  );
+}
+
 export async function rejectKycReview(row: {
   userId: string;
   sessionId?: string;

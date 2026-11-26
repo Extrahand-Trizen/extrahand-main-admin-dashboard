@@ -569,6 +569,43 @@ export function AssignmentManagementPage() {
     </div>
   );
 
+  const renderCityAssignmentRow = () => {
+    if (!selectedCity) return null;
+    const cityRule = getAreaRule(selectedCity.name);
+    const partnerCount = getDisplayedAreaPartnerCount(selectedCity.name);
+    const search = areaSearch.trim().toLowerCase();
+    const citySearchMatches = !search ||
+      selectedCity.name.toLowerCase().includes(search) ||
+      selectedCityAreas.some((area) => area.name.toLowerCase().includes(search));
+    if (!citySearchMatches || !matchesPartnerAssignment(selectedCity.name)) return null;
+
+    return (
+      <>
+        <tr className="border-b bg-amber-50/60">
+          <td className="px-3 py-3 font-medium">
+            Entire city
+          </td>
+          <td className="px-3 py-3">{partnerCount || "—"}</td>
+          <td className="px-3 py-2 text-right">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => openAreaEditor(cityRule, selectedCity.name)}
+            >
+              <Plus className="mr-1 h-3 w-3" />
+              {partnerCount ? "Edit" : "Add Partners"}
+            </Button>
+          </td>
+        </tr>
+        {areaEditorOpen && normalizeArea(areaName) === normalizeArea(selectedCity.name) && (
+          <tr>
+            <td colSpan={3} className="border-b p-0">{renderAreaPartnerEditor()}</td>
+          </tr>
+        )}
+      </>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -670,7 +707,7 @@ export function AssignmentManagementPage() {
                   <div className="flex items-center justify-between"><h3 className="font-semibold text-gray-900">Areas in {selectedCity.name}</h3><span className="text-xs text-gray-500">{visibleCityAreas.length} shown</span></div>
                   <div className="overflow-x-auto rounded-lg border">
                     <table className="w-full min-w-[480px] text-left text-sm"><thead className="border-b bg-gray-50 text-xs uppercase text-gray-500"><tr><th className="px-3 py-2">Area</th><th className="px-3 py-2">Partners</th><th className="px-3 py-2 text-right">Actions</th></tr></thead>
-                      <tbody>{(selectedCity.areas || []).filter((area) => areaMatchesFilters(area, selectedCity.name)).map((area) => {
+                      <tbody>{renderCityAssignmentRow()}{(selectedCity.areas || []).filter((area) => areaMatchesFilters(area, selectedCity.name)).map((area) => {
                         const rule = getAreaRule(area.name);
                         const partnerCount = getDisplayedAreaPartnerCount(area.name);
                         return <Fragment key={area.id}><tr className="border-b"><td className="px-3 py-3 font-medium">{area.name}{area.enabled === false && <Badge className="ml-2" variant="secondary">Disabled</Badge>}</td><td className="px-3 py-3">{partnerCount || "—"}</td><td className="px-3 py-2 text-right"><Button size="sm" variant="outline" onClick={() => openAreaEditor(rule, area.name)}><Plus className="mr-1 h-3 w-3" />{partnerCount ? "Edit" : "Add Partners"}</Button></td></tr>{areaEditorOpen && normalizeArea(areaName) === normalizeArea(area.name) && <tr><td colSpan={3} className="border-b p-0">{renderAreaPartnerEditor()}</td></tr>}</Fragment>;
@@ -679,6 +716,13 @@ export function AssignmentManagementPage() {
                   </div>
                   {(selectedCity.areas || []).filter((area) => areaMatchesFilters(area, selectedCity.name)).length === 0 && <p className="py-8 text-center text-sm text-gray-500">No areas match the selected filters.</p>}
                 </div> : <div className="space-y-3">
+                  <div className="flex items-center justify-between"><h3 className="font-semibold text-gray-900">Areas in {selectedCity.name}</h3><span className="text-xs text-gray-500">{visibleCityAreas.length} shown</span></div>
+                  <div className="overflow-x-auto rounded-lg border">
+                    <table className="w-full min-w-[480px] text-left text-sm">
+                      <thead className="border-b bg-gray-50 text-xs uppercase text-gray-500"><tr><th className="px-3 py-2">Area</th><th className="px-3 py-2">Partners</th><th className="px-3 py-2 text-right">Actions</th></tr></thead>
+                      <tbody>{renderCityAssignmentRow()}</tbody>
+                    </table>
+                  </div>
                   {visibleZones.map((zone, zoneIndex) => {
                     const zoneAreas = (zone.areas || []).filter((area) => areaMatchesFilters(area, zone.name));
                     const isExpanded = expandedZoneIds === null ? zoneIndex === 0 : expandedZoneIds.includes(zone.id);

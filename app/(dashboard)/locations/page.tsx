@@ -22,6 +22,7 @@ import {
   deleteLocationZone,
   getLocationCatalog,
   ManagedLocation,
+  LocationAreaType,
   updateCityLocationArea,
   updateLocationArea,
   updateLocationCity,
@@ -44,6 +45,15 @@ function Status({ enabled }: { enabled: boolean }) {
   );
 }
 
+function LocationTypeBadge({ type }: { type?: LocationAreaType }) {
+  const isTown = type === 'town';
+  return (
+    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${isTown ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>
+      {isTown ? 'Town' : 'Area'}
+    </span>
+  );
+}
+
 function LocationEditor({
   editor,
   saving,
@@ -53,9 +63,10 @@ function LocationEditor({
   editor: Exclude<EditorState, null>;
   saving: boolean;
   onClose: () => void;
-  onSave: (name: string) => void;
+  onSave: (name: string, areaType: LocationAreaType) => void;
 }) {
   const [name, setName] = useState(editor.location?.name || '');
+  const [areaType, setAreaType] = useState<LocationAreaType>(editor.location?.type || 'area');
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-gray-950/40 p-4" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -66,7 +77,7 @@ function LocationEditor({
         className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-5 shadow-xl"
         onSubmit={(event) => {
           event.preventDefault();
-          onSave(name.trim());
+          onSave(name.trim(), areaType);
         }}
       >
         <div className="mb-5 flex items-center justify-between">
@@ -87,6 +98,36 @@ function LocationEditor({
           className="h-10 w-full rounded-md border border-gray-300 px-3 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
           placeholder={`${levelLabels[editor.level]} name`}
         />
+        {editor.level === 'area' && (
+          <fieldset className="mt-4">
+            <legend className="mb-1.5 block text-sm font-medium text-gray-700">Type</legend>
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              {([
+                ['town', 'Nearby town'],
+                ['area', 'Area'],
+              ] as const).map(([value, label]) => (
+                <label
+                  key={value}
+                  className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors focus-within:ring-2 focus-within:ring-amber-200 ${
+                    areaType === value
+                      ? 'border-amber-400 bg-amber-50 font-medium text-amber-900'
+                      : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="area-type"
+                    value={value}
+                    checked={areaType === value}
+                    onChange={() => setAreaType(value)}
+                    className="h-4 w-4 accent-amber-500"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        )}
         <div className="mt-5 flex justify-end gap-2">
           <button type="button" onClick={onClose} className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
           <button type="submit" disabled={!name.trim() || saving} className="rounded-md bg-amber-500 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50">
@@ -198,7 +239,7 @@ export default function LocationManagementPage() {
     }
   };
 
-  const saveEditor = (name: string) => {
+  const saveEditor = (name: string, areaType: LocationAreaType) => {
     if (!editor) return;
     const { level, location } = editor;
     if (level === 'city') {
@@ -208,12 +249,12 @@ export default function LocationManagementPage() {
     } else if (level === 'area' && city) {
       if (zone) {
         void perform(() => location
-          ? updateLocationArea(city.id, zone.id, location.id, { name })
-          : createLocationArea(city.id, zone.id, name));
+          ? updateLocationArea(city.id, zone.id, location.id, { name, type: areaType })
+          : createLocationArea(city.id, zone.id, name, areaType));
       } else {
         void perform(() => location
-          ? updateCityLocationArea(city.id, location.id, { name })
-          : createCityLocationArea(city.id, name));
+          ? updateCityLocationArea(city.id, location.id, { name, type: areaType })
+          : createCityLocationArea(city.id, name, areaType));
       }
     }
   };
@@ -287,20 +328,20 @@ export default function LocationManagementPage() {
           </div>
         </section>
 
-        <section className="border-b border-gray-200 md:border-b-0 md:border-r" aria-label={showingCityAreas ? 'Areas' : 'Zones'}>
+        <section className="border-b border-gray-200 md:border-b-0 md:border-r" aria-label={showingCityAreas ? 'Nearby towns or areas' : 'Zones'}>
           <div className="flex h-14 items-center justify-between border-b border-gray-100 px-4">
-            <div><h2 className="text-sm font-semibold text-gray-900">{showingCityAreas ? 'Areas' : 'Zones'}</h2><p className="truncate text-xs text-gray-500">{showingCityAreas ? `${city?.name} · Areas in this city` : city?.name || 'Choose a city'}</p></div>
+            <div><h2 className="text-sm font-semibold text-gray-900">{showingCityAreas ? 'Nearby towns or areas' : 'Zones'}</h2><p className="truncate text-xs text-gray-500">{showingCityAreas ? `${city?.name} · Nearby towns or areas` : city?.name || 'Choose a city'}</p></div>
             {canManageLocations && <button type="button" disabled={!city} onClick={() => openEditor(showingCityAreas ? 'area' : 'zone')} title={showingCityAreas ? 'Add area' : 'Add zone'} aria-label={showingCityAreas ? 'Add area' : 'Add zone'} className="rounded-md p-1.5 text-gray-500 hover:bg-amber-50 hover:text-amber-700 disabled:opacity-40"><Plus className="h-4 w-4" /></button>}
           </div>
           <div className="max-h-[520px] overflow-y-auto p-2">
             {showingCityAreas ? city?.areas?.map((entry) => (
               <div key={entry.id} className="flex items-center justify-between gap-2 rounded-md px-2.5 py-2 hover:bg-gray-50">
-                <div className="min-w-0"><p className="truncate text-sm font-medium text-gray-800">{entry.name}</p><Status enabled={entry.enabled !== false} /></div>
+                <div className="min-w-0"><div className="flex items-center gap-2"><p className="truncate text-sm font-medium text-gray-800">{entry.name}</p><LocationTypeBadge type={entry.type} /></div><Status enabled={entry.enabled !== false} /></div>
                 <RowActions location={{ ...entry, enabled: entry.enabled !== false }} canEdit={canManageLocations} onEdit={() => openEditor('area', entry)} onToggle={() => toggle('area', entry)} onDelete={() => remove('area', entry)} />
               </div>
             )) : city?.zones?.map((entry) => (
               <div key={entry.id} onClick={() => setSelectedZoneId(entry.id)} className={`flex cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-2 ${entry.id === zone?.id ? 'bg-amber-50 ring-1 ring-amber-200' : 'hover:bg-gray-50'}`}>
-                <div className="min-w-0"><p className="truncate text-sm font-medium text-gray-800">{entry.name}</p><Status enabled={entry.enabled !== false} /></div>
+                <div className="min-w-0"><div className="flex items-center gap-2"><p className="truncate text-sm font-medium text-gray-800">{entry.name}</p><LocationTypeBadge type={entry.type} /></div><Status enabled={entry.enabled !== false} /></div>
                 <RowActions location={{ ...entry, enabled: entry.enabled !== false }} canEdit={canManageLocations} onEdit={() => openEditor('zone', entry)} onToggle={() => toggle('zone', entry)} onDelete={() => remove('zone', entry)} />
               </div>
             ))}
@@ -310,15 +351,15 @@ export default function LocationManagementPage() {
           </div>
         </section>
 
-        {!showingCityAreas && <section aria-label="Areas">
+        {!showingCityAreas && <section aria-label="Nearby towns or areas">
           <div className="flex h-14 items-center justify-between border-b border-gray-100 px-4">
-            <div><h2 className="text-sm font-semibold text-gray-900">Areas</h2><p className="truncate text-xs text-gray-500">{zone?.name || (city ? `${city.name} · Areas in this city` : 'Choose a city')}</p></div>
+            <div><h2 className="text-sm font-semibold text-gray-900">Nearby towns or areas</h2><p className="truncate text-xs text-gray-500">{zone?.name || (city ? `${city.name} · Nearby towns or areas` : 'Choose a city')}</p></div>
             {canManageLocations && <button type="button" disabled={!city} onClick={() => openEditor('area')} title="Add area" aria-label="Add area" className="rounded-md p-1.5 text-gray-500 hover:bg-amber-50 hover:text-amber-700 disabled:opacity-40"><Plus className="h-4 w-4" /></button>}
           </div>
           <div className="max-h-[520px] overflow-y-auto p-2">
             {(zone?.areas ?? city?.areas)?.map((entry) => (
               <div key={entry.id} className="flex items-center justify-between gap-2 rounded-md px-2.5 py-2 hover:bg-gray-50">
-                <div className="min-w-0"><p className="truncate text-sm font-medium text-gray-800">{entry.name}</p><Status enabled={entry.enabled !== false} /></div>
+                <div className="min-w-0"><div className="flex items-center gap-2"><p className="truncate text-sm font-medium text-gray-800">{entry.name}</p><span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-gray-600">{entry.type === 'town' ? 'Town' : 'Area'}</span></div><Status enabled={entry.enabled !== false} /></div>
                 <RowActions location={{ ...entry, enabled: entry.enabled !== false }} canEdit={canManageLocations} onEdit={() => openEditor('area', entry)} onToggle={() => toggle('area', entry)} onDelete={() => remove('area', entry)} />
               </div>
             ))}

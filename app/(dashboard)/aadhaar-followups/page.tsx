@@ -709,7 +709,7 @@ export default function AadhaarFollowUpsPage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Aadhaar Follow-ups</h1>
         <p className="mt-2 text-sm text-gray-600">
-          Helpers and partners registered but Aadhaar not verified. Operations admins see only their assigned users; super admins see all follow-up cases.
+          Partners registered but Aadhaar not verified. Operations admins see only their assigned users; super admins see all follow-up cases.
         </p>
       </div>
 
