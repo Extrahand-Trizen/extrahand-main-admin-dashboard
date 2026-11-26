@@ -133,7 +133,7 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
     pathname?.startsWith('/users')
   );
   const [servicesConfigSectionOpen, setServicesConfigSectionOpen] = useState(
-    ['/services', '/partner-categories', '/book-now-availability', '/category-minimums', '/location-pricing', '/hourly-helper-availability', '/banners', '/coupons', '/fee-settings']
+    ['/services', '/book-now-availability', '/category-minimums', '/location-pricing', '/hourly-helper-availability', '/banners', '/coupons', '/fee-settings']
       .some((path) => pathname === path || pathname?.startsWith(`${path}/`)),
   );
   const [priceSettingsOpen, setPriceSettingsOpen] = useState(
@@ -485,7 +485,7 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
                         aria-expanded={servicesConfigSectionOpen}
                         className={cn(
                           'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
-                          ['/services', '/partner-categories', '/book-now-availability', '/category-minimums', '/location-pricing', '/hourly-helper-availability', '/banners', '/coupons', '/fee-settings']
+                          ['/services', '/book-now-availability', '/category-minimums', '/location-pricing', '/hourly-helper-availability', '/banners', '/coupons', '/fee-settings']
                             .some((path) => pathname === path || pathname?.startsWith(`${path}/`))
                             ? 'bg-yellow-50 text-yellow-700'
                             : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600',
@@ -515,20 +515,6 @@ export function Sidebar({ isMobileOpen = false, onClose }: SidebarProps) {
                               )}
                             >
                               Service Management
-                            </Link>
-                          )}
-                          {(isSuperAdmin || isOperationsAdminRole) && (
-                            <Link
-                              href="/partner-categories"
-                              onClick={handleLinkClick}
-                              className={cn(
-                                'block rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                                pathname === '/partner-categories' || pathname?.startsWith('/partner-categories/')
-                                  ? 'bg-yellow-50 text-yellow-700'
-                                  : 'text-gray-600 hover:bg-yellow-50/50 hover:text-yellow-600',
-                              )}
-                            >
-                              Partner Categories
                             </Link>
                           )}
                           {isOperationsAdminRole && !isSuperAdmin && (
