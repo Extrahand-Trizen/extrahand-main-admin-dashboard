@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronLeft, ChevronRight, Clock3, Search, X } from 'lucide-react';
@@ -24,6 +24,7 @@ import {
 import { usePermissions } from '@/lib/hooks/usePermissions';
 import { formatDateTime } from '@/lib/utils';
 import { toast } from 'sonner';
+import { listPartnerCategories } from '@/lib/api/partner-categories';
 import {
   getPartnerCategoryLabel,
   PARTNER_CATEGORY_SKILLS,
@@ -64,6 +65,33 @@ export default function PartnerCategoryRequestsPage() {
     status: Exclude<PartnerCategoryRequestStatus, 'pending'>;
   } | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
+
+  const categoryCatalogQuery = useQuery({
+    queryKey: ['partner-category-catalog', 'all'],
+    queryFn: () => listPartnerCategories(true),
+    enabled: hasPermission('user.list'),
+    retry: false,
+  });
+  const categoryById = useMemo(
+    () => new Map((categoryCatalogQuery.data ?? []).map((category) => [category.id, category])),
+    [categoryCatalogQuery.data],
+  );
+  const getCategoryLabel = (categoryId: string) =>
+    categoryById.get(categoryId)?.label ?? getPartnerCategoryLabel(categoryId);
+  const getSkillName = (categoryId: string, skillId: string) =>
+    categoryById.get(categoryId)?.skills.find((skill) => skill.id === skillId)?.label ??
+    PARTNER_CATEGORY_SKILLS[categoryId]?.[skillId] ??
+    skillId;
+
+  useEffect(() => {
+    if (categoryCatalogQuery.error) {
+      toast.error(
+        categoryCatalogQuery.error instanceof Error
+          ? categoryCatalogQuery.error.message
+          : 'Failed to load partner category catalog',
+      );
+    }
+  }, [categoryCatalogQuery.error]);
 
   const requestsQuery = useQuery({
     queryKey: [
@@ -319,13 +347,13 @@ export default function PartnerCategoryRequestsPage() {
                         </TableCell>
                         <TableCell className="break-words px-2">
                           {request.currentCategories?.length
-                            ? request.currentCategories.map(getPartnerCategoryLabel).join(', ')
+                            ? request.currentCategories.map(getCategoryLabel).join(', ')
                             : '—'}
                         </TableCell>
                         <TableCell className="break-words px-2">
                           <p className="font-medium">
                             {request.requestedCategory
-                              ? getPartnerCategoryLabel(request.requestedCategory)
+                              ? getCategoryLabel(request.requestedCategory)
                               : '—'}
                           </p>
                           {request.requestedSkills?.length ? (
@@ -334,8 +362,7 @@ export default function PartnerCategoryRequestsPage() {
                               {request.requestedSkills
                                 .map(
                                   (skillId) =>
-                                    PARTNER_CATEGORY_SKILLS[request.requestedCategory]?.[skillId] ??
-                                    skillId,
+                                    getSkillName(request.requestedCategory, skillId),
                                 )
                                 .join(', ')}
                             </p>
@@ -428,7 +455,7 @@ export default function PartnerCategoryRequestsPage() {
             <DialogDescription>
               {reviewing?.request.partnerName || reviewing?.request.name} requested to add{' '}
               {reviewing
-                ? getPartnerCategoryLabel(reviewing.request.requestedCategory)
+                ? getCategoryLabel(reviewing.request.requestedCategory)
                 : 'this category'}.
               {reviewing?.status === 'approved'
                 ? ' Approving will add this category and the partner’s selected skills to their profile.'
@@ -444,7 +471,7 @@ export default function PartnerCategoryRequestsPage() {
               <ul className="grid gap-1 text-sm text-gray-600 sm:grid-cols-2">
                 {reviewing.request.requestedSkills.map((skillId) => (
                   <li key={skillId}>
-                    • {PARTNER_CATEGORY_SKILLS[reviewing.request.requestedCategory]?.[skillId] ?? skillId}
+                    • {getSkillName(reviewing.request.requestedCategory, skillId)}
                   </li>
                 ))}
               </ul>

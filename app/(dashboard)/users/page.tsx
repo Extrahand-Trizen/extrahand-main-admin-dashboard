@@ -63,7 +63,7 @@ import {
 import { getLocationAreas, getLocationCatalog } from "@/lib/api/locations";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { formatDate } from "@/lib/utils";
-import { CATEGORY_OPTIONS } from "@/lib/category-options";
+import { usePartnerCategoryOptions } from "@/lib/hooks/usePartnerCategoryOptions";
 import { toast } from "sonner";
 import { User, UserFilters } from "@/types";
 import Link from "next/link";
@@ -310,6 +310,7 @@ export default function UsersPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { hasPermission } = usePermissions();
+  const { options: categoryOptions } = usePartnerCategoryOptions();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -965,7 +966,7 @@ export default function UsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {CATEGORY_OPTIONS.map((category) => (
+                  {categoryOptions.map((category) => (
                     <SelectItem key={category.value} value={category.value}>
                       {category.label}
                     </SelectItem>

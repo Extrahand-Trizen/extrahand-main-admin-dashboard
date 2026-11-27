@@ -13,6 +13,8 @@ export const PARTNER_CATEGORY_LABELS: Record<string, string> = {
   laundry: 'Laundry',
   car_wash: 'Car Wash',
   'daily-labour': 'Daily Labour',
+  home_services: 'Home Services',
+  event_services: 'Event Services',
 };
 
 export const PARTNER_APP_CATEGORY_IDS = [
@@ -30,6 +32,11 @@ export const PARTNER_APP_CATEGORY_IDS = [
   'laundry',
   'car_wash',
   'daily-labour',
+] as const;
+
+export const FILTER_ONLY_PARTNER_CATEGORY_IDS = [
+  'home_services',
+  'event_services',
 ] as const;
 
 export const PARTNER_CATEGORY_SKILLS: Record<string, Record<string, string>> = {
@@ -129,6 +136,12 @@ export const PARTNER_CATEGORY_SKILLS: Record<string, Record<string, string>> = {
     digging_earthwork: 'Digging & Earthwork',
     shifting_moving: 'Shifting & Moving',
     general_manual_labour: 'General Manual Labour',
+  },
+  home_services: {
+    general_home_services: 'General Home Services',
+  },
+  event_services: {
+    general_event_services: 'General Event Services',
   },
 };
 

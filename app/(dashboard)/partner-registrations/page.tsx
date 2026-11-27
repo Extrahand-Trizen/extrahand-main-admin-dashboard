@@ -38,6 +38,7 @@ import Link from "next/link";
 import { TableSkeleton } from "@/components/LoadingSkeleton";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { toast } from "sonner";
+import { usePartnerCategoryOptions } from "@/lib/hooks/usePartnerCategoryOptions";
 
 const statusColors: Record<string, string> = {
   approved: "success",
@@ -54,16 +55,6 @@ const PARTNER_STATUS_OPTIONS = [
   { value: "draft", label: "Draft" },
   { value: "rejected", label: "Rejected" },
   { value: "suspended", label: "Suspended" },
-];
-
-const PARTNER_CATEGORY_OPTIONS = [
-  { value: "cleaning_related", label: "Cleaning & Related Services" },
-  { value: "plumbing", label: "Plumbing" },
-  { value: "Home Services", label: "Home Services" },
-  { value: "Delivery & Logistics", label: "Delivery & Logistics" },
-  { value: "Driving", label: "Driving" },
-  { value: "Professional Services", label: "Professional Services" },
-  { value: "Care Services", label: "Care Services" },
 ];
 
 const getStatusLabel = (status?: string) => {
@@ -130,6 +121,7 @@ const getPartnerWorkAreaLabels = (user: User) => {
 
 export default function PartnerRegistrationsPage() {
   const router = useRouter();
+  const { options: categoryOptions } = usePartnerCategoryOptions();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -379,7 +371,7 @@ export default function PartnerRegistrationsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {PARTNER_CATEGORY_OPTIONS.map((category) => (
+                  {categoryOptions.map((category) => (
                     <SelectItem key={category.value} value={category.value}>
                       {category.label}
                     </SelectItem>

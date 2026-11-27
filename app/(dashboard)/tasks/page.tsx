@@ -56,7 +56,7 @@ import { listTasks, deleteTask, requestTaskDelete } from "@/lib/api/tasks";
 import { getRoundRobinTeamSettings } from "@/lib/api/admin";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { formatDate, formatCurrency, isTaskOverdue } from "@/lib/utils";
-import { CATEGORY_OPTIONS } from "@/lib/category-options";
+import { usePartnerCategoryOptions } from "@/lib/hooks/usePartnerCategoryOptions";
 import { toast } from "sonner";
 import { ApiResponse, Task } from "@/types";
 import Link from "next/link";
@@ -141,6 +141,7 @@ export default function TasksPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { hasPermission, isSuperAdmin } = usePermissions();
+  const { options: categoryOptions } = usePartnerCategoryOptions();
 
   const cacheTaskDetails = (task: Task, taskId: string) => {
     const queryKey = ["task", taskId] as const;
@@ -651,7 +652,7 @@ export default function TasksPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {CATEGORY_OPTIONS.map((category) => (
+                  {categoryOptions.map((category) => (
                     <SelectItem key={category.value} value={category.value}>
                       {category.label}
                     </SelectItem>
