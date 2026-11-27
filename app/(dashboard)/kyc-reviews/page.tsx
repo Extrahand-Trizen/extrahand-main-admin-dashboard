@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Eye, ExternalLink, ImageIcon, Search, XCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Trash2 } from "lucide-react";
+import { Check, Eye, ExternalLink, ImageIcon, Search, XCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,16 +17,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -57,7 +47,6 @@ import {
   rejectKycReview,
   claimKycReview,
   getKycReviewDocuments,
-  deleteKycReview,
 } from "@/lib/api/kyc-reviews";
 
 const reviewStatusLabels: Record<KycReviewStatus | "failed", string> = {
@@ -442,7 +431,6 @@ export default function KycReviewsPage() {
   const [page, setPage] = useState<number>(savedFilters?.page ?? 1);
   const [limit, setLimit] = useState<number>(savedFilters?.limit ?? 20);
   const [selectedRow, setSelectedRow] = useState<KycReviewRow | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<KycReviewRow | null>(null);
 
   const allowed = isAllReviewsRole(user?.role, isSuperAdmin) || isOperationsRole(user?.role);
 
@@ -494,16 +482,6 @@ export default function KycReviewsPage() {
 
   const rows = useMemo(() => data?.data || [], [data]);
   const pagination = data?.pagination || { page: 1, limit: 20, total: 0, pages: 1 };
-
-  const deleteMutation = useMutation({
-    mutationFn: (row: KycReviewRow) => deleteKycReview(row.userId),
-    onSuccess: () => {
-      toast.success("KYC review and Aadhaar photos deleted");
-      setDeleteTarget(null);
-      queryClient.invalidateQueries({ queryKey: ["kyc-reviews"] });
-    },
-    onError: (error: Error) => toast.error(error.message || "Failed to delete KYC review"),
-  });
 
   useEffect(() => {
     if (!reviewUserId || isLoading || rows.length === 0) return;
@@ -704,18 +682,6 @@ export default function KycReviewsPage() {
                                 <Eye className="mr-2 h-4 w-4" />
                                 Review
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                disabled={deleteMutation.isPending}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeleteTarget(row);
-                                }}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                              </Button>
                             </div>
                           ) : !row.claimedBy ? (
                             isOperationsRole(user?.role) ? (
@@ -842,37 +808,6 @@ export default function KycReviewsPage() {
           if (!open) setSelectedRow(null);
         }}
       />
-      <AlertDialog
-        open={Boolean(deleteTarget)}
-        onOpenChange={(open) => {
-          if (!open && !deleteMutation.isPending) setDeleteTarget(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this KYC review permanently?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This deletes all Aadhaar verification records and photos in the KYC vault for{" "}
-              <span className="font-medium text-gray-900">
-                {deleteTarget?.userName || deleteTarget?.userPhone || "this user"}
-              </span>
-              , resets their Aadhaar verification status, and removes their KYC review history. The user account will remain. This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={deleteMutation.isPending}
-              onClick={(event) => {
-                event.preventDefault();
-                if (deleteTarget) deleteMutation.mutate(deleteTarget);
-              }}
-            >
-              {deleteMutation.isPending ? "Deleting..." : "Delete permanently"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
